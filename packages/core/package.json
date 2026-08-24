@@ -1,0 +1,64 @@
+{
+  "name": "@nexgrid/core",
+  "version": "0.1.0",
+  "description": "Framework-agnostic engine for NexGrid: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
+  "license": "MIT",
+  "author": "NexGrid contributors",
+  "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChhaganSinha/NexGrid.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/ChhaganSinha/NexGrid/issues"
+  },
+  "keywords": [
+    "datagrid",
+    "data-grid",
+    "table",
+    "server-side",
+    "pagination",
+    "sorting",
+    "export",
+    "csv",
+    "excel"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./styles.css": "./styles/nexgrid.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "styles",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "npm run build && node --test \"test/**/*.test.mjs\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

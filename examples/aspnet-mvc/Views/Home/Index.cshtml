@@ -1,0 +1,110 @@
+@{
+    ViewData["Title"] = "Students";
+    var statuses = (IReadOnlyList<string>)(ViewData["Statuses"] ?? Array.Empty<string>());
+}
+
+<h1>NexGrid — ASP.NET Core MVC</h1>
+
+<p class="intro">
+    200 students served by <code>/api/students</code>, which binds
+    <code>NexGridQuery</code> off the query string and answers with a
+    <code>PagedResponse</code> through <code>ToPagedResponse</code>. The grid
+    fetches its own data, manages its loading and error states, and re-fetches on
+    every query change. There is no JavaScript in this view except the optional
+    filter wiring at the bottom.
+</p>
+
+@*
+    The whole integration.
+
+    `endpoint` puts the grid in endpoint mode: it fetches
+    buildQueryUrl(endpoint, query) itself, expects a PagedResponse JSON body,
+    and owns its loading / error / retry states. Drop the attribute and another
+    script drives it instead through element.nexgrid.update({ ... }).
+
+    `field` must match the JSON property name the endpoint returns — camelCase
+    under ASP.NET Core's default policy, so `enrolledAt`, not `EnrolledAt`.
+
+    `sort="enrolledAt:desc"` only works because the controller registered
+    `.Sortable(s => s.EnrolledAt)`; an unregistered field is silently ignored,
+    by design.
+*@
+<nex-grid id="students-grid"
+          caption="Students"
+          endpoint="/api/students"
+          export-file-name="students"
+          search-placeholder="Search name, email or department…"
+          enable-selection="true"
+          page-size="25"
+          sort="enrolledAt:desc">
+    <nex-grid-column field="name" header="Student" min-width="200" />
+    <nex-grid-column field="email" header="Email" min-width="220" />
+    <nex-grid-column field="department" header="Department" min-width="160"
+                     filterable="true"
+                     filter-options="Computer Science,Mechanical,Electrical,Mathematics,Physics,Economics" />
+    <nex-grid-column field="status" header="Status" align="Center" width="130"
+                     filterable="true"
+                     filter-options="Active,Pending,Suspended,Alumni" />
+    <nex-grid-column field="score" header="Score" align="Right" width="90" />
+    <nex-grid-column field="enrolledAt" header="Enrolled" width="140" />
+    <nex-grid-column field="scholarship" header="Scholarship" align="Center" width="120" />
+</nex-grid>
+
+<section class="panel">
+    <h2>Column filters</h2>
+    <p>
+        The grid renders no filter UI of its own — a column filter is just another
+        part of the <code>QueryState</code>. This select drives the same grid
+        through the handle the Tag Helper leaves on the container element, and the
+        server honours it only because the controller allowlisted
+        <code>.Filterable("status", s =&gt; s.Status)</code>.
+    </p>
+
+    <label>
+        Status:
+        <select id="status-filter" class="nxg-rows-select">
+            <option value="">All statuses</option>
+            @foreach (var status in statuses)
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+    </label>
+</section>
+
+@section Scripts {
+    <script>
+        // The Tag Helper leaves the handle on the container as `element.nexgrid`,
+        // so any script can call update() / refresh() / getQuery() / getSelection().
+        //
+        // This listener is registered after the one the Tag Helper emitted (its
+        // script tag comes earlier in the document), so by the time this runs the
+        // grid exists.
+        (function () {
+            function wire() {
+                var host = document.getElementById("students-grid");
+                var select = document.getElementById("status-filter");
+                if (!host || !select || !host.nexgrid) return;
+
+                select.addEventListener("change", function () {
+                    var grid = host.nexgrid;
+                    // Always mutate a QueryState through a reducer: withFilter
+                    // clears the key when the value is empty and resets to page 1
+                    // either way. In endpoint mode, update({ query }) refetches.
+                    var next = NexGrid.withFilter(
+                        grid.getQuery(),
+                        "status",
+                        select.value === "" ? undefined : select.value
+                    );
+                    grid.update({ query: next });
+                });
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", wire);
+            } else {
+                wire();
+            }
+        })();
+    </script>
+}

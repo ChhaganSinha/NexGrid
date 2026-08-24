@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NexGrid — vanilla HTML example</title>
+
+    <!--
+      The shared stylesheet. Identical to the one the React and Angular
+      adapters use, which is why every adapter renders the same grid.
+    -->
+    <link rel="stylesheet" href="../../packages/vanilla/dist/nexgrid.css" />
+
+    <style>
+      /* Page chrome, plus the three classes the custom cell renderers use.
+         The grid itself is re-skinned by overriding its CSS custom properties
+         (--nxg-primary, --nxg-radius, …), never by fighting its classes. */
+      :root {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: #f6f7f9;
+        color: #16181d;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 26px;
+      }
+
+      .intro {
+        margin: 0 0 24px;
+        max-width: 70ch;
+        color: #5b6270;
+        line-height: 1.55;
+      }
+
+      .page-foot {
+        margin-top: 24px;
+        font-size: 13px;
+        color: #5b6270;
+      }
+
+      .page-foot code {
+        overflow-wrap: anywhere;
+      }
+
+      .cell-stack {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.35;
+      }
+
+      .cell-stack small {
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #e5e7eb;
+        color: #374151;
+      }
+
+      .badge--active {
+        background: #dcfce7;
+        color: #15803d;
+      }
+
+      .badge--pending {
+        background: #fef3c7;
+        color: #b45309;
+      }
+
+      .badge--suspended {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+
+      .badge--alumni {
+        background: #e0e7ff;
+        color: #4338ca;
+      }
+
+      .row-actions {
+        display: inline-flex;
+        gap: 6px;
+      }
+
+      .toolbar-extra {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="page">
+      <h1>NexGrid — vanilla HTML</h1>
+      <p class="intro">
+        One file, no build step, no framework. 200 students held in an inline array and served
+        through a function that answers a <code>QueryState</code> exactly the way an HTTP endpoint
+        would: search, sort, column filter, paging, with simulated latency.
+      </p>
+
+      <!-- The grid mounts in here. It stays empty until createNexGrid runs. -->
+      <div id="grid"></div>
+
+      <footer class="page-foot">
+        <p>Query: <code id="wire">—</code></p>
+        <p>Selected ids: <code id="selection">none</code></p>
+        <p id="notice" role="status"></p>
+      </footer>
+    </main>
+
+    <!--
+      The browser bundle. It inlines @nexgrid/core and exposes everything on a
+      global called `NexGrid` — createNexGrid, the query reducers, the DOM
+      helpers, the icon set. A classic script, so it works from file:// too.
+    -->
+    <script src="../../packages/vanilla/dist/nexgrid.global.js"></script>
+
+    <script>
+      (function () {
+        "use strict";
+
+        if (!window.NexGrid) {
+          document.getElementById("grid").textContent =
+            "nexgrid.global.js did not load. Run `npm run build:vanilla` at the repository root.";
+          return;
+        }
+
+        // =====================================================================
+        // 1. The dataset — 200 rows, generated deterministically so every
+        //    reload shows the same data.
+        // =====================================================================
+
+        var STATUSES = ["Active", "Pending", "Suspended", "Alumni"];
+        var DEPARTMENTS = [
+          "Computer Science",
+          "Mechanical",
+          "Electrical",
+          "Mathematics",
+          "Physics",
+          "Economics",
+        ];
+
+        var FIRST_NAMES = [
+          "Aditi", "Rahul", "Meera", "Jonas", "Priya", "Chen", "Sofia", "Omar",
+          "Elena", "Tomas", "Nadia", "Hiroshi", "Grace", "Malik", "Ingrid",
+          "Yusuf", "Clara", "Diego", "Anika", "Peter",
+        ];
+
+        var LAST_NAMES = [
+          "Sharma", "Okafor", "Lindqvist", "Alvarez", "Tanaka", "Fitzgerald",
+          "Novak", "Haddad", "Kowalski", "Mbeki", "Rossi", "Andersen", "Duarte",
+          "Volkov",
+        ];
+
+        /** A sine hash: reproducible pseudo-randomness in [0, 1) with no state. */
+        function pseudoRandom(seed) {
+          var x = Math.sin(seed * 12.9898) * 43758.5453;
+          return x - Math.floor(x);
+        }
+
+        function buildStudents(count) {
+          var rows = [];
+          for (var i = 0; i < count; i++) {
+            var first = FIRST_NAMES[(i * 7 + 3) % FIRST_NAMES.length];
+            var last = LAST_NAMES[(i * 5 + 1) % LAST_NAMES.length];
+
+            var day = new Date(Date.UTC(2021, 0, 1));
+            day.setUTCDate(day.getUTCDate() + i * 7 + (i % 5));
+
+            rows.push({
+              id: 1000 + i,
+              name: first + " " + last,
+              email: (first + "." + last + i).toLowerCase() + "@example.edu",
+              department: DEPARTMENTS[(i * 5 + 2) % DEPARTMENTS.length],
+              status: STATUSES[Math.floor(pseudoRandom(i + 1) * STATUSES.length)],
+              score: Math.round(45 + pseudoRandom(i + 101) * 55),
+              enrolledAt: day.toISOString().slice(0, 10),
+              scholarship: pseudoRandom(i + 7) > 0.68,
+            });
+          }
+          return rows;
+        }
+
+        var STUDENTS = buildStudents(200);
+
+        // =====================================================================
+        // 2. The "endpoint" — answer a QueryState from that array.
+        //
+        //    The order is the part worth copying, and it is the same order
+        //    NexGrid.AspNetCore applies on the server:
+        //      search -> filter -> sort -> count -> page
+        //    `total` is the FILTERED count across every page. That is what
+        //    draws the pager; handing back items.length collapses the grid to
+        //    a single page.
+        //
+        //    Sorting and filtering are ALLOWLISTED. Column ids reach a real
+        //    endpoint through a public URL, so a server must never turn one
+        //    into a property lookup unchecked — the same discipline is worth
+        //    keeping here.
+        // =====================================================================
+
+        var SORTABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
+        var SEARCHABLE = ["name", "email", "department"];
+        var FILTERABLE = ["status", "department"];
+        var LATENCY_MS = 300;
+
+        function compare(a, b) {
+          if (typeof a === "number" && typeof b === "number") return a - b;
+          if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
+          return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+        }
+
+        function queryStudents(query) {
+          var matching = STUDENTS.slice();
+
+          // 1. Global search.
+          var term = (query.q || "").trim().toLowerCase();
+          if (term) {
+            matching = matching.filter(function (row) {
+              return SEARCHABLE.some(function (field) {
+                return String(row[field]).toLowerCase().indexOf(term) !== -1;
+              });
+            });
+          }
+
+          // 2. Column filters — filter[status]=Active — compared for equality.
+          var filter = query.filter || {};
+          Object.keys(filter).forEach(function (field) {
+            var value = filter[field];
+            if (!value || FILTERABLE.indexOf(field) === -1) return;
+            var wanted = String(value).toLowerCase();
+            matching = matching.filter(function (row) {
+              return String(row[field]).toLowerCase() === wanted;
+            });
+          });
+
+          // 3. Sort. Unknown fields are dropped.
+          var sorts = (query.sort || []).filter(function (spec) {
+            return SORTABLE.indexOf(spec.field) !== -1;
+          });
+          matching.sort(function (left, right) {
+            for (var i = 0; i < sorts.length; i++) {
+              var result = compare(left[sorts[i].field], right[sorts[i].field]);
+              if (result !== 0) return sorts[i].dir === "desc" ? -result : result;
+            }
+            // A stable tiebreaker, so paging never shows the same row twice.
+            return left.id - right.id;
+          });
+
+          // 4. Page, clamped so a stale page number shows the last page.
+          var total = matching.length;
+          var pageSize = query.pageSize;
+          var totalPages = Math.max(1, Math.ceil(total / pageSize));
+          var page = Math.min(Math.max(1, query.page), totalPages);
+          var start = (page - 1) * pageSize;
+
+          return {
+            items: matching.slice(start, start + pageSize),
+            page: page,
+            pageSize: pageSize,
+            total: total,
+            totalPages: totalPages,
+          };
+        }
+
+        // =====================================================================
+        // 3. Columns.
+        //
+        //    A `cell` renderer returns a string (written with textContent) or a
+        //    Node. Build nodes with NexGrid.el / svgEl / append — they only
+        //    ever write text, so a row value can never be parsed as markup.
+        //    Never assemble a cell from an HTML string.
+        //
+        //    Return a NEW node every call: the renderer runs once for the table
+        //    row and once for the mobile card, and handing back the same node
+        //    would move it out of one and into the other.
+        // =====================================================================
+
+        var el = NexGrid.el;
+        var dateFormat = new Intl.DateTimeFormat(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        });
+
+        var columns = [
+          {
+            accessorKey: "name",
+            header: "Student",
+            meta: { minWidth: 200 },
+            cell: function (ctx) {
+              var row = ctx.row.original;
+              return el("div", { class: "cell-stack" }, [
+                el("strong", { text: row.name }),
+                el("small", { text: row.email }),
+              ]);
+            },
+          },
+          // Starts hidden; still listed in the Columns menu, and exported once
+          // the user switches it on.
+          { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220 } },
+          { accessorKey: "department", header: "Department", meta: { minWidth: 160 } },
+          {
+            accessorKey: "status",
+            header: "Status",
+            meta: {
+              align: "center",
+              width: 130,
+              serverFilterable: true,
+              filterOptions: STATUSES,
+            },
+            // Presentation only — exports still write "Active", not the badge.
+            cell: function (ctx) {
+              var status = String(ctx.getValue());
+              return el("span", {
+                class: "badge badge--" + status.toLowerCase(),
+                text: status,
+              });
+            },
+          },
+          { accessorKey: "score", header: "Score", meta: { align: "right", width: 90 } },
+          {
+            accessorKey: "enrolledAt",
+            header: "Enrolled",
+            meta: { width: 140 },
+            // Sorting happens against the raw ISO value, so the display format
+            // is free to be whatever reads best.
+            cell: function (ctx) {
+              var raw = String(ctx.getValue());
+              return el("time", {
+                text: dateFormat.format(new Date(raw + "T00:00:00Z")),
+                attrs: { datetime: raw, title: raw },
+              });
+            },
+          },
+          // No cell: booleans fall back to the locale's yes/no labels.
+          { accessorKey: "scholarship", header: "Scholarship", meta: { align: "center", width: 120 } },
+          {
+            // `actions` is a structural id: never sorted, never exported, never
+            // listed in the Columns menu.
+            id: "actions",
+            header: "",
+            meta: { align: "right", width: 90 },
+            cell: function (ctx) {
+              var button = el("button", { class: "nxg-btn", text: "Edit", attrs: { type: "button" } });
+              button.addEventListener("click", function (event) {
+                // Without this the row click handler fires too.
+                event.stopPropagation();
+                setNotice("Edit " + ctx.row.original.name + " (#" + ctx.row.original.id + ")");
+              });
+              return el("div", { class: "row-actions" }, [button]);
+            },
+          },
+        ];
+
+        // =====================================================================
+        // 4. Toolbar actions — a status filter.
+        //
+        //    The grid renders no filter UI of its own: a column filter is just
+        //    another part of the QueryState. Build it with the `withFilter`
+        //    reducer, which clears the key on an empty value and resets to page
+        //    1 either way.
+        // =====================================================================
+
+        var statusSelect = el("select", { class: "nxg-rows-select" }, [
+          el("option", { text: "All statuses", attrs: { value: "" } }),
+        ]);
+        STATUSES.forEach(function (status) {
+          statusSelect.appendChild(el("option", { text: status, attrs: { value: status } }));
+        });
+        statusSelect.addEventListener("change", function () {
+          applyQuery(
+            NexGrid.withFilter(query, "status", statusSelect.value === "" ? undefined : statusSelect.value)
+          );
+        });
+
+        var breakButton = el("button", {
+          class: "nxg-btn",
+          text: "Break next load",
+          attrs: { type: "button" },
+        });
+        breakButton.addEventListener("click", function () {
+          failNext = true;
+          applyQuery(query);
+        });
+
+        // A single Node is appended to the end of the toolbar, so anything with
+        // more than one child needs a wrapper of its own.
+        var toolbarActions = el("div", { class: "toolbar-extra" }, [
+          el("label", {}, [el("span", { class: "nxg-sr-only", text: "Filter by status" }), statusSelect]),
+          breakButton,
+        ]);
+
+        // =====================================================================
+        // 5. Create the grid — CONTROLLED mode.
+        //
+        //    We own the data, so the grid renders exactly what it is handed and
+        //    emits intent through onQueryChange; it does NOT move on its own.
+        //    Fetch (here: compute) the new page and push it back with
+        //    handle.update().
+        //
+        //    The alternative is endpoint mode — pass `endpoint: "/api/students"`
+        //    and no data/total/query, and the grid fetches, retries and manages
+        //    its own loading state. That is what the ASP.NET example uses.
+        // =====================================================================
+
+        var query = NexGrid.defaultQuery();
+        var requestId = 0;
+        var failNext = false;
+
+        var grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+          caption: "Students",
+          columns: columns,
+          data: [],
+          total: 0,
+          query: query,
+          enableSelection: true,
+          exportFileName: "students",
+          searchPlaceholder: "Search name, email or department…",
+          toolbarActions: toolbarActions,
+          onQueryChange: applyQuery,
+          onRetry: function () {
+            applyQuery(query);
+          },
+          onRowClick: function (row) {
+            setNotice("Opened " + row.name + " (#" + row.id + ")");
+          },
+          onSelectionChange: function (ids) {
+            document.getElementById("selection").textContent = ids.length ? ids.join(", ") : "none";
+          },
+          // The grid never renders toasts — it hands them to you.
+          onNotify: function (notice) {
+            setNotice(notice.message);
+          },
+        });
+
+        /** Adopt a query, then answer it after a simulated round trip. */
+        function applyQuery(next) {
+          query = next;
+          requestId += 1;
+          var ticket = requestId;
+
+          grid.update({ isLoading: true, error: false });
+          document.getElementById("wire").textContent = NexGrid.serializeQuery(next);
+
+          window.setTimeout(function () {
+            // Discard a response a newer request has already superseded.
+            if (ticket !== requestId) return;
+
+            if (failNext) {
+              failNext = false;
+              grid.update({ isLoading: false, error: true });
+              return;
+            }
+
+            var page = queryStudents(next);
+            grid.update({
+              data: page.items,
+              total: page.total,
+              query: next,
+              isLoading: false,
+              error: false,
+            });
+          }, LATENCY_MS);
+        }
+
+        function setNotice(message) {
+          document.getElementById("notice").textContent = message;
+        }
+
+        // First load.
+        applyQuery(query);
+      })();
+    </script>
+  </body>
+</html>

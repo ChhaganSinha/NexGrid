@@ -1,0 +1,64 @@
+{
+  "name": "@nexgrid/vanilla",
+  "version": "0.1.0",
+  "description": "Zero-dependency vanilla JS/DOM renderer for NexGrid — the professional, server-driven data grid. Also powers NexGrid.AspNetCore.",
+  "license": "MIT",
+  "author": "NexGrid contributors",
+  "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChhaganSinha/NexGrid.git",
+    "directory": "packages/vanilla"
+  },
+  "bugs": {
+    "url": "https://github.com/ChhaganSinha/NexGrid/issues"
+  },
+  "keywords": [
+    "datagrid",
+    "data-grid",
+    "table",
+    "vanilla",
+    "server-side",
+    "pagination",
+    "export"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/nexgrid.global.js",
+  "jsdelivr": "./dist/nexgrid.global.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./styles.css": "./dist/nexgrid.css",
+    "./global": "./dist/nexgrid.global.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-styles.mjs",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@nexgrid/core": "0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,55 @@
+/* Page chrome only. The grid is styled by
+   _content/NexGrid.AspNetCore/nexgrid.css, referenced in _Layout.cshtml, and
+   is re-skinned by overriding its CSS custom properties:
+
+     .nxg-root { --nxg-primary: #7c3aed; --nxg-radius: 8px; }
+*/
+
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f6f7f9;
+  color: #16181d;
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.intro {
+  margin: 0 0 24px;
+  max-width: 70ch;
+  color: #5b6270;
+  line-height: 1.55;
+}
+
+.panel {
+  margin-top: 28px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.panel p {
+  margin: 0 0 12px;
+  max-width: 70ch;
+  color: #5b6270;
+  font-size: 14px;
+  line-height: 1.55;
+}

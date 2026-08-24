@@ -1,0 +1,48 @@
+name: Bug report
+description: Report something that does not work as documented
+labels: ["bug", "needs triage"]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@nexgrid/core"
+        - "@nexgrid/react"
+        - "@nexgrid/angular"
+        - "@nexgrid/vanilla"
+        - NexGrid.AspNetCore
+        - Documentation
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A minimal repo, StackBlitz link, or code snippet that reproduces the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Framework version, browser, Node/.NET version, OS.
+      placeholder: "React 19.0.0, Chrome 130, Node 20.11, Windows 11"

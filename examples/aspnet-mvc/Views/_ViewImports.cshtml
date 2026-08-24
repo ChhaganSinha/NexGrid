@@ -1,0 +1,16 @@
+@using NexGrid.Example.Mvc
+@using NexGrid.Example.Mvc.Models
+
+@* Brings NexGridAssets (and the rest of the API) into scope for the views. *@
+@using NexGrid.AspNetCore
+
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+@*
+    This one line is what turns <nex-grid> and <nex-grid-column> from unknown
+    elements into Tag Helpers. Discovery is by ASSEMBLY NAME, so it is
+    "NexGrid.AspNetCore" whether the package arrived as a NuGet reference or a
+    project reference. Forget it and the elements render as literal, inert HTML
+    with no error — which is the single most common "why is my grid blank".
+*@
+@addTagHelper *, NexGrid.AspNetCore

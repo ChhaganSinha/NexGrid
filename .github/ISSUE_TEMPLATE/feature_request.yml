@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a capability NexGrid should have
+labels: ["enhancement", "needs triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation you are in, not just the feature you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should the API look like? Sketch it if you can.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: platforms
+    attributes:
+      label: Which platforms should this cover?
+      description: NexGrid keeps feature parity across adapters — a feature normally lands everywhere.
+      options:
+        - label: React / Next.js
+        - label: Angular
+        - label: Vanilla JS
+        - label: ASP.NET Core
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

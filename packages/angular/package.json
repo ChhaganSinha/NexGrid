@@ -1,0 +1,56 @@
+{
+  "name": "@nexgrid/angular",
+  "version": "0.1.0",
+  "description": "NexGrid for Angular — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
+  "license": "MIT",
+  "author": "NexGrid contributors",
+  "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChhaganSinha/NexGrid.git",
+    "directory": "packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/ChhaganSinha/NexGrid/issues"
+  },
+  "keywords": [
+    "angular",
+    "datagrid",
+    "data-grid",
+    "table",
+    "server-side",
+    "pagination",
+    "export"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json && node scripts/copy-styles.mjs",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@nexgrid/core": "0.1.0",
+    "tslib": "^2.6.0"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=17.0.0",
+    "@angular/core": ">=17.0.0",
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@angular/common": "^19.2.0",
+    "@angular/compiler": "^19.2.0",
+    "@angular/compiler-cli": "^19.2.0",
+    "@angular/core": "^19.2.0",
+    "ng-packagr": "^19.2.0",
+    "rxjs": "^7.8.1",
+    "typescript": "~5.6.3",
+    "zone.js": "~0.15.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

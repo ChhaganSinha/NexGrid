@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Angular
+.angular/
+
+# Next.js
+.next/
+
+# Logs & OS
+npm-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editor
+.idea/
+*.suo
