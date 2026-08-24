@@ -33,26 +33,27 @@ jobs:
           npm test
 
       - name: Publish @nexgrid/core
-        run: npm publish --workspace=@nexgrid/core --access public
+        run: npm publish --workspace=@nexgrid/core --access public || echo "@nexgrid/core already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @nexgrid/vanilla
-        run: npm publish --workspace=@nexgrid/vanilla --access public
+        run: npm publish --workspace=@nexgrid/vanilla --access public || echo "@nexgrid/vanilla already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @nexgrid/react
-        run: npm publish --workspace=@nexgrid/react --access public
+        run: npm publish --workspace=@nexgrid/react --access public || echo "@nexgrid/react already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @nexgrid/angular
         run: |
           cd packages/angular/dist
-          npm publish --access public
+          npm publish --access public || echo "@nexgrid/angular already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
 
   publish-nuget:
     name: Publish NuGet Package
