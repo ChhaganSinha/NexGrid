@@ -1,0 +1,87 @@
+name: Publish to NPM & NuGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-npm:
+    name: Publish NPM Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Run tests & typecheck
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Publish @nexgrid/core
+        run: npm publish --workspace=@nexgrid/core --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @nexgrid/vanilla
+        run: npm publish --workspace=@nexgrid/vanilla --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @nexgrid/react
+        run: npm publish --workspace=@nexgrid/react --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @nexgrid/angular
+        run: |
+          cd packages/angular/dist
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-nuget:
+    name: Publish NuGet Package
+    runs-on: ubuntu-latest
+    needs: publish-npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build static web assets for RCL
+        run: |
+          npm ci
+          npm run build:core && npm run build:vanilla
+
+      - name: Build and Pack NexGrid.AspNetCore
+        run: |
+          dotnet pack dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release -o ./nupkg
+
+      - name: Push to NuGet.org (Trusted Publishing / OIDC)
+        run: |
+          dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY || 'nuget' }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
