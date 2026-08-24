@@ -77,7 +77,7 @@ public Task<PagedResponse<Student>> Get(NexGridQuery query, CancellationToken ct
         .DefaultSort(s => s.CreatedAt, SortDirection.Descending), ct);
 ```
 
-**The view**
+**The view (MVC / Razor Pages)**
 
 ```cshtml
 <nex-grid caption="Students" endpoint="/api/students" enable-selection="true">
@@ -89,8 +89,26 @@ public Task<PagedResponse<Student>> Get(NexGridQuery query, CancellationToken ct
 </nex-grid>
 ```
 
+**The view (Blazor Server, WebAssembly, or Auto)**
+
+Add `@using NexGrid.AspNetCore.Components` to `_Imports.razor`:
+
+```razor
+@page "/students"
+@using NexGrid.AspNetCore.Components
+
+<NexGrid TItem="Student" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true">
+    <NexGridColumn Field="name" Header="Name" MinWidth="180" />
+    <NexGridColumn Field="email" Header="Email" />
+    <NexGridColumn Field="status" Header="Status" Align="NexGridColumnAlign.Center" />
+    <NexGridColumn Field="score" Header="Score" Align="NexGridColumnAlign.Right" Width="90" />
+    <NexGridColumn Field="createdAt" Header="Enrolled" />
+</NexGrid>
+```
+
 That is the whole integration. The grid fetches its own data, manages its
 loading and error states, and re-fetches on every query change.
+
 
 ---
 

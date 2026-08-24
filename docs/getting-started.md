@@ -490,7 +490,7 @@ public sealed record StudentRow(
     int Id, string Name, string Email, string Status, int Score, DateTime CreatedAt);
 ```
 
-The view:
+### Razor Pages & MVC
 
 ```cshtml
 @* Views/Students/Index.cshtml *@
@@ -509,8 +509,31 @@ The view:
 </nex-grid>
 ```
 
+### Blazor (.NET 8 Server / WebAssembly / Auto)
+
+Add `@using NexGrid.AspNetCore.Components` to your `_Imports.razor`:
+
+```razor
+@* Pages/Students.razor *@
+@page "/students"
+@using NexGrid.AspNetCore.Components
+
+<PageTitle>Students</PageTitle>
+
+<h1>Students</h1>
+
+<NexGrid TItem="StudentRow" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true">
+    <NexGridColumn Field="name" Header="Name" MinWidth="180" />
+    <NexGridColumn Field="email" Header="Email" />
+    <NexGridColumn Field="status" Header="Status" Align="NexGridColumnAlign.Center" />
+    <NexGridColumn Field="score" Header="Score" Align="NexGridColumnAlign.Right" Width="90" />
+    <NexGridColumn Field="createdAt" Header="Enrolled" />
+</NexGrid>
+```
+
 That is the whole integration. The grid fetches its own data, manages its
 loading and error states, and re-fetches on every query change.
+
 
 Static web assets are served by `app.UseStaticFiles()`, which the default
 templates already call:
