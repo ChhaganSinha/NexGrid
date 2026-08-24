@@ -36,4 +36,5 @@ jobs:
       # The RCL embeds the vanilla bundle as static web assets, so build JS first.
       - run: npm ci
       - run: npm run build:core && npm run build:vanilla
-      - run: dotnet build dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release
+      - run: dotnet build dotnet/NexGrid.sln -c Release
+      - run: dotnet test dotnet/NexGrid.sln -c Release --no-build

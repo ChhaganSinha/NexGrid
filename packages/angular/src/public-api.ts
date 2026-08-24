@@ -40,6 +40,8 @@ export {
   parseQuery,
   queryClientData,
   serializeQuery,
+  withToggledSort,
+  withToggledMultiSort,
 } from "@nexgrid/core";
 export type {
   ClientQueryOptions,

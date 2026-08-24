@@ -50,6 +50,7 @@ export {
 
   // Query reducers — the only supported way to mutate a QueryState
   withToggledSort,
+  withToggledMultiSort,
   withSort,
   withSearch,
   withPage,

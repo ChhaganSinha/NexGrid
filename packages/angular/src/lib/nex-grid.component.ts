@@ -72,10 +72,13 @@ import {
   toExportColumns,
   totalPagesFor,
   visibleColumns,
+  withFilter,
   withPage,
   withPageSize,
   withSearch,
   withToggledSort,
+  withToggledMultiSort,
+  copyToClipboard,
   type Density,
   type ExcelBadgeRule,
   type NexGridLocale,
@@ -391,6 +394,33 @@ const SEARCH_DEBOUNCE_MS = 350;
                       <small>{{ strings.exportCsvSubtitle }}</small>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    class="nxg-menu-item"
+                    role="menuitem"
+                    (click)="runExport('clipboard')"
+                  >
+                    <svg
+                      class="nxg-icon--csv"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div class="nxg-menu-item-title">
+                      <strong>{{ strings.exportClipboardTitle }}</strong>
+                      <small>{{ strings.exportClipboardSubtitle }}</small>
+                    </div>
+                  </button>
                 </div>
               }
             </div>
@@ -411,13 +441,15 @@ const SEARCH_DEBOUNCE_MS = 350;
               }
               @if (enableSelection) {
                 <th class="nxg-th nxg-th--select" scope="col">
-                  <input
-                    type="checkbox"
-                    class="nxg-checkbox"
-                    [checked]="allPageSelected"
-                    [attr.aria-label]="strings.selectAllLabel"
-                    (change)="toggleSelectAll()"
-                  />
+                  @if (selectionMode !== 'single') {
+                    <input
+                      type="checkbox"
+                      class="nxg-checkbox"
+                      [checked]="allPageSelected"
+                      [attr.aria-label]="strings.selectAllLabel"
+                      (change)="toggleSelectAll()"
+                    />
+                  }
                 </th>
               }
               @for (header of headers; track header.key) {
@@ -429,7 +461,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   [style.width.px]="header.width"
                   [style.minWidth.px]="header.minWidth"
                   [style.textAlign]="header.align"
-                  (click)="onHeaderActivate(header)"
+                  (click)="onHeaderActivate(header, $event)"
                 >
                   <div
                     class="nxg-th-inner"
@@ -442,7 +474,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   >
                     <span>{{ header.title }}</span>
                     @if (header.sortable) {
-                      <span>
+                      <span class="nxg-sort-icon-wrap">
                         @switch (header.sortState) {
                           @case ('asc') {
                             <svg
@@ -492,9 +524,95 @@ const SEARCH_DEBOUNCE_MS = 350;
                             </svg>
                           }
                         }
+                        @if (header.sortOrder !== null) {
+                          <span class="nxg-sort-order">{{ header.sortOrder }}</span>
+                        }
                       </span>
                     }
+
+                    @if (header.serverFilterable) {
+                      <div class="nxg-col-filter-wrap">
+                        <button
+                          type="button"
+                          class="nxg-col-filter-btn"
+                          [class.nxg-col-filter-btn--active]="header.activeFilter !== undefined && header.activeFilter !== ''"
+                          [attr.aria-label]="'Filter ' + header.title"
+                          (click)="toggleFilterPopover(header.id, $event)"
+                        >
+                          <svg
+                            class="nxg-icon"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                          </svg>
+                        </button>
+
+                        @if (openFilterColumn === header.id) {
+                          <div class="nxg-filter-popover" (click)="$event.stopPropagation()">
+                            @if (header.filterOptions && header.filterOptions.length > 0) {
+                              <div class="nxg-filter-popover-options">
+                                <div
+                                  class="nxg-filter-option"
+                                  [class.nxg-filter-option--selected]="!header.activeFilter"
+                                  (click)="applyColumnFilter(header.id, undefined)"
+                                >
+                                  {{ strings.filterAll }}
+                                </div>
+                                @for (opt of header.filterOptions; track opt) {
+                                  <div
+                                    class="nxg-filter-option"
+                                    [class.nxg-filter-option--selected]="header.activeFilter === opt"
+                                    (click)="applyColumnFilter(header.id, opt)"
+                                  >
+                                    {{ opt }}
+                                  </div>
+                                }
+                              </div>
+                            } @else {
+                              <div>
+                                <input
+                                  #filterInput
+                                  type="text"
+                                  class="nxg-filter-popover-input"
+                                  [value]="header.activeFilter ?? ''"
+                                  [placeholder]="'Filter ' + header.title + '…'"
+                                  (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                                />
+                                <div class="nxg-filter-popover-actions">
+                                  @if (header.activeFilter) {
+                                    <button
+                                      type="button"
+                                      class="nxg-filter-popover-btn"
+                                      (click)="applyColumnFilter(header.id, undefined)"
+                                    >
+                                      {{ strings.clearFilter }}
+                                    </button>
+                                  }
+                                  <button
+                                    type="button"
+                                    class="nxg-filter-popover-btn nxg-filter-popover-btn--primary"
+                                    (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                                  >
+                                    {{ strings.applyFilter }}
+                                  </button>
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
                   </div>
+
+                  @if (enableColumnResize) {
+                    <div class="nxg-resize-handle" (pointerdown)="onResizePointerDown(header.id, header, $event)"></div>
+                  }
                 </th>
               }
             </tr>
@@ -525,7 +643,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   @if (enableSelection) {
                     <td class="nxg-td nxg-td--select" (click)="$event.stopPropagation()">
                       <input
-                        type="checkbox"
+                        [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
                         class="nxg-checkbox"
                         [checked]="row.selected"
                         [attr.aria-label]="row.selectLabel"
@@ -580,7 +698,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   @if (enableSelection) {
                     <span class="nxg-card-select" (click)="$event.stopPropagation()">
                       <input
-                        type="checkbox"
+                        [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
                         class="nxg-checkbox"
                         [checked]="row.selected"
                         [attr.aria-label]="row.selectLabel"
@@ -762,6 +880,12 @@ export class NexGridComponent<TData>
   /** Adds the selection checkbox column and the "N selected" badge. */
   @Input({ transform: booleanAttribute }) enableSelection = false;
 
+  /** Selection mode: multi (default) or single. */
+  @Input() selectionMode: "multi" | "single" = "multi";
+
+  /** Enable dragging column borders to resize columns. */
+  @Input({ transform: booleanAttribute }) enableColumnResize = true;
+
   /** Show the global search box. */
   @Input({ transform: booleanAttribute }) enableSearch = true;
 
@@ -840,7 +964,9 @@ export class NexGridComponent<TData>
 
   protected strings: NexGridLocale = resolveLocale();
   protected currentDensity: Density = "default";
-  protected openMenu: MenuName | null = null;
+  protected openMenu: "columns" | "density" | "export" | null = null;
+  protected openFilterColumn: string | null = null;
+  protected columnWidths: Record<string, number> = {};
   protected isExporting = false;
   protected searchText = "";
   protected searchLabel = "";
@@ -1027,14 +1153,60 @@ export class NexGridComponent<TData>
   // Sorting
   // ---------------------------------------------------------------------
 
-  protected onHeaderActivate(header: NexGridHeaderView): void {
+  protected onHeaderActivate(header: NexGridHeaderView, event?: MouseEvent | KeyboardEvent | Event): void {
+    const target = event?.target as HTMLElement | null;
+    if (target?.closest(".nxg-col-filter-wrap") || target?.closest(".nxg-resize-handle")) {
+      return;
+    }
     if (!header.sortable) return;
-    this.emitQuery(withToggledSort(this.query, header.id));
+    const isMulti =
+      event instanceof MouseEvent || event instanceof KeyboardEvent ? event.shiftKey : false;
+    this.emitQuery(
+      isMulti ? withToggledMultiSort(this.query, header.id) : withToggledSort(this.query, header.id),
+    );
   }
 
   protected onHeaderKeydown(event: Event, header: NexGridHeaderView): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".nxg-col-filter-wrap")) return;
     event.preventDefault();
-    this.onHeaderActivate(header);
+    this.onHeaderActivate(header, event);
+  }
+
+  protected toggleFilterPopover(id: string, event: Event): void {
+    event.stopPropagation();
+    this.openFilterColumn = this.openFilterColumn === id ? null : id;
+    this.recompute();
+  }
+
+  protected applyColumnFilter(id: string, value: string | undefined): void {
+    this.openFilterColumn = null;
+    this.emitQuery(withFilter(this.query, id, value));
+  }
+
+  protected onResizePointerDown(id: string, header: NexGridHeaderView, event: PointerEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const targetTh = (event.currentTarget as HTMLElement)?.parentElement as HTMLElement | null;
+    const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (header.width ?? 120);
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextW = Math.max(header.minWidth ?? 60, Math.round(startWidth + (moveEvent.clientX - startX)));
+      this.columnWidths[id] = nextW;
+      this.recompute();
+      this.cdr.markForCheck();
+    };
+
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.body?.classList.remove("nxg-resizing");
+    };
+
+    document.body?.classList.add("nxg-resizing");
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
   }
 
   // ---------------------------------------------------------------------
@@ -1042,6 +1214,7 @@ export class NexGridComponent<TData>
   // ---------------------------------------------------------------------
 
   protected toggleSelectAll(): void {
+    if (this.selectionMode === "single") return;
     const next = new Set(this.selectedIds);
     if (this.allPageSelected) {
       for (const row of this.rows) next.delete(row.id);
@@ -1052,6 +1225,11 @@ export class NexGridComponent<TData>
   }
 
   protected toggleRow(row: NexGridRowView<TData>): void {
+    if (this.selectionMode === "single") {
+      if (this.selectedIds.has(row.id)) this.applySelection(new Set());
+      else this.applySelection(new Set([row.id]));
+      return;
+    }
     const next = new Set(this.selectedIds);
     if (next.has(row.id)) next.delete(row.id);
     else next.add(row.id);
@@ -1111,11 +1289,11 @@ export class NexGridComponent<TData>
   // Export (spec section 5 — identical flow in every adapter)
   // ---------------------------------------------------------------------
 
-  protected async runExport(format: "excel" | "csv"): Promise<void> {
+  protected async runExport(format: "excel" | "csv" | "clipboard"): Promise<void> {
     this.closeMenus();
 
     // 1. The host owns the export when it is listening for it.
-    if (this.exportAll.observed) {
+    if (this.exportAll.observed && format !== "clipboard") {
       this.exportAll.emit();
       return;
     }
@@ -1139,7 +1317,22 @@ export class NexGridComponent<TData>
       });
       const prefix = this.exportFileName ?? filePrefixFromCaption(this.caption);
 
-      // 5. Write the file and report what landed on disk.
+      // 5. Write the file or copy to clipboard
+      if (format === "clipboard") {
+        const ok = await copyToClipboard(rows, exportColumns);
+        if (ok) {
+          this.notify.emit({
+            type: "success",
+            message: formatMessage(this.strings.exportClipboardSuccess, {
+              count: rows.length.toLocaleString(),
+            }),
+          });
+        } else {
+          this.notify.emit({ type: "error", message: "Failed to copy to clipboard" });
+        }
+        return;
+      }
+
       if (format === "excel") {
         const count = downloadExcel<TData>({
           filename: prefix,
@@ -1255,14 +1448,23 @@ export class NexGridComponent<TData>
     this.headers = visible.map((column, index) => {
       const id = getColumnId(column);
       const sortable = isSortable(column);
-      const direction = sortable && sort?.field === id ? sort.dir : null;
-      const width = column.meta?.width ?? null;
+      const sortIndex = this.query.sort.findIndex((s) => s.field === id);
+      const sortItem = sortIndex >= 0 ? this.query.sort[sortIndex] : undefined;
+      const direction = sortable && sortItem ? sortItem.dir : null;
+      const sortOrder = this.query.sort.length > 1 && sortIndex >= 0 ? sortIndex + 1 : null;
+      const customWidth = this.columnWidths[id];
+      const width = customWidth !== undefined ? customWidth : (column.meta?.width ?? null);
+      const activeFilter = this.query.filter?.[id];
       return {
         key: keys[index] ?? String(index),
         id,
         title: headerText(column) || id || "Column",
         sortable,
         sortState: direction ?? "none",
+        sortOrder,
+        serverFilterable: column.meta?.serverFilterable ?? false,
+        filterOptions: column.meta?.filterOptions,
+        activeFilter,
         ariaSort: !sortable
           ? null
           : direction === "asc"

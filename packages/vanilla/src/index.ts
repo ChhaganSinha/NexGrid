@@ -81,6 +81,7 @@ export {
   withSearch,
   withSort,
   withToggledSort,
+  withToggledMultiSort,
 } from "@nexgrid/core";
 
 export type {

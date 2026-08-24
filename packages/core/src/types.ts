@@ -72,3 +72,7 @@ export const DENSITY_ROW_HEIGHT: Record<Density, number> = {
 
 /** All density values, in menu order. */
 export const DENSITIES: readonly Density[] = ["compact", "default", "comfortable"];
+
+/** Selection mode: multiple rows or single row. */
+export type SelectionMode = "multi" | "single";
+

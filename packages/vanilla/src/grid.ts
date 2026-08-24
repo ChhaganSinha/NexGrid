@@ -44,10 +44,13 @@ import {
   toExportColumns,
   totalPagesFor,
   visibleColumns,
+  withFilter,
   withPage,
   withPageSize,
   withSearch,
   withToggledSort,
+  withToggledMultiSort,
+  copyToClipboard,
   type Density,
   type NexGridLocale,
   type PagedResponse,
@@ -140,6 +143,8 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private isError: boolean;
   private isExporting = false;
   private openMenu: MenuName | null = null;
+  private openFilterColumn: string | null = null;
+  private readonly columnWidths: Record<string, number> = {};
   private focusMenuOnRender = false;
   private mounted: "grid" | "error" | null = null;
   private destroyed = false;
@@ -431,15 +436,28 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   }
 
   private readonly handleDocumentPointerDown = (event: Event): void => {
-    if (this.openMenu === null) return;
-    const wrap = this.menuWraps.get(this.openMenu);
     const target = event.target;
-    if (wrap && target instanceof Node && wrap.contains(target)) return;
-    this.setOpenMenu(null);
+    if (this.openMenu !== null) {
+      const wrap = this.menuWraps.get(this.openMenu);
+      if (!(wrap && target instanceof Node && wrap.contains(target))) {
+        this.setOpenMenu(null);
+      }
+    }
+    if (this.openFilterColumn !== null) {
+      if (!(target instanceof Node && this.root.querySelector(".nxg-col-filter-wrap")?.contains(target))) {
+        this.openFilterColumn = null;
+        this.render();
+      }
+    }
   };
 
   private readonly handleDocumentKeyDown = (event: Event): void => {
     if (!(event instanceof KeyboardEvent) || event.key !== "Escape") return;
+    if (this.openFilterColumn !== null) {
+      this.openFilterColumn = null;
+      this.render();
+      return;
+    }
     const open = this.openMenu;
     if (open === null) return;
     this.setOpenMenu(null, { returnFocusTo: open });
@@ -573,12 +591,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     }
   }
 
-  private async runExport(format: "excel" | "csv"): Promise<void> {
+  private async runExport(format: "excel" | "csv" | "clipboard"): Promise<void> {
     if (this.isExporting) return;
     this.setOpenMenu(null, { returnFocusTo: "export" });
 
     const { onExportAll } = this.options;
-    if (onExportAll) {
+    if (onExportAll && format !== "clipboard") {
       void onExportAll();
       return;
     }
@@ -594,6 +612,19 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       no: this.locale.booleanNo,
     });
     const prefix = this.options.exportFileName ?? filePrefixFromCaption(this.caption);
+
+    if (format === "clipboard") {
+      const ok = await copyToClipboard(rows, columns);
+      if (ok) {
+        this.notify(
+          "success",
+          formatMessage(this.locale.exportClipboardSuccess, { count: rows.length.toLocaleString() }),
+        );
+      } else {
+        this.notify("error", "Failed to copy to clipboard");
+      }
+      return;
+    }
 
     if (format === "excel") {
       const count = downloadExcel({
@@ -645,7 +676,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     return this.data.map((row) => this.rowId(row));
   }
 
+  private isSingleSelection(): boolean {
+    return this.options.selectionMode === "single";
+  }
+
   private toggleSelectAll(): void {
+    if (this.isSingleSelection()) return;
     const ids = this.pageRowIds();
     const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
     for (const id of ids) {
@@ -657,8 +693,16 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   }
 
   private toggleSelectRow(id: string): void {
-    if (this.selected.has(id)) this.selected.delete(id);
-    else this.selected.add(id);
+    if (this.isSingleSelection()) {
+      if (this.selected.has(id)) this.selected.clear();
+      else {
+        this.selected.clear();
+        this.selected.add(id);
+      }
+    } else {
+      if (this.selected.has(id)) this.selected.delete(id);
+      else this.selected.add(id);
+    }
     this.emitSelection();
     this.render();
   }
@@ -944,7 +988,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
   private buildExportMenu(): HTMLElement {
     const option = (
-      key: "excel" | "csv",
+      key: "excel" | "csv" | "clipboard",
       glyph: SVGSVGElement,
       title: string,
       subtitle: string,
@@ -970,6 +1014,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         this.locale.exportExcelSubtitle,
       ),
       option("csv", fileTextIcon(), this.locale.exportCsvTitle, this.locale.exportCsvSubtitle),
+      option(
+        "clipboard",
+        fileTextIcon(),
+        this.locale.exportClipboardTitle,
+        this.locale.exportClipboardSubtitle,
+      ),
     ]);
   }
 
@@ -983,29 +1033,35 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     }
 
     if (this.selectionEnabled()) {
-      const ids = this.pageRowIds();
-      const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
-      const someSelected = ids.some((id) => this.selected.has(id));
-      const checkbox = el("input", {
-        class: "nxg-checkbox",
-        attrs: {
-          type: "checkbox",
-          "aria-label": this.locale.selectAllLabel,
-          "data-nxg-focus": "select-all",
-        },
-      });
-      checkbox.checked = allSelected;
-      checkbox.indeterminate = !allSelected && someSelected;
-      checkbox.addEventListener("change", () => this.toggleSelectAll());
-      cells.push(el("th", { class: "nxg-th nxg-th--select" }, [checkbox]));
+      if (this.isSingleSelection()) {
+        cells.push(el("th", { class: "nxg-th nxg-th--select" }));
+      } else {
+        const ids = this.pageRowIds();
+        const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
+        const someSelected = ids.some((id) => this.selected.has(id));
+        const checkbox = el("input", {
+          class: "nxg-checkbox",
+          attrs: {
+            type: "checkbox",
+            "aria-label": this.locale.selectAllLabel,
+            "data-nxg-focus": "select-all",
+          },
+        });
+        checkbox.checked = allSelected;
+        checkbox.indeterminate = !allSelected && someSelected;
+        checkbox.addEventListener("change", () => this.toggleSelectAll());
+        cells.push(el("th", { class: "nxg-th nxg-th--select" }, [checkbox]));
+      }
     }
 
-    const sort = primarySort(this.query);
+    const sorts = this.query.sort;
 
     for (const column of this.visibleCols()) {
       const id = getColumnId(column);
       const sortable = isSortable(column);
-      const sorted = sortable && sort?.field === id ? sort.dir : null;
+      const sortIndex = sorts.findIndex((s) => s.field === id);
+      const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
+      const sorted = sortable && sortItem ? sortItem.dir : null;
       const meta = column.meta ?? {};
       const align = meta.align ?? "left";
 
@@ -1022,11 +1078,55 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       if (sortable) {
         const glyph =
           sorted === "asc" ? arrowUpIcon() : sorted === "desc" ? arrowDownIcon() : arrowUpDownIcon();
-        inner.appendChild(el("span", {}, [glyph]));
+        const iconWrap = el("span", { class: "nxg-sort-icon-wrap" }, [glyph]);
+        if (sorts.length > 1 && sortIndex >= 0) {
+          iconWrap.appendChild(
+            el("span", { class: "nxg-sort-order", text: String(sortIndex + 1) }),
+          );
+        }
+        inner.appendChild(iconWrap);
+      }
+
+      if (meta.serverFilterable) {
+        const activeFilter = this.query.filter?.[id];
+        const isFilterActive = activeFilter !== undefined && activeFilter !== "";
+        const filterWrap = el("div", { class: "nxg-col-filter-wrap" });
+        const filterBtn = el(
+          "button",
+          {
+            class: isFilterActive
+              ? "nxg-col-filter-btn nxg-col-filter-btn--active"
+              : "nxg-col-filter-btn",
+            attrs: {
+              type: "button",
+              "aria-label": `Filter ${getColumnTitle(column) || id}`,
+            },
+          },
+          [filterIcon("nxg-icon")],
+        );
+        filterBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.openFilterColumn = this.openFilterColumn === id ? null : id;
+          this.render();
+        });
+        filterWrap.appendChild(filterBtn);
+
+        if (this.openFilterColumn === id) {
+          filterWrap.appendChild(this.buildColumnFilterPopover(id, column, meta, activeFilter));
+        }
+        inner.appendChild(filterWrap);
       }
 
       const ariaSort =
         sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
+
+      const customWidth = this.columnWidths[id];
+      const effectiveWidth =
+        customWidth !== undefined
+          ? `${customWidth}px`
+          : meta.width === undefined
+            ? undefined
+            : `${meta.width}px`;
 
       const th = el(
         "th",
@@ -1035,15 +1135,11 @@ class NexGridController<TData> implements NexGridHandle<TData> {
           attrs: {
             scope: "col",
             "aria-sort": sortable ? ariaSort : undefined,
-            // A sortable header is an interactive control, so it has to be
-            // reachable without a mouse — but `role="button"` would cost it its
-            // column-header semantics, so it stays a `th` that answers to
-            // Enter/Space and announces its state through `aria-sort`.
             tabindex: sortable ? "0" : undefined,
             "data-nxg-focus": sortable ? `sort:${id}` : undefined,
           },
           style: {
-            width: meta.width === undefined ? undefined : `${meta.width}px`,
+            width: effectiveWidth,
             minWidth: meta.width === undefined ? `${meta.minWidth ?? 120}px` : undefined,
             textAlign: align,
           },
@@ -1052,12 +1148,51 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       );
 
       if (sortable) {
-        th.addEventListener("click", () => this.applyQuery(withToggledSort(this.query, id)));
-        th.addEventListener("keydown", (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          this.applyQuery(withToggledSort(this.query, id));
+        th.addEventListener("click", (event: MouseEvent) => {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest(".nxg-col-filter-wrap") || target?.closest(".nxg-resize-handle")) {
+            return;
+          }
+          const next = event.shiftKey
+            ? withToggledMultiSort(this.query, id)
+            : withToggledSort(this.query, id);
+          this.applyQuery(next);
         });
+        th.addEventListener("keydown", (event: KeyboardEvent) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          const target = event.target as HTMLElement | null;
+          if (target?.closest(".nxg-col-filter-wrap")) return;
+          event.preventDefault();
+          const next = event.shiftKey
+            ? withToggledMultiSort(this.query, id)
+            : withToggledSort(this.query, id);
+          this.applyQuery(next);
+        });
+      }
+
+      if (this.options.enableColumnResize !== false) {
+        const handle = el("div", { class: "nxg-resize-handle" });
+        handle.addEventListener("pointerdown", (event: PointerEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const startX = event.clientX;
+          const startWidth = th.getBoundingClientRect ? th.getBoundingClientRect().width : (customWidth ?? meta.width ?? 120);
+          const onMove = (e: PointerEvent) => {
+            const nextWidth = Math.max(meta.minWidth ?? 60, Math.round(startWidth + (e.clientX - startX)));
+            this.columnWidths[id] = nextWidth;
+            th.style.width = `${nextWidth}px`;
+          };
+          const onUp = () => {
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+            document.body?.classList.remove("nxg-resizing");
+            this.render();
+          };
+          document.body?.classList.add("nxg-resizing");
+          document.addEventListener("pointermove", onMove);
+          document.addEventListener("pointerup", onUp);
+        });
+        th.appendChild(handle);
       }
 
       cells.push(th);
@@ -1166,11 +1301,100 @@ class NexGridController<TData> implements NexGridHandle<TData> {
    * The guard lives on the checkbox itself rather than the cell so it behaves
    * the same in the table and in the mobile card, where there is no cell.
    */
+  private buildColumnFilterPopover(
+    id: string,
+    column: NexGridVanillaColumn<TData>,
+    meta: NonNullable<NexGridVanillaColumn<TData>["meta"]>,
+    currentValue?: string,
+  ): HTMLElement {
+    const popover = el("div", { class: "nxg-filter-popover" });
+    popover.addEventListener("click", (e) => e.stopPropagation());
+
+    if (meta.filterOptions && meta.filterOptions.length > 0) {
+      const optionsWrap = el("div", { class: "nxg-filter-popover-options" });
+      const allOption = el("div", {
+        class: !currentValue ? "nxg-filter-option nxg-filter-option--selected" : "nxg-filter-option",
+        text: this.locale.filterAll,
+      });
+      allOption.addEventListener("click", () => {
+        this.openFilterColumn = null;
+        this.applyQuery(withFilter(this.query, id, undefined));
+      });
+      optionsWrap.appendChild(allOption);
+
+      for (const opt of meta.filterOptions) {
+        const isSelected = currentValue === opt;
+        const optEl = el("div", {
+          class: isSelected ? "nxg-filter-option nxg-filter-option--selected" : "nxg-filter-option",
+          text: opt,
+        });
+        optEl.addEventListener("click", () => {
+          this.openFilterColumn = null;
+          this.applyQuery(withFilter(this.query, id, opt));
+        });
+        optionsWrap.appendChild(optEl);
+      }
+      popover.appendChild(optionsWrap);
+    } else {
+      const title = getColumnTitle(column) || id;
+      const input = el("input", {
+        class: "nxg-filter-popover-input",
+        attrs: {
+          type: "text",
+          placeholder: formatMessage(this.locale.filterColumnPlaceholder, { column: title }),
+          value: currentValue ?? "",
+        },
+      });
+
+      const apply = () => {
+        const val = input.value.trim();
+        this.openFilterColumn = null;
+        this.applyQuery(withFilter(this.query, id, val || undefined));
+      };
+
+      input.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          apply();
+        }
+      });
+
+      const actions = el("div", { class: "nxg-filter-popover-actions" });
+      if (currentValue) {
+        const clearBtn = el("button", {
+          class: "nxg-filter-popover-btn",
+          attrs: { type: "button" },
+          text: this.locale.clearFilter,
+        });
+        clearBtn.addEventListener("click", () => {
+          this.openFilterColumn = null;
+          this.applyQuery(withFilter(this.query, id, undefined));
+        });
+        actions.appendChild(clearBtn);
+      }
+
+      const applyBtn = el("button", {
+        class: "nxg-filter-popover-btn nxg-filter-popover-btn--primary",
+        attrs: { type: "button" },
+        text: this.locale.applyFilter,
+      });
+      applyBtn.addEventListener("click", apply);
+      actions.appendChild(applyBtn);
+
+      popover.appendChild(input);
+      popover.appendChild(actions);
+    }
+
+    return popover;
+  }
+
   private buildRowCheckbox(id: string, selected: boolean, focusKey: string): HTMLInputElement {
+    const isSingle = this.isSingleSelection();
     const checkbox = el("input", {
       class: "nxg-checkbox",
       attrs: {
-        type: "checkbox",
+        type: isSingle ? "radio" : "checkbox",
+        name: isSingle ? `${this.uid}-row-select` : undefined,
         "aria-label": formatMessage(this.locale.selectRowLabel, { id }),
         "data-nxg-focus": focusKey,
       },

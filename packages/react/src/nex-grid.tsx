@@ -40,10 +40,13 @@ import {
   toExportColumns,
   totalPagesFor,
   visibleColumns,
+  withFilter,
   withPage,
   withPageSize,
   withSearch,
   withToggledSort,
+  withToggledMultiSort,
+  copyToClipboard,
   type Density,
   type PagedResponse,
 } from "@nexgrid/core";
@@ -111,35 +114,38 @@ const DENSITY_LABEL_KEY = {
  * />
  * ```
  */
-export function NexGrid<TData>({
-  columns,
-  data,
-  total,
-  query,
-  onQueryChange,
-  caption,
-  density: initialDensity = "default",
-  isLoading = false,
-  error = false,
-  onRetry,
-  enableSelection = false,
-  onSelectionChange,
-  enableSearch = true,
-  searchPlaceholder,
-  toolbarActions,
-  onRowClick,
-  getRowId = defaultRowId,
-  className,
-  showSerialNumber = true,
-  enableExport = true,
-  exportFileName,
-  onExportAll,
-  fetchEndpoint,
-  badgeRules,
-  locale: localeOverrides,
-  onNotify,
-  theme = "light",
-}: NexGridProps<TData>): React.JSX.Element {
+export function NexGrid<TData>(props: NexGridProps<TData>): React.JSX.Element {
+  const {
+    columns,
+    data,
+    total,
+    query,
+    onQueryChange,
+    caption,
+    density: initialDensity = "default",
+    isLoading = false,
+    error = false,
+    onRetry,
+    enableSelection = false,
+    selectionMode = "multi",
+    enableColumnResize = true,
+    onSelectionChange,
+    enableSearch = true,
+    searchPlaceholder,
+    toolbarActions,
+    onRowClick,
+    getRowId = defaultRowId,
+    className,
+    showSerialNumber = true,
+    enableExport = true,
+    exportFileName,
+    onExportAll,
+    fetchEndpoint,
+    badgeRules,
+    locale: localeOverrides,
+    onNotify,
+    theme = "light",
+  } = props;
   const locale = resolveLocale(localeOverrides);
   const boolLabels = { yes: locale.booleanYes, no: locale.booleanNo };
 
@@ -151,6 +157,8 @@ export function NexGrid<TData>({
     () => new Set<string>(),
   );
   const [isExporting, setIsExporting] = React.useState(false);
+  const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
+  const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
 
   const columnsMenu = useDropdown();
   const densityMenu = useDropdown();
@@ -215,8 +223,10 @@ export function NexGrid<TData>({
 
   // ---- Sorting -------------------------------------------------------------
 
-  const toggleSort = (columnId: string): void => {
-    onQueryChange(withToggledSort(query, columnId));
+  const toggleSort = (columnId: string, isMulti = false): void => {
+    onQueryChange(
+      isMulti ? withToggledMultiSort(query, columnId) : withToggledSort(query, columnId),
+    );
   };
 
   // ---- Selection -----------------------------------------------------------
@@ -225,14 +235,15 @@ export function NexGrid<TData>({
   const allPageSelected = pageRowIds.length > 0 && selectedOnPage === pageRowIds.length;
   const somePageSelected = selectedOnPage > 0 && !allPageSelected;
 
+  const isSingleSelect = selectionMode === "single";
+
   const commitSelection = (next: Set<string>): void => {
     setSelectedIds(next);
-    // `allAcrossSelected` is reserved: today the grid only ever knows about ids
-    // it has actually rendered.
     onSelectionChange?.(Array.from(next), false);
   };
 
   const toggleSelectAll = (): void => {
+    if (isSingleSelect) return;
     const next = new Set(selectedIds);
     for (const id of pageRowIds) {
       if (allPageSelected) next.delete(id);
@@ -242,10 +253,15 @@ export function NexGrid<TData>({
   };
 
   const toggleSelectRow = (id: string): void => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    commitSelection(next);
+    if (isSingleSelect) {
+      if (selectedIds.has(id)) commitSelection(new Set());
+      else commitSelection(new Set([id]));
+    } else {
+      const next = new Set(selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      commitSelection(next);
+    }
   };
 
   // ---- Columns / density ---------------------------------------------------
@@ -285,10 +301,10 @@ export function NexGrid<TData>({
     }
   };
 
-  const handleExport = async (format: "excel" | "csv"): Promise<void> => {
+  const handleExport = async (format: "excel" | "csv" | "clipboard"): Promise<void> => {
     exportMenu.close();
 
-    if (onExportAll) {
+    if (onExportAll && format !== "clipboard") {
       void onExportAll();
       return;
     }
@@ -303,6 +319,19 @@ export function NexGrid<TData>({
 
       const exportColumns = toExportColumns(visible, boolLabels);
       const prefix = exportFileName ?? filePrefixFromCaption(caption);
+
+      if (format === "clipboard") {
+        const ok = await copyToClipboard(rows, exportColumns);
+        if (ok) {
+          notify(
+            "success",
+            formatMessage(locale.exportClipboardSuccess, { count: rows.length.toLocaleString() }),
+          );
+        } else {
+          notify("error", "Failed to copy to clipboard");
+        }
+        return;
+      }
 
       if (format === "excel") {
         const count = downloadExcel({
@@ -522,6 +551,18 @@ export function NexGrid<TData>({
                       <small>{locale.exportCsvSubtitle}</small>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    className="nxg-menu-item"
+                    role="menuitem"
+                    onClick={() => void handleExport("clipboard")}
+                  >
+                    <FileTextIcon className="nxg-icon--csv" />
+                    <div className="nxg-menu-item-title">
+                      <strong>{locale.exportClipboardTitle}</strong>
+                      <small>{locale.exportClipboardSubtitle}</small>
+                    </div>
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -544,36 +585,68 @@ export function NexGrid<TData>({
 
               {enableSelection ? (
                 <th className="nxg-th nxg-th--select" scope="col">
-                  <input
-                    type="checkbox"
-                    className="nxg-checkbox"
-                    checked={allPageSelected}
-                    ref={(el) => {
-                      // "Some of this page is selected" has no HTML attribute —
-                      // it only exists as a DOM property.
-                      if (el) el.indeterminate = somePageSelected;
-                    }}
-                    onChange={toggleSelectAll}
-                    aria-label={locale.selectAllLabel}
-                  />
+                  {!isSingleSelect ? (
+                    <input
+                      type="checkbox"
+                      className="nxg-checkbox"
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected;
+                      }}
+                      onChange={toggleSelectAll}
+                      aria-label={locale.selectAllLabel}
+                    />
+                  ) : null}
                 </th>
               ) : null}
 
               {visible.map((col, index) => {
                 const id = getColumnId(col);
                 const sortable = isSortable(col);
-                const sorted = sortable && id !== "" && sort?.field === id;
+                const sortIndex = query.sort.findIndex((s) => s.field === id);
+                const sortItem = sortIndex >= 0 ? query.sort[sortIndex] : undefined;
+                const sorted = sortable && sortItem !== undefined;
                 const title = getColumnTitle(col) || id;
+                const meta = col.meta;
+                const activeFilter = query.filter?.[id];
+                const isFilterActive = activeFilter !== undefined && activeFilter !== "";
+
+                const customWidth = colWidths[id];
+                const baseStyle = headerCellStyle(col);
+                const thStyle: React.CSSProperties = customWidth !== undefined
+                  ? { ...baseStyle, width: `${customWidth}px` }
+                  : baseStyle;
+
+                const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const startX = e.clientX;
+                  const targetTh = (e.currentTarget.parentElement as HTMLElement) || null;
+                  const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (customWidth ?? meta?.width ?? 120);
+
+                  const onMove = (moveEvent: PointerEvent) => {
+                    const nextW = Math.max(meta?.minWidth ?? 60, Math.round(startWidth + (moveEvent.clientX - startX)));
+                    setColWidths((prev) => ({ ...prev, [id]: nextW }));
+                  };
+                  const onUp = () => {
+                    document.removeEventListener("pointermove", onMove);
+                    document.removeEventListener("pointerup", onUp);
+                    document.body?.classList.remove("nxg-resizing");
+                  };
+                  document.body?.classList.add("nxg-resizing");
+                  document.addEventListener("pointermove", onMove);
+                  document.addEventListener("pointerup", onUp);
+                };
 
                 return (
                   <th
                     key={id || `col-${index}`}
                     scope="col"
                     className={sortable ? "nxg-th nxg-th--sortable" : "nxg-th"}
-                    style={headerCellStyle(col)}
+                    style={thStyle}
                     aria-sort={
                       sorted
-                        ? sort?.dir === "asc"
+                        ? sortItem?.dir === "asc"
                           ? "ascending"
                           : "descending"
                         : sortable
@@ -582,13 +655,19 @@ export function NexGrid<TData>({
                     }
                     aria-label={title || undefined}
                     tabIndex={sortable ? 0 : undefined}
-                    onClick={sortable ? () => toggleSort(id) : undefined}
+                    onClick={sortable ? (event) => {
+                      const t = event.target as HTMLElement | null;
+                      if (t?.closest(".nxg-col-filter-wrap") || t?.closest(".nxg-resize-handle")) return;
+                      toggleSort(id, event.shiftKey);
+                    } : undefined}
                     onKeyDown={
                       sortable
                         ? (event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
+                            const t = event.target as HTMLElement | null;
+                            if (t?.closest(".nxg-col-filter-wrap")) return;
                             event.preventDefault();
-                            toggleSort(id);
+                            toggleSort(id, event.shiftKey);
                           }
                         : undefined
                     }
@@ -596,9 +675,9 @@ export function NexGrid<TData>({
                     <div className={headerInnerClass(col)}>
                       <span>{renderColumnHeader(col)}</span>
                       {sortable ? (
-                        <span>
+                        <span className="nxg-sort-icon-wrap">
                           {sorted ? (
-                            sort?.dir === "asc" ? (
+                            sortItem?.dir === "asc" ? (
                               <ArrowUpIcon className="nxg-sort-icon" />
                             ) : (
                               <ArrowDownIcon className="nxg-sort-icon" />
@@ -606,9 +685,121 @@ export function NexGrid<TData>({
                           ) : (
                             <ArrowUpDownIcon className="nxg-sort-icon nxg-sort-icon--idle" />
                           )}
+                          {query.sort.length > 1 && sortIndex >= 0 ? (
+                            <span className="nxg-sort-order">{sortIndex + 1}</span>
+                          ) : null}
                         </span>
                       ) : null}
+
+                      {meta?.serverFilterable ? (
+                        <div className="nxg-col-filter-wrap">
+                          <button
+                            type="button"
+                            className={
+                              isFilterActive
+                                ? "nxg-col-filter-btn nxg-col-filter-btn--active"
+                                : "nxg-col-filter-btn"
+                            }
+                            aria-label={`Filter ${title}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenFilterCol(openFilterCol === id ? null : id);
+                            }}
+                          >
+                            <FilterIcon className="nxg-icon" />
+                          </button>
+
+                          {openFilterCol === id ? (
+                            <div
+                              className="nxg-filter-popover"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {meta.filterOptions && meta.filterOptions.length > 0 ? (
+                                <div className="nxg-filter-popover-options">
+                                  <div
+                                    className={
+                                      !activeFilter
+                                        ? "nxg-filter-option nxg-filter-option--selected"
+                                        : "nxg-filter-option"
+                                    }
+                                    onClick={() => {
+                                      setOpenFilterCol(null);
+                                      onQueryChange(withFilter(query, id, undefined));
+                                    }}
+                                  >
+                                    {locale.filterAll}
+                                  </div>
+                                  {meta.filterOptions.map((opt) => (
+                                    <div
+                                      key={opt}
+                                      className={
+                                        activeFilter === opt
+                                          ? "nxg-filter-option nxg-filter-option--selected"
+                                          : "nxg-filter-option"
+                                      }
+                                      onClick={() => {
+                                        setOpenFilterCol(null);
+                                        onQueryChange(withFilter(query, id, opt));
+                                      }}
+                                    >
+                                      {opt}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div>
+                                  <input
+                                    type="text"
+                                    className="nxg-filter-popover-input"
+                                    defaultValue={activeFilter ?? ""}
+                                    placeholder={formatMessage(locale.filterColumnPlaceholder, { column: title })}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        const val = (e.currentTarget as HTMLInputElement).value.trim();
+                                        setOpenFilterCol(null);
+                                        onQueryChange(withFilter(query, id, val || undefined));
+                                      }
+                                    }}
+                                  />
+                                  <div className="nxg-filter-popover-actions">
+                                    {activeFilter ? (
+                                      <button
+                                        type="button"
+                                        className="nxg-filter-popover-btn"
+                                        onClick={() => {
+                                          setOpenFilterCol(null);
+                                          onQueryChange(withFilter(query, id, undefined));
+                                        }}
+                                      >
+                                        {locale.clearFilter}
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      className="nxg-filter-popover-btn nxg-filter-popover-btn--primary"
+                                      onClick={(e) => {
+                                        const parent = (e.currentTarget as HTMLElement).closest(".nxg-filter-popover");
+                                        const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
+                                        const val = inputEl?.value.trim();
+                                        setOpenFilterCol(null);
+                                        onQueryChange(withFilter(query, id, val || undefined));
+                                      }}
+                                    >
+                                      {locale.applyFilter}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
+
+                    {enableColumnResize ? (
+                      <div className="nxg-resize-handle" onPointerDown={startResize} />
+                    ) : null}
                   </th>
                 );
               })}
@@ -660,7 +851,8 @@ export function NexGrid<TData>({
                         onClick={(event) => event.stopPropagation()}
                       >
                         <input
-                          type="checkbox"
+                          type={isSingleSelect ? "radio" : "checkbox"}
+                          name={isSingleSelect ? `${instanceId}-select` : undefined}
                           className="nxg-checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelectRow(id)}

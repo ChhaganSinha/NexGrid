@@ -42,6 +42,38 @@ export function withToggledSort(query: QueryState, field: string): QueryState {
   return { ...query, sort, page: 1 };
 }
 
+/**
+ * Advance the sort cycle for a column within a multi-column sort list:
+ * - If not present in `query.sort`: appends `{ field, dir: "asc" }`.
+ * - If present with `"asc"`: updates to `"desc"`.
+ * - If present with `"desc"`: removes this column from the sort list.
+ * Resets to page 1.
+ */
+export function withToggledMultiSort(query: QueryState, field: string): QueryState {
+  const existingIndex = query.sort.findIndex((s) => s.field === field);
+  let sort: SortSpec[];
+
+  if (existingIndex === -1) {
+    sort = [...query.sort, { field, dir: "asc" }];
+  } else {
+    const current = query.sort[existingIndex];
+    if (current?.dir === "asc") {
+      sort = [
+        ...query.sort.slice(0, existingIndex),
+        { field, dir: "desc" },
+        ...query.sort.slice(existingIndex + 1),
+      ];
+    } else {
+      sort = [
+        ...query.sort.slice(0, existingIndex),
+        ...query.sort.slice(existingIndex + 1),
+      ];
+    }
+  }
+
+  return { ...query, sort, page: 1 };
+}
+
 /** Set an explicit sort. Resets to page 1. */
 export function withSort(query: QueryState, field: string, dir: SortDir): QueryState {
   return { ...query, sort: [{ field, dir }], page: 1 };

@@ -67,6 +67,10 @@ export interface NexGridProps<TData> {
 
   /** Render selection checkboxes. Default `false`. */
   enableSelection?: boolean;
+  /** Selection mode: `"multi"` (default) or `"single"`. */
+  selectionMode?: "multi" | "single";
+  /** Enable dragging column borders to resize columns. Default `true`. */
+  enableColumnResize?: boolean;
   /**
    * Called with every selected row id after each change.
    * `allAcrossSelected` is reserved for a future "select all matching rows"

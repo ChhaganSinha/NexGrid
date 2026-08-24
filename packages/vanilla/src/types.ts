@@ -104,6 +104,10 @@ export interface NexGridOptions<TData> {
   searchPlaceholder?: string;
   /** Show row selection checkboxes. Default `false`. */
   enableSelection?: boolean;
+  /** Selection mode: `"multi"` (default) or `"single"`. */
+  selectionMode?: "multi" | "single";
+  /** Enable dragging column borders to resize columns. Default `true`. */
+  enableColumnResize?: boolean;
   /**
    * Called with the running selection whenever it changes.
    * `allAcrossSelected` is always `false` today — the argument is reserved for

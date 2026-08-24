@@ -8,6 +8,7 @@ import {
   defaultQuery,
   primarySort,
   withToggledSort,
+  withToggledMultiSort,
   withSort,
   withSearch,
   withPage,
@@ -37,6 +38,36 @@ test("sort cycles asc -> desc -> cleared on the same column", () => {
 
   const cleared = withToggledSort(desc, "name");
   assert.deepEqual(cleared.sort, []);
+});
+
+test("withToggledMultiSort appends, cycles, and removes columns in multi-sort", () => {
+  const base = defaultQuery();
+
+  // 1. Add first sort column
+  const sort1 = withToggledMultiSort(base, "name");
+  assert.deepEqual(sort1.sort, [{ field: "name", dir: "asc" }]);
+
+  // 2. Add second sort column
+  const sort2 = withToggledMultiSort(sort1, "score");
+  assert.deepEqual(sort2.sort, [
+    { field: "name", dir: "asc" },
+    { field: "score", dir: "asc" },
+  ]);
+
+  // 3. Cycle second sort column to desc
+  const sort3 = withToggledMultiSort(sort2, "score");
+  assert.deepEqual(sort3.sort, [
+    { field: "name", dir: "asc" },
+    { field: "score", dir: "desc" },
+  ]);
+
+  // 4. Cycle second sort column to cleared
+  const sort4 = withToggledMultiSort(sort3, "score");
+  assert.deepEqual(sort4.sort, [{ field: "name", dir: "asc" }]);
+
+  // 5. Verify page resets to 1
+  const onPage3 = { ...sort2, page: 3 };
+  assert.equal(withToggledMultiSort(onPage3, "name").page, 1);
 });
 
 test("sorting a different column restarts at ascending", () => {

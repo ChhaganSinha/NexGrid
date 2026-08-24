@@ -16,6 +16,13 @@ export interface NexGridLocale {
   exportExcelSubtitle: string;
   exportCsvTitle: string;
   exportCsvSubtitle: string;
+  exportClipboardTitle: string;
+  exportClipboardSubtitle: string;
+  exportClipboardSuccess: string;
+  filterColumnPlaceholder: string;
+  filterAll: string;
+  clearFilter: string;
+  applyFilter: string;
   serialHeader: string;
   selectAllLabel: string;
   selectRowLabel: string;
@@ -56,6 +63,13 @@ export const DEFAULT_LOCALE: NexGridLocale = {
   exportExcelSubtitle: "With colored badges & styling",
   exportCsvTitle: "Raw CSV (.csv)",
   exportCsvSubtitle: "Standard unformatted data",
+  exportClipboardTitle: "Copy to Clipboard",
+  exportClipboardSubtitle: "Tab-separated values (TSV)",
+  exportClipboardSuccess: "Copied {count} records to clipboard",
+  filterColumnPlaceholder: "Filter {column}…",
+  filterAll: "All",
+  clearFilter: "Clear",
+  applyFilter: "Apply",
   serialHeader: "S.No.",
   selectAllLabel: "Select all rows",
   selectRowLabel: "Select row {id}",

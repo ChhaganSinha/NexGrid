@@ -15,6 +15,7 @@ export type {
   QueryState,
   PagedResponse,
   Density,
+  SelectionMode,
 } from "./types.js";
 
 // Column model
@@ -42,6 +43,7 @@ export {
   defaultQuery,
   primarySort,
   withToggledSort,
+  withToggledMultiSort,
   withSort,
   withSearch,
   withPage,
@@ -71,6 +73,7 @@ export type { AllPages } from "./fetch-all-pages.js";
 export { toExportColumns } from "./export/columns.js";
 export type { ExportColumn } from "./export/columns.js";
 export { toCsv, downloadCsv } from "./export/csv.js";
+export { toTsv, copyToClipboard } from "./export/clipboard.js";
 export {
   toExcelHtml,
   downloadExcel,

@@ -25,6 +25,8 @@ export interface NexGridHeaderView {
   sortable: boolean;
   /** Which sort icon to draw. */
   sortState: "asc" | "desc" | "none";
+  /** Sort order priority number for multi-column sorting (1, 2, ...), or null. */
+  sortOrder: number | null;
   /** `aria-sort` value, or `null` when the column cannot be sorted. */
   ariaSort: "ascending" | "descending" | "none" | null;
   align: "left" | "center" | "right";
@@ -32,6 +34,12 @@ export interface NexGridHeaderView {
   width: number | null;
   /** Minimum pixel width, or `null` when a fixed width is set. */
   minWidth: number | null;
+  /** Whether the column has a server-filterable menu. */
+  serverFilterable: boolean;
+  /** Preset options if defined on column metadata. */
+  filterOptions?: readonly string[];
+  /** The current filter value applied to this column, if any. */
+  activeFilter?: string;
 }
 
 /** One rendered data cell, in the table and in the mobile card list. */

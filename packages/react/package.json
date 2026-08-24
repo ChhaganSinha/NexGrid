@@ -44,6 +44,7 @@
   ],
   "scripts": {
     "build": "tsup && node scripts/copy-styles.mjs",
+    "test": "npm run build && node test/render.test.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
