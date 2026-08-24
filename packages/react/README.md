@@ -420,6 +420,13 @@ Always mutate a `QueryState` through those reducers rather than spreading it by
 hand — they are what guarantee that a search or a page-size change resets to page
 one and that the sort cycle stays `asc → desc → cleared` across every adapter.
 
+## Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
 ## License
 
-MIT
+[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+

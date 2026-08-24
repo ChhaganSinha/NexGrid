@@ -81,3 +81,12 @@ Every feature in NexGrid behaves with 100% parity across all 4 platforms:
 ## 🤝 Specification & Compliance
 
 Building a custom renderer or extending NexGrid? Review [`adapter-spec.md`](adapter-spec.md) for the normative DOM, accessibility, and behavioral specifications required of any NexGrid adapter.
+
+---
+
+## 👨‍💻 Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+

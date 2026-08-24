@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Zero-dependency vanilla JS/DOM renderer for NexGrid — the professional, server-driven data grid. Also powers NexGrid.AspNetCore.",
   "license": "MIT",
-  "author": "NexGrid contributors",
+  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",

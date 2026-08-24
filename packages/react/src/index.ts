@@ -32,13 +32,22 @@ export type {
   ExcelBadgeRule,
 } from "@nexgrid/core";
 
+export { useClientNexGrid } from "./use-client-nex-grid.js";
+export type { UseClientNexGridOptions } from "./use-client-nex-grid.js";
+
 export {
-  // Building and reading a query
+  // In-memory client-side data querying
+  queryClientData,
+  // Building and reading a query (REST & OData v4)
   defaultQuery,
   parseQuery,
   serializeQuery,
   buildQueryUrl,
+  toODataParams,
+  buildODataUrl,
+  fromODataResponse,
   primarySort,
+
   // Query reducers — the only supported way to mutate a QueryState
   withToggledSort,
   withSort,
@@ -55,3 +64,5 @@ export {
   DEFAULT_LOCALE,
   resolveLocale,
 } from "@nexgrid/core";
+export type { ClientQueryOptions } from "@nexgrid/core";
+

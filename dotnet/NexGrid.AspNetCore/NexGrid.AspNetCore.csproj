@@ -25,7 +25,7 @@
     <PackageId>NexGrid.AspNetCore</PackageId>
     <Version>0.1.0</Version>
     <Title>NexGrid for ASP.NET Core</Title>
-    <Authors>NexGrid contributors</Authors>
+    <Authors>Chhagan Sinha</Authors>
     <Company>NexGrid</Company>
     <Product>NexGrid</Product>
     <Description>Server-driven data grid for ASP.NET Core: Tag Helpers that render the NexGrid browser bundle, a query-string binder for NexGrid's wire format, and allowlisted IQueryable extensions that turn a page/sort/search/filter request into an EF Core-translatable query and a PagedResponse.</Description>
@@ -36,7 +36,7 @@
     <RepositoryUrl>https://github.com/ChhaganSinha/NexGrid.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <Copyright>Copyright (c) NexGrid contributors</Copyright>
+    <Copyright>Copyright (c) Chhagan Sinha</Copyright>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>

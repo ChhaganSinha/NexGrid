@@ -4,7 +4,7 @@
   "private": true,
   "description": "NexGrid — a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.",
   "license": "MIT",
-  "author": "NexGrid contributors",
+  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/ChhaganSinha/NexGrid.git"

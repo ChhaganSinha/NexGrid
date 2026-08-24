@@ -347,6 +347,14 @@ dotnet pack dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release
 
 ---
 
+## 👨‍💻 Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for development workflows, coding guidelines, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
@@ -357,4 +365,5 @@ For security reports, please refer to [SECURITY.md](SECURITY.md).
 
 ## 📄 License
 
-NexGrid is open source software licensed under the [MIT License](LICENSE). Free for personal and commercial use forever.
+NexGrid is open source software created by **Chhagan Sinha** and licensed under the [MIT License](LICENSE). Free for personal and commercial use forever.
+

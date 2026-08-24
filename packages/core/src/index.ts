@@ -37,7 +37,7 @@ export type {
   NexGridCellContext,
 } from "./column.js";
 
-// Query reducers
+// Query reducers and client-side dataset querying
 export {
   defaultQuery,
   primarySort,
@@ -49,13 +49,19 @@ export {
   withFilter,
   totalPagesFor,
 } from "./query.js";
+export { queryClientData } from "./client-query.js";
+export type { ClientQueryOptions } from "./client-query.js";
+
 
 // Pagination presentation
 export { getPageNumbers, getRecordRange, serialNumber } from "./pagination.js";
 export type { PageItem, RecordRange } from "./pagination.js";
 
-// Wire format
+// Wire format (REST & OData v4)
 export { toSearchParams, serializeQuery, parseQuery, buildQueryUrl } from "./serialize.js";
+export { toODataParams, buildODataUrl, fromODataResponse } from "./odata.js";
+export type { ODataQueryOptions, ODataResponse } from "./odata.js";
+
 
 // Full-dataset collection
 export { fetchAllPages, MAX_PAGE_SIZE, DEFAULT_ROW_CAP } from "./fetch-all-pages.js";

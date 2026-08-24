@@ -485,8 +485,15 @@ The query format is stable and documented, and
 Use `parseQuery` / `serializeQuery` from `@nexgrid/core` (re-exported here) to
 round-trip it through the URL and make grid state shareable.
 
+## Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
 ---
 
 ## License
 
-MIT
+[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+

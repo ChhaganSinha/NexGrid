@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Framework-agnostic engine for NexGrid: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
   "license": "MIT",
-  "author": "NexGrid contributors",
+  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",

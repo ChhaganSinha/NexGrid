@@ -10,12 +10,12 @@
 
 Please **do not** open a public issue for security vulnerabilities.
 
-Report privately via GitHub's *Security → Report a vulnerability* (private
-vulnerability reporting) on this repository. Include:
+Report privately via GitHub's *Security → Report a vulnerability* on this repository, or email **Chhagan Sinha** directly at [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com). Include:
 
 - affected package(s) and version(s)
 - a description of the issue and its impact
 - reproduction steps or a proof of concept
+
 
 You will receive an acknowledgement within 72 hours. We aim to release a fix
 and coordinated disclosure within 90 days.

@@ -356,8 +356,15 @@ onQueryChange: (next) => {
 // …and on load: query: NexGrid.parseQuery(location.search)
 ```
 
+## Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
 ---
 
 ## License
 
-MIT
+[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+

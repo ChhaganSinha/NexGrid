@@ -57,6 +57,13 @@ interface PagedResponse<T> {
 Add the `nxg-dark` class on the grid root (or an ancestor) for dark mode, or
 `nxg-auto` to follow the OS preference.
 
+## Author & Maintainer
+
+**Chhagan Sinha**  
+- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
 ## License
 
-[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE)
+[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+

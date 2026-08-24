@@ -33,8 +33,16 @@ export type {
 } from "./lib/view-model";
 
 // Re-exported from the engine for convenience.
-export { PAGE_SIZES, buildQueryUrl, defaultQuery, parseQuery, serializeQuery } from "@nexgrid/core";
+export {
+  PAGE_SIZES,
+  buildQueryUrl,
+  defaultQuery,
+  parseQuery,
+  queryClientData,
+  serializeQuery,
+} from "@nexgrid/core";
 export type {
+  ClientQueryOptions,
   Density,
   ExcelBadgeRule,
   NexGridColumn,
@@ -46,3 +54,4 @@ export type {
   SortDir,
   SortSpec,
 } from "@nexgrid/core";
+

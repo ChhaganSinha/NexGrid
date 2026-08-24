@@ -296,8 +296,49 @@ Two rules worth repeating:
 - **Order before you page.** `OFFSET`/`FETCH` over an unordered query has no
   defined row order — pages overlap and rows disappear.
 
+## Client side (In-Memory Datasets)
+
+When you already have a full in-memory dataset in the browser (e.g. 500 items fetched once, or static data), use `queryClientData` or the `useClientNexGrid` hook. It executes global search, column filters, multi-column sorting, and windowed pagination completely on the client:
+
+### React (`useClientNexGrid`)
+```tsx
+import { NexGrid, useClientNexGrid } from "@nexgrid/react";
+
+export function ClientTable({ allStudents }: { allStudents: Student[] }) {
+  // Handles in-memory pagination, search, sort, and filters automatically
+  const grid = useClientNexGrid(allStudents);
+
+  return (
+    <NexGrid
+      caption="Students"
+      columns={columns}
+      {...grid}
+    />
+  );
+}
+```
+
+### Vanilla JS / Angular / Core (`queryClientData`)
+```ts
+import { defaultQuery, queryClientData, type QueryState } from "@nexgrid/core";
+
+let query: QueryState = defaultQuery();
+
+// Pure evaluator: returns exactly one page of items and total filtered count
+const page = queryClientData(allStudents, query, {
+  searchableFields: ["name", "email", "department"],
+  sortableFields: ["name", "score", "enrolledAt"],
+});
+
+console.log(page.items);      // 10 items for page 1
+console.log(page.total);      // 500 total
+console.log(page.totalPages); // 50 pages
+```
+
 ## Related
 
 - [Search](search.md) · [Sorting](sorting.md) · [Selection](selection.md)
 - [Server integration](../server-integration.md)
-- [`@nexgrid/core` API](../api/core.md) — `getPageNumbers`, `getRecordRange`, `serialNumber`
+- [`@nexgrid/core` API](../api/core.md) — `queryClientData`, `getPageNumbers`, `getRecordRange`, `serialNumber`
+- [`@nexgrid/react` API](../api/react.md) — `useClientNexGrid`
+

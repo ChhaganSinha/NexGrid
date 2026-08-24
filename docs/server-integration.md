@@ -584,6 +584,218 @@ export default async function handler(
 }
 ```
 
+---
+
+## OData v4 Integration
+
+NexGrid includes built-in adapters for **OData v4** (`toODataParams`, `buildODataUrl`, and `fromODataResponse`).
+
+### Client Setup (React / Angular / Vanilla)
+
+```tsx
+import { useEffect, useState } from "react";
+import { NexGrid } from "@nexgrid/react";
+import {
+  defaultQuery,
+  buildODataUrl,
+  fromODataResponse,
+  type QueryState,
+  type PagedResponse,
+} from "@nexgrid/core";
+
+export function ODataGrid() {
+  const [query, setQuery] = useState<QueryState>(defaultQuery());
+  const [page, setPage] = useState<PagedResponse<Student>>();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+
+    // Converts QueryState -> $top, $skip, $orderby, $filter, $count=true
+    const url = buildODataUrl("https://api.example.com/odata/Students", query, {
+      searchableFields: ["Name", "Email"],
+      fieldMap: { status: "Status", createdAt: "CreatedOn" },
+    });
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((odataJson) => setPage(fromODataResponse(odataJson, query)))
+      .finally(() => setLoading(false));
+  }, [query]);
+
+  return (
+    <NexGrid
+      caption="OData Students"
+      columns={columns}
+      data={page?.items ?? []}
+      total={page?.total ?? 0}
+      query={query}
+      onQueryChange={setQuery}
+      isLoading={loading}
+    />
+  );
+}
+```
+
+### Backend (ASP.NET Core OData)
+
+```csharp
+[HttpGet]
+[EnableQuery(PageSize = 100)]
+public IQueryable<Student> Get()
+{
+    return _db.Students.AsNoTracking();
+}
+```
+
+---
+
+## gRPC / Connect-RPC Integration
+
+For high-throughput microservices using Protobuf and gRPC or Connect-RPC:
+
+### 1. Protobuf Definition (`students.proto`)
+
+```protobuf
+syntax = "proto3";
+
+package students.v1;
+
+message QueryRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  repeated string sort = 3;       // e.g. ["name:asc", "created_at:desc"]
+  string search = 4;
+  map<string, string> filter = 5; // e.g. {"status": "Active"}
+}
+
+message StudentItem {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string status = 4;
+}
+
+message QueryResponse {
+  repeated StudentItem items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  int32 total_pages = 5;
+}
+
+service StudentService {
+  rpc ListStudents (QueryRequest) returns (QueryResponse);
+}
+```
+
+### 2. Client Setup (TypeScript with `@connectrpc/connect` or `grpc-web`)
+
+```tsx
+import { useEffect, useState } from "react";
+import { NexGrid } from "@nexgrid/react";
+import { defaultQuery, type QueryState, type PagedResponse } from "@nexgrid/core";
+import { createPromiseClient } from "@connectrpc/connect";
+import { StudentService } from "./gen/students_connect";
+
+export function GrpcGrid({ transport }: { transport: any }) {
+  const [query, setQuery] = useState<QueryState>(defaultQuery());
+  const [page, setPage] = useState<PagedResponse<Student>>();
+  const [loading, setLoading] = useState(true);
+
+  const client = createPromiseClient(StudentService, transport);
+
+  useEffect(() => {
+    setLoading(true);
+
+    client.listStudents({
+      page: query.page,
+      pageSize: query.pageSize,
+      sort: query.sort.map((s) => `${s.field}:${s.dir}`),
+      search: query.q || "",
+      filter: query.filter || {},
+    })
+    .then((res) => {
+      setPage({
+        items: res.items as Student[],
+        page: res.page,
+        pageSize: res.pageSize,
+        total: res.total,
+        totalPages: res.totalPages,
+      });
+    })
+    .finally(() => setLoading(false));
+  }, [query]);
+
+  return (
+    <NexGrid
+      caption="gRPC Students"
+      columns={columns}
+      data={page?.items ?? []}
+      total={page?.total ?? 0}
+      query={query}
+      onQueryChange={setQuery}
+      isLoading={loading}
+    />
+  );
+}
+```
+
+---
+
+## GraphQL Integration
+
+Connecting NexGrid to GraphQL APIs (Apollo, Relay, Hot Chocolate):
+
+```tsx
+import { gql, useQuery } from "@apollo/client";
+import { useState } from "react";
+import { NexGrid } from "@nexgrid/react";
+import { defaultQuery, type QueryState } from "@nexgrid/core";
+
+const GET_STUDENTS = gql`
+  query GetStudents($page: Int!, $pageSize: Int!, $sort: [String!], $q: String, $status: String) {
+    students(page: $page, pageSize: $pageSize, sort: $sort, q: $q, status: $status) {
+      items { id name email status }
+      total
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
+export function GraphQLGrid() {
+  const [query, setQuery] = useState<QueryState>(defaultQuery());
+
+  const { data, loading } = useQuery(GET_STUDENTS, {
+    variables: {
+      page: query.page,
+      pageSize: query.pageSize,
+      sort: query.sort.map((s) => `${s.field}:${s.dir}`),
+      q: query.q || null,
+      status: query.filter?.status || null,
+    },
+  });
+
+  const page = data?.students;
+
+  return (
+    <NexGrid
+      caption="GraphQL Students"
+      columns={columns}
+      data={page?.items ?? []}
+      total={page?.total ?? 0}
+      query={query}
+      onQueryChange={setQuery}
+      isLoading={loading}
+    />
+  );
+}
+```
+
+---
+
 ## Checklist
 
 - [ ] `page`, `pageSize`, repeatable `sort`, `q` and `filter[...]` are read from
@@ -606,3 +818,4 @@ export default async function handler(
 - [Concepts](concepts.md) — why the contract looks like this
 - [Sorting](features/sorting.md) · [Search](features/search.md) · [Pagination](features/pagination.md)
 - [`NexGrid.AspNetCore` API](api/aspnet.md) · [`@nexgrid/core` API](api/core.md)
+

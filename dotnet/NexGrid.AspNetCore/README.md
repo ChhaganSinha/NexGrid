@@ -513,8 +513,15 @@ The `.csproj` copies `packages/vanilla/dist/nexgrid.global.js` and
 checkout where the JavaScript has not been built still compiles — it just warns
 and produces a package with no browser payload.
 
+## Author & Maintainer
+
+**Chhagan Sinha**  
+- Email: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
+- GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
+
 ---
 
 ## License
 
-MIT © NexGrid contributors. See [LICENSE](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE).
+MIT © 2026 Chhagan Sinha. See [LICENSE](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE).
+

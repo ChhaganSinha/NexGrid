@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "NexGrid for React and Next.js — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
   "license": "MIT",
-  "author": "NexGrid contributors",
+  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",

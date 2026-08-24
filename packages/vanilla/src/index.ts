@@ -68,6 +68,7 @@ export {
   isPageSize,
   parseQuery,
   primarySort,
+  queryClientData,
   resolveLocale,
   serialNumber,
   serializeQuery,
@@ -83,6 +84,7 @@ export {
 } from "@nexgrid/core";
 
 export type {
+  ClientQueryOptions,
   Density,
   ExcelBadgeRule,
   NexGridCellContext,
@@ -97,3 +99,4 @@ export type {
   SortDir,
   SortSpec,
 } from "@nexgrid/core";
+
