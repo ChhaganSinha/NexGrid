@@ -1,78 +1,97 @@
 <div align="center">
 
-# NexGrid
+# ⚡ NexGrid
 
-**A professional, server-driven data grid for React, Next.js, Angular, vanilla JavaScript, and ASP.NET Core.**
+### **A professional, server-driven data grid for React, Next.js, Angular, vanilla JavaScript, and ASP.NET Core.**
 
-One engine. One stylesheet. One server contract. Four platforms.
+One Engine · One Stylesheet · One Server Contract · Four Frameworks
 
-Free and open source, MIT licensed, forever.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@nexgrid/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@nexgrid/react)
+[![NuGet version](https://img.shields.io/nuget/v/NexGrid.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/NexGrid.AspNetCore)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
+[![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen?style=flat-square)](packages/core/test)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+
+[**Explore Documentation**](docs/README.md) · [**View Examples**](examples/README.md) · [**Getting Started**](docs/getting-started.md) · [**Changelog**](CHANGELOG.md)
 
 </div>
 
 ---
 
-## Why NexGrid
+## 🚀 Why NexGrid?
 
-Most data grids assume they can hold your data. That works until the table has a
-million rows — then "sort" silently sorts *the current page*, "search" filters
-what happens to be in memory, and the export writes out whatever the user could
-already see.
+Traditional data grids assume the browser can hold your entire dataset in memory. That works fine for 100 rows, but breaks down when datasets scale:
+- Sorting silently re-orders **only the current page**, showing incorrect rankings.
+- Search filters only what is already downloaded in memory.
+- Exporting writes out only the visible DOM rows instead of the full filtered dataset.
 
-NexGrid is built the other way round. The grid **never holds your dataset**.
-Every interaction — page, sort, search, filter — becomes a `QueryState` your
-server answers with exactly one page of rows plus a total count. That single
-decision is what makes the grid behave identically at 50 rows and at 5,000,000.
+**NexGrid is designed server-driven from the core.**
 
-And because the engine is framework-agnostic, the React grid, the Angular grid,
-the vanilla grid, and the ASP.NET grid are not four implementations that drift
-apart — they are four thin renderers over the same pagination math, the same
-export pipeline, the same stylesheet, and the same wire format.
+The grid **never holds your entire dataset**. Every user interaction — paging, multi-column sorting, global search, column filters — compiles into a standard [`QueryState`](docs/concepts.md#the-querystate-contract) object. Your server responds with exactly **one page of records plus the total matching count**.
 
-## Packages
+This single architectural rule ensures NexGrid behaves with identical lightning-fast performance at **50 rows or 5,000,000 rows**.
 
-| Package | Platform | Install |
-| ------- | -------- | ------- |
-| [`@nexgrid/core`](packages/core) | Framework-agnostic engine | `npm i @nexgrid/core` |
-| [`@nexgrid/react`](packages/react) | React 18+ / Next.js | `npm i @nexgrid/react` |
-| [`@nexgrid/angular`](packages/angular) | Angular 17+ | `npm i @nexgrid/angular` |
-| [`@nexgrid/vanilla`](packages/vanilla) | Any page, no framework | `npm i @nexgrid/vanilla` |
-| [`NexGrid.AspNetCore`](dotnet/NexGrid.AspNetCore) | ASP.NET Core 8+ | `dotnet add package NexGrid.AspNetCore` |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Grid as NexGrid (UI Component)
+    participant Server as Backend API / ASP.NET / Node
+    participant DB as Database (SQL / EF Core / Mongo)
 
-## Features
+    User->>Grid: Interacts (Search "smith", Sort "name:asc", Page 2)
+    Grid->>Server: GET /api/students?page=2&pageSize=25&sort=name:asc&q=smith
+    Server->>DB: Apply WHERE, ORDER BY, COUNT(*), OFFSET/FETCH
+    DB-->>Server: 25 rows + Total: 1,284
+    Server-->>Grid: PagedResponse { items: [...], page: 2, pageSize: 25, total: 1284 }
+    Grid-->>User: Renders table + updates live pager ("Showing 26 to 50 of 1,284")
+```
 
-Every feature below works the same way on **every** platform.
+---
 
-- **Server-driven everything** — paging, sorting, global search, and per-column
-  filters are query state, not client-side array operations.
-- **Global search** with 350 ms debounce and a clear button.
-- **Sorting** with the familiar three-state cycle: ascending → descending → cleared.
-- **Numbered pagination** with ellipsis, rows-per-page, a "Go to page" jump box,
-  and a live "Showing 21 to 40 of 1,284 entries" range.
-- **Row selection** with a select-all-on-page header checkbox and a selection count badge.
-- **Column visibility** menu, per column, with columns hidden by default if you say so.
-- **Density switching** — compact, standard, comfortable.
-- **Automatic serial numbers** that keep counting across pages.
-- **Exports** — a formatted Excel workbook with colored status badges, and an
-  RFC 4180 CSV with a UTF-8 BOM. Both can pull the **whole filtered dataset**
-  across pages, not just what is on screen.
-- **Responsive by construction** — a table on desktop, and below 768 px a card
-  per record so nobody has to scroll sideways to read one row.
-- **Loading, empty, and error states**, with a retry action.
-- **Custom cell renderers** in every framework's own idiom (JSX, Angular
-  templates, DOM nodes).
-- **Fully themeable** through CSS custom properties — no class overrides, no
-  `!important`, with built-in dark mode.
-- **Fully localizable** — every string in the UI is overridable.
-- **Accessible** — real table semantics, accessible names on every control,
-  `aria-sort`, keyboard-operable menus.
+## 📦 Packages
 
-## Quick start
+| Package | Target Platform | Installation |
+| :--- | :--- | :--- |
+| [`@nexgrid/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @nexgrid/core` |
+| [`@nexgrid/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @nexgrid/react` |
+| [`@nexgrid/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @nexgrid/angular` |
+| [`@nexgrid/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @nexgrid/vanilla` |
+| [`NexGrid.AspNetCore`](dotnet/NexGrid.AspNetCore) | ASP.NET Core 8+ Razor Class Library & TagHelpers | `dotnet add package NexGrid.AspNetCore` |
 
-### React / Next.js
+---
+
+## ✨ Features
+
+Every feature works identically across React, Angular, Vanilla JS, and ASP.NET Core:
+
+- ⚡ **Server-Driven Query Engine** — Pagination, sorting, global search, and filters are server requests, never client-side array mutations.
+- 🔍 **Debounced Global Search** — 350 ms debounced search with automatic clear button.
+- 🔄 **Three-State Sorting** — Familiar cycle: `Ascending → Descending → Cleared`. Multi-column sorting supported.
+- 📄 **Numbered Pagination & Jump** — Smart ellipsis, page size selector (`10, 25, 50, 100`), jump-to-page input, and live range summary (`Showing 21 to 40 of 1,284 entries`).
+- ☑️ **Row Selection** — Single and multi-row selection with "Select All on Page" checkbox and active selection badge.
+- 👁️ **Column Visibility & Alignment** — Dropdown menu to toggle column visibility on the fly; custom left/center/right alignment.
+- 📏 **Density Switching** — Compact (36px), Standard (44px), and Comfortable (52px) row height modes.
+- 🔢 **Automatic Serial Numbers** — Built-in `S.No.` column that seamlessly counts across pages.
+- 📊 **Multi-Format Exports** —
+  - **Formatted Excel (.xls)** with automatic status badge styling and colored cell tags.
+  - **RFC 4180 CSV** with UTF-8 BOM.
+  - Full-dataset export support (fetches all filtered pages in the background, not just on-screen rows).
+  - OWASP spreadsheet-injection neutralization (formula protection).
+- 📱 **Mobile Card Responsive Layout** — Renders as a structured table on desktop; automatically switches to high-density cards below 768px.
+- 🎨 **Modern Theming & Dark Mode** — Clean CSS custom properties (`--nxg-*`), with built-in Light, Dark, and OS-matched Auto themes.
+- 🌐 **100% Localizable** — Every string and label is overridable via [`NexGridLocale`](docs/localization.md).
+- ♿ **Accessible & Safe** — Semantic table markup, full ARIA attributes (`aria-sort`, `role="region"`), keyboard operable, and strict XSS protection.
+
+---
+
+## ⚡ Quick Start
+
+### 1. React / Next.js (App Router Safe)
 
 ```bash
-npm install @nexgrid/react
+npm install @nexgrid/react @nexgrid/core
 ```
 
 ```tsx
@@ -121,7 +140,7 @@ export function StudentsGrid() {
 
   return (
     <NexGrid
-      caption="Students"
+      caption="Students Directory"
       columns={columns}
       data={page?.items ?? []}
       total={page?.total ?? 0}
@@ -135,97 +154,207 @@ export function StudentsGrid() {
 }
 ```
 
-### ASP.NET Core
+---
+
+### 2. Angular (17+ Standalone)
+
+```bash
+npm install @nexgrid/angular @nexgrid/core
+```
+
+```typescript
+import { Component, signal } from '@angular/core';
+import { NexGridComponent, type NexGridColumn } from '@nexgrid/angular';
+import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from '@nexgrid/core';
+
+@Component({
+  selector: 'app-students-grid',
+  standalone: true,
+  imports: [NexGridComponent],
+  template: `
+    <nex-grid
+      caption="Students Directory"
+      [columns]="columns"
+      [data]="data()"
+      [total]="total()"
+      [query]="query()"
+      [isLoading]="loading()"
+      [enableSelection]="true"
+      fetchEndpoint="/api/students"
+      (queryChange)="onQueryChange($event)"
+    />
+  `,
+})
+export class StudentsGridComponent {
+  query = signal<QueryState>(defaultQuery());
+  data = signal<Student[]>([]);
+  total = signal(0);
+  loading = signal(false);
+
+  columns: NexGridColumn<Student>[] = [
+    { accessorKey: 'name', header: 'Name' },
+    { accessorKey: 'email', header: 'Email' },
+    { accessorKey: 'status', header: 'Status' },
+  ];
+
+  onQueryChange(next: QueryState) {
+    this.query.set(next);
+    this.loading.set(true);
+    fetch(buildQueryUrl('/api/students', next))
+      .then((r) => r.json())
+      .then((res: PagedResponse<Student>) => {
+        this.data.set(res.items);
+        this.total.set(res.total);
+      })
+      .finally(() => this.loading.set(false));
+  }
+}
+```
+
+---
+
+### 3. ASP.NET Core (Razor Tag Helpers + EF Core)
 
 ```bash
 dotnet add package NexGrid.AspNetCore
 ```
 
+**Controller / Minimal API Endpoint:**
 ```csharp
 [HttpGet("/api/students")]
-public async Task<PagedResponse<Student>> Get([FromQuery] NexGridQuery query) =>
-    await db.Students.AsNoTracking().ToPagedResponseAsync(query, o => o
-        .Sortable(s => s.Name, s => s.CreatedAt)
-        .Searchable(s => s.Name, s => s.Email)
-        .Filterable("status", s => s.Status));
+public async Task<PagedResponse<Student>> Get([FromQuery] NexGridQuery query, AppDbContext db)
+{
+    return await db.Students
+        .AsNoTracking()
+        .ToPagedResponseAsync(query, options => options
+            .Sortable(s => s.Name, s => s.CreatedAt)
+            .Searchable(s => s.Name, s => s.Email)
+            .Filterable("status", s => s.Status)
+            .DefaultSort(s => s.CreatedAt, SortDirection.Descending));
+}
 ```
 
+**Razor View (`.cshtml`):**
 ```cshtml
-<nex-grid caption="Students" endpoint="/api/students" enable-selection="true">
-    <nex-grid-column field="name" header="Name" />
+@using NexGrid.AspNetCore
+@addTagHelper *, NexGrid.AspNetCore
+
+<link rel="stylesheet" href="@NexGridAssets.StylesheetPath" />
+<script src="@NexGridAssets.ScriptPath"></script>
+
+<nex-grid caption="Students Directory" endpoint="/api/students" enable-selection="true">
+    <nex-grid-column field="name" header="Name" min-width="180" />
     <nex-grid-column field="email" header="Email" />
-    <nex-grid-column field="status" header="Status" />
+    <nex-grid-column field="status" header="Status" align="Center" />
 </nex-grid>
 ```
 
-Angular and vanilla quick starts live in [the getting-started guide](docs/getting-started.md).
+---
 
-## The contract
+### 4. Vanilla JavaScript / Plain HTML
 
-Everything rests on two types. Implement them on your server and any NexGrid
-adapter works against it with no glue code.
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/nexgrid.css" />
+<script src="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/nexgrid.global.js"></script>
 
+<div id="grid"></div>
+
+<script>
+  const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+    caption: "Students Directory",
+    endpoint: "/api/students",
+    enableSelection: true,
+    columns: [
+      { accessorKey: "name", header: "Name" },
+      { accessorKey: "email", header: "Email" },
+      { accessorKey: "status", header: "Status" },
+    ],
+  });
+</script>
 ```
+
+---
+
+## 📡 The Wire Contract
+
+The entire communication between client and server rests upon two simple, standardized structures:
+
+### 1. Request Query String
+```http
 GET /api/students?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 ```
 
+### 2. JSON Response
 ```jsonc
 {
-  "items": [ /* exactly ONE page of rows */ ],
+  "items": [
+    { "id": 101, "name": "Aditi Sharma", "email": "aditi@example.edu", "status": "Active" }
+    /* ... exactly 25 items for page 2 ... */
+  ],
   "page": 2,
   "pageSize": 25,
-  "total": 1284,      // full FILTERED count — this drives the pager
+  "total": 1284,       // Full count matching search & filters (drives pager)
   "totalPages": 52
 }
 ```
 
-## Documentation
+---
 
-Full documentation lives in [`docs/`](docs/README.md):
+## 📚 Documentation Index
 
-- [Getting started](docs/getting-started.md) — every platform
-- [Concepts](docs/concepts.md) — the server-driven architecture
-- [Columns](docs/columns.md) · [Theming](docs/theming.md) · [Localization](docs/localization.md)
-- [Server integration](docs/server-integration.md) — ASP.NET Core, Node, Next.js
-- [Features](docs/README.md#features) — search, sorting, pagination, selection, density, export, responsive
-- [API reference](docs/api/core.md)
-- [Migrating from TanStack Table](docs/migration-from-tanstack.md)
+| Guide | Description |
+| :--- | :--- |
+| 📖 [**Getting Started**](docs/getting-started.md) | Setup and first working grid in React, Next.js, Angular, ASP.NET Core, and Vanilla JS. |
+| 💡 [**Core Concepts**](docs/concepts.md) | Deep dive into the server-driven model, `QueryState`, and state reducers. |
+| 📐 [**Column Configuration**](docs/columns.md) | Alignment, custom cell renderers, min/max widths, visibility, and sorting options. |
+| 🎨 [**Theming & Styling**](docs/theming.md) | CSS custom property tokens (`--nxg-*`), Dark mode, and custom presets. |
+| 🌍 [**Localization**](docs/localization.md) | Overriding strings, RTL considerations, and internationalized messages. |
+| 🖥️ [**Server Integration**](docs/server-integration.md) | Implementing endpoints in ASP.NET Core, Node.js/Express, Next.js Route Handlers. |
+| 🔀 [**Migrating from TanStack Table**](docs/migration-from-tanstack.md) | Direct comparison and drop-in migration from TanStack Table v8. |
+| ❓ [**Frequently Asked Questions (FAQ)**](docs/faq.md) | Common questions, performance tips, and troubleshooting. |
+| 📜 [**API Reference**](docs/api/core.md) | Complete prop and type documentation for all packages. |
 
-## Examples
+---
 
-Runnable sample apps live in [`examples/`](examples/README.md): React + Vite,
-Next.js App Router, Angular, ASP.NET Core MVC, and a single-file vanilla HTML page.
+## 💻 Runnable Example Projects
 
-## Repository layout
+Explore ready-to-run projects inside the [`examples/`](examples/README.md) directory:
 
-```
-packages/core       @nexgrid/core       Engine: contract, state, export, theme CSS
-packages/vanilla    @nexgrid/vanilla    Zero-dependency DOM renderer (powers ASP.NET)
-packages/react      @nexgrid/react      React / Next.js component
-packages/angular    @nexgrid/angular    Angular standalone component
-dotnet/             NexGrid.AspNetCore  Tag Helper + IQueryable server extensions
-docs/               Documentation
-examples/           Runnable sample apps
-```
+- ⚛️ [`examples/react-vite`](examples/react-vite) — React 19 + Vite + TypeScript
+- ▲ [`examples/nextjs`](examples/nextjs) — Next.js 15 App Router + Server Route Handlers
+- 🅰️ [`examples/angular`](examples/angular) — Angular 19 Standalone Components
+- 🔷 [`examples/aspnet-mvc`](examples/aspnet-mvc) — ASP.NET Core 8 MVC + Razor Tag Helpers
+- 🌐 [`examples/vanilla-html`](examples/vanilla-html) — Single-file standalone HTML + JS
 
-## Building from source
+---
+
+## 🛠️ Building From Source
 
 ```bash
+# Clone the repository
+git clone https://github.com/ChhaganSinha/NexGrid.git
+cd NexGrid
+
+# Install dependencies and build all JS packages
 npm install
 npm run build
-npm run typecheck
-```
+npm run test
 
-```bash
+# Build and pack ASP.NET Core library
 dotnet build dotnet/NexGrid.sln -c Release
+dotnet pack dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release
 ```
 
-## Contributing
+---
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
-development workflow and design rules, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-Security issues: please follow [SECURITY.md](SECURITY.md).
+## 🤝 Contributing
 
-## License
+Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for development workflows, coding guidelines, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-[MIT](LICENSE) — free for personal and commercial use, forever.
+For security reports, please refer to [SECURITY.md](SECURITY.md).
+
+---
+
+## 📄 License
+
+NexGrid is open source software licensed under the [MIT License](LICENSE). Free for personal and commercial use forever.

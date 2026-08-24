@@ -1,68 +1,83 @@
-# NexGrid documentation
+# 📖 NexGrid Documentation
 
-NexGrid is a server-driven data grid for React, Next.js, Angular, vanilla
-JavaScript and ASP.NET Core. One engine (`@nexgrid/core`), one stylesheet, one
-wire format, four renderers.
+Welcome to the official documentation for **NexGrid** — the server-driven data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
 
-The grid never holds your dataset. Every interaction becomes a `QueryState`;
-your server answers with one page of rows and a total count. That single
-decision is what makes the grid behave the same at 50 rows and at 5,000,000.
+---
 
-New here? Read [Concepts](concepts.md) first, then
-[Getting started](getting-started.md).
+## 🧭 Navigation Guide
 
-## Guides
+```
+docs/
+├── concepts.md                 # Server-driven architecture & data flow
+├── getting-started.md          # Step-by-step guides for all 4 frameworks
+├── columns.md                  # Column definitions, widths, alignment, custom cells
+├── theming.md                  # CSS custom properties, dark mode, color presets
+├── localization.md             # Custom strings, translations, RTL support
+├── server-integration.md       # Implementing endpoints in ASP.NET Core, Node, Next.js
+├── migration-from-tanstack.md  # Migrating from TanStack Table v8
+├── faq.md                      # Common questions and troubleshooting
+├── adapter-spec.md             # Normative DOM & behavior contract for adapters
+├── features/                   # Deep dives into grid capabilities
+│   ├── search.md               # Debounced search & highlight
+│   ├── sorting.md              # 3-state sorting & multi-sort
+│   ├── pagination.md           # Numbered pager, range calculation, jump box
+│   ├── selection.md            # Checkboxes, select-all, action badges
+│   ├── density.md              # Compact, default, comfortable presets
+│   ├── export.md               # Excel (.xls) & CSV full-dataset exports
+│   └── responsive.md           # Desktop table to mobile card layout
+└── api/                        # API & Prop References
+    ├── core.md                 # @nexgrid/core
+    ├── react.md                # @nexgrid/react
+    ├── angular.md              # @nexgrid/angular
+    ├── vanilla.md              # @nexgrid/vanilla
+    └── aspnet.md               # NexGrid.AspNetCore
+```
 
-| Page | What it covers |
-| --- | --- |
-| [Getting started](getting-started.md) | Install and a first working grid in React, Next.js, Angular and ASP.NET Core. |
-| [Concepts](concepts.md) | The server-driven architecture, the `QueryState` / `PagedResponse` contract, why there is no client-side sorting, and the data-flow diagram. |
-| [Columns](columns.md) | Column definitions, `meta` options, custom cells per framework, alignment and width. |
-| [Theming](theming.md) | Every `--nxg-*` token, dark mode, worked re-skins. |
-| [Localization](localization.md) | `NexGridLocale`, every key, a worked non-English example. |
-| [Server integration](server-integration.md) | The wire format in detail, and endpoints in ASP.NET Core, Node/Express and Next.js route handlers. |
-| [Migrating from TanStack Table](migration-from-tanstack.md) | Column definitions are structurally compatible — here is the swap. |
-| [FAQ](faq.md) | The questions that come up once the grid is running. |
+---
 
-## Features
+## 📚 Core Guides
 
-Every feature behaves identically on every platform. The behavioral contract
-that guarantees that is [`adapter-spec.md`](adapter-spec.md).
+| Guide | Description |
+| :--- | :--- |
+| 🚀 [**Getting Started**](getting-started.md) | Installation and first working grid in React, Next.js, Angular, ASP.NET Core, and Vanilla HTML. |
+| 💡 [**Core Concepts**](concepts.md) | Why NexGrid never holds your dataset, the `QueryState` / `PagedResponse` contract, and data flow. |
+| 📐 [**Columns & Custom Cells**](columns.md) | Header names, accessor keys, custom cell templates (JSX, Angular templates, DOM nodes), alignment, and width. |
+| 🎨 [**Theming & Styling**](theming.md) | CSS custom properties (`--nxg-*`), Dark mode, high-contrast themes, and customization. |
+| 🌍 [**Localization**](localization.md) | Complete `NexGridLocale` interface, translating buttons, placeholders, and range text. |
+| 🖥️ [**Server Integration**](server-integration.md) | Wire format specifications with sample backends (ASP.NET Core EF Core, Node.js/Express, Next.js API Routes). |
+| 🔀 [**Migrating from TanStack Table**](migration-from-tanstack.md) | Step-by-step migration guide for projects using `@tanstack/react-table`. |
+| ❓ [**Frequently Asked Questions (FAQ)**](faq.md) | Answers to architectural, export, security, and performance questions. |
 
-| Page | What it covers |
-| --- | --- |
-| [Search](features/search.md) | Debounced global search, clearing, external control. |
-| [Sorting](features/sorting.md) | The `asc → desc → cleared` cycle, multi-sort, server allowlists. |
-| [Pagination](features/pagination.md) | Page sizes, the numbered pager, the record range, page jump. |
-| [Selection](features/selection.md) | Row identity, select-all-on-page, bulk actions. |
-| [Density](features/density.md) | `compact` / `default` / `comfortable`, and styling from outside. |
-| [Export](features/export.md) | CSV and Excel, fetch-all behaviour, the row cap, badge rules, security. |
-| [Responsive](features/responsive.md) | Table above 768 px, one card per record below. |
+---
 
-## API reference
+## ⚡ Feature Deep Dives
 
-| Page | Package |
-| --- | --- |
-| [`@nexgrid/core`](api/core.md) | The engine: types, reducers, pagination math, wire format, export, locale. |
-| [`@nexgrid/react`](api/react.md) | `<NexGrid />` props. |
-| [`@nexgrid/angular`](api/angular.md) | `<nex-grid>` inputs, outputs and directives. |
-| [`@nexgrid/vanilla`](api/vanilla.md) | `createNexGrid` options and the handle. |
-| [`NexGrid.AspNetCore`](api/aspnet.md) | `NexGridQuery`, `ToPagedResponse*`, Tag Helpers. |
+Every feature in NexGrid behaves with 100% parity across all 4 platforms:
 
-The package READMEs are the canonical prop/option tables and stay in the
-packages themselves:
-[`@nexgrid/react`](../packages/react/README.md) ·
-[`@nexgrid/angular`](../packages/angular/README.md) ·
-[`@nexgrid/vanilla`](../packages/vanilla/README.md) ·
-[`NexGrid.AspNetCore`](../dotnet/NexGrid.AspNetCore/README.md).
+| Feature | Topics Covered |
+| :--- | :--- |
+| 🔍 [**Global Search**](features/search.md) | 350ms debouncing, clear button, custom search fields, and server translation. |
+| 🔄 [**Sorting**](features/sorting.md) | Three-state sort cycle (`asc → desc → clear`), multi-column sort tokens, and server allowlists. |
+| 📄 [**Pagination**](features/pagination.md) | Page size allowlists, smart ellipsis calculations, "Go to page" jump input, live record count. |
+| ☑️ [**Row Selection**](features/selection.md) | Row identity keys, select-all-on-page header checkbox, selection badge, and bulk actions. |
+| 📏 [**Row Density**](features/density.md) | `compact` (36px), `default` (44px), and `comfortable` (52px) row height modes. |
+| 📊 [**Excel & CSV Exports**](features/export.md) | Formatted Excel (.xls) with badges, RFC 4180 CSV with UTF-8 BOM, full-dataset collector, and OWASP formula defense. |
+| 📱 [**Responsive Card View**](features/responsive.md) | Seamless transformation from table (desktop) to cards (screens < 768px). |
 
-## Contributing
+---
 
-Building an adapter, or changing an existing one? Start with
-[`adapter-spec.md`](adapter-spec.md) — it is the normative contract, and if an
-adapter and the spec disagree, the adapter is wrong. Development workflow lives
-in [CONTRIBUTING.md](../CONTRIBUTING.md).
+## 📜 Package API References
 
-## License
+| Package | Documentation |
+| :--- | :--- |
+| [`@nexgrid/core`](api/core.md) | Engine: types, query reducers, pagination math, URL query serializer, export engine. |
+| [`@nexgrid/react`](api/react.md) | `<NexGrid />` props, hooks, and types. |
+| [`@nexgrid/angular`](api/angular.md) | `<nex-grid>` inputs, outputs, `*nexGridCell`, and `*nexGridToolbar` directives. |
+| [`@nexgrid/vanilla`](api/vanilla.md) | `createNexGrid()` options, event handlers, and handle methods. |
+| [`NexGrid.AspNetCore`](api/aspnet.md) | `<nex-grid>` Tag Helpers, `NexGridQuery` model binder, and EF Core `IQueryable` extensions. |
 
-MIT.
+---
+
+## 🤝 Specification & Compliance
+
+Building a custom renderer or extending NexGrid? Review [`adapter-spec.md`](adapter-spec.md) for the normative DOM, accessibility, and behavioral specifications required of any NexGrid adapter.
