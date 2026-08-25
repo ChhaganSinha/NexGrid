@@ -367,11 +367,22 @@
               });
             },
           },
-          { accessorKey: "score", header: "Score", meta: { align: "right", width: 90 } },
+          {
+            accessorKey: "score",
+            header: "Score",
+            meta: { align: "right", width: 90, filterable: true },
+            cell: function (ctx) {
+              var score = Number(ctx.getValue());
+              return el("span", {
+                class: score >= 80 ? "score score--high" : "score",
+                text: String(score),
+              });
+            },
+          },
           {
             accessorKey: "enrolledAt",
             header: "Enrolled",
-            meta: { width: 140 },
+            meta: { width: 140, filterable: true },
             // Sorting happens against the raw ISO value, so the display format
             // is free to be whatever reads best.
             cell: function (ctx) {
@@ -382,8 +393,18 @@
               });
             },
           },
-          // No cell: booleans fall back to the locale's yes/no labels.
-          { accessorKey: "scholarship", header: "Scholarship", meta: { align: "center", width: 120 } },
+          {
+            accessorKey: "scholarship",
+            header: "Scholarship",
+            meta: { align: "center", width: 120, filterable: true, filterOptions: ["true", "false"] },
+            cell: function (ctx) {
+              var hasScholarship = Boolean(ctx.getValue());
+              return el("span", {
+                class: hasScholarship ? "badge badge--scholarship" : "badge",
+                text: hasScholarship ? "Yes" : "No",
+              });
+            },
+          },
           {
             // `actions` is a structural id: never sorted, never exported, never
             // listed in the Columns menu.

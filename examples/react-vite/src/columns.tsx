@@ -122,8 +122,16 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "scholarship",
       header: "Scholarship",
-      meta: { align: "center", width: 120 },
-      // No `cell`: booleans fall back to the locale's yes/no labels.
+      meta: {
+        align: "center",
+        width: 120,
+        filterable: true,
+        filterOptions: ["true", "false"],
+      },
+      cell: ({ getValue }) => {
+        const has = Boolean(getValue());
+        return <span className={has ? "badge badge--scholarship" : "badge"}>{has ? "Yes" : "No"}</span>;
+      },
     },
     {
       id: "actions",
