@@ -444,5 +444,18 @@ test("createTableX renders column filter trigger and applies filter", () => {
   assert.ok(emittedQuery, "Query should be emitted with filter");
   assert.equal(emittedQuery.filter?.status, "Active");
 
+  // Open popover again and click Clear button
+  const filterBtnActive = container.querySelector(".tbx-col-filter-btn");
+  filterBtnActive.dispatchEvent(new MockMouseEvent("click"));
+  const popover2 = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover2, "Filter popover should be open again");
+
+  const clearBtn = popover2.querySelector(".tbx-filter-popover-btn");
+  assert.ok(clearBtn, "Clear button should exist");
+  clearBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  assert.equal(emittedQuery.filter?.status, undefined, "Filter should be cleared");
+  assert.equal(handle.getQuery().filter?.status, undefined, "Internal query filter should be cleared");
+
   handle.destroy();
 });

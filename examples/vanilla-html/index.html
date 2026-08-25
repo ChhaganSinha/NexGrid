@@ -573,6 +573,7 @@
           requestId += 1;
           var ticket = requestId;
 
+          statusSelect.value = (next.filter && next.filter.status) ? next.filter.status : "";
           grid.update({ isLoading: true, error: false });
           document.getElementById("wire").textContent = TableX.serializeQuery(next);
 

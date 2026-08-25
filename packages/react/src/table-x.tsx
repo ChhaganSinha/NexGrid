@@ -781,22 +781,22 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                               ) : null}
 
                               <div className="tbx-filter-popover-actions">
-                                {activeFilter ? (
-                                  <button
-                                    type="button"
-                                    className="tbx-filter-popover-btn"
-                                    onClick={() => {
-                                      setOpenFilterCol(null);
-                                      onQueryChange(withFilter(query, id, undefined));
-                                    }}
-                                  >
-                                    {locale.clearFilter}
-                                  </button>
-                                ) : null}
+                                <button
+                                  type="button"
+                                  className="tbx-filter-popover-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenFilterCol(null);
+                                    onQueryChange(withFilter(query, id, undefined));
+                                  }}
+                                >
+                                  {locale.clearFilter}
+                                </button>
                                 <button
                                   type="button"
                                   className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
                                   onClick={(e) => {
+                                    e.stopPropagation();
                                     const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
                                     const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
                                     const val = inputEl?.value.trim();

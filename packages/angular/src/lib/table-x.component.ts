@@ -584,15 +584,13 @@ const SEARCH_DEBOUNCE_MS = 350;
                               </div>
                             }
                             <div class="tbx-filter-popover-actions">
-                              @if (header.activeFilter) {
-                                <button
-                                  type="button"
-                                  class="tbx-filter-popover-btn"
-                                  (click)="applyColumnFilter(header.id, undefined)"
-                                >
-                                  {{ strings.clearFilter }}
-                                </button>
-                              }
+                              <button
+                                type="button"
+                                class="tbx-filter-popover-btn"
+                                (click)="applyColumnFilter(header.id, undefined)"
+                              >
+                                {{ strings.clearFilter }}
+                              </button>
                               <button
                                 type="button"
                                 class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"

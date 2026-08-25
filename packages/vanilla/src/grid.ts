@@ -473,13 +473,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
       this.render();
       return;
     }
+    this.query = next;
     if (this.options.endpoint !== undefined) {
-      this.query = next;
       this.options.onQueryChange?.(next);
       void this.fetchFromEndpoint();
       return;
     }
-    // Controlled mode is pure: emit and wait for the host's `update({ query })`.
+    // Controlled mode: emit to host and re-render with updated state
     this.options.onQueryChange?.(next);
     this.render();
   }
@@ -1391,24 +1391,27 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const actions = el("div", { class: "tbx-filter-popover-actions" });
-    if (currentValue) {
-      const clearBtn = el("button", {
-        class: "tbx-filter-popover-btn",
-        attrs: { type: "button" },
-        text: this.locale.clearFilter,
-      });
-      clearBtn.addEventListener("click", () => {
-        apply("");
-      });
-      actions.appendChild(clearBtn);
-    }
+    const clearBtn = el("button", {
+      class: "tbx-filter-popover-btn",
+      attrs: { type: "button" },
+      text: this.locale.clearFilter,
+    });
+    clearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      input.value = "";
+      apply("");
+    });
+    actions.appendChild(clearBtn);
 
     const applyBtn = el("button", {
       class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
       attrs: { type: "button" },
       text: this.locale.applyFilter,
     });
-    applyBtn.addEventListener("click", () => apply());
+    applyBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      apply();
+    });
     actions.appendChild(applyBtn);
 
     popover.appendChild(actions);
