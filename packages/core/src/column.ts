@@ -160,10 +160,10 @@ export function visibleColumns<TData, TRender>(
   });
 }
 
-/** Is this column filterable? Defaults to true if meta.serverFilterable, meta.filterable, or meta.filterOptions is set, or if global column filtering is enabled. */
+/** Is this column filterable? Defaults to true for all non-structural data columns unless explicitly disabled. */
 export function isFilterable<TData, TRender>(
   col: TableXColumn<TData, TRender>,
-  globalFilterable = false,
+  globalFilterable = true,
 ): boolean {
   if (isStructuralColumn(col) || getColumnId(col) === "") return false;
   if (col.enableFiltering === false || col.filterable === false) return false;

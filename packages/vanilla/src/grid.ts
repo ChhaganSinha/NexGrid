@@ -69,6 +69,7 @@ import {
   chevronRightIcon,
   columnsIcon,
   densityIcon,
+  dotsVerticalIcon,
   downloadIcon,
   downloadTrayIcon,
   editIcon,
@@ -77,6 +78,7 @@ import {
   fileTextIcon,
   filterIcon,
   funnelIcon,
+  moreVerticalIcon,
   rotateCcwIcon,
   searchIcon,
   slidersIcon,
@@ -1119,10 +1121,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
               : "tbx-col-filter-btn",
             attrs: {
               type: "button",
-              "aria-label": `Filter ${getColumnTitle(column) || id}`,
+              "aria-label": `Options and filter for ${getColumnTitle(column) || id}`,
             },
           },
-          [filterIcon("tbx-icon")],
+          [dotsVerticalIcon("tbx-icon")],
         );
         filterBtn.addEventListener("click", (e) => {
           e.stopPropagation();

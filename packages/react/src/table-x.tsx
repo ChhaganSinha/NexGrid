@@ -62,6 +62,7 @@ import {
   ChevronRightIcon,
   ColumnsIcon,
   DensityIcon,
+  DotsVerticalIcon,
   DownloadIcon,
   DownloadTrayIcon,
   EditIcon,
@@ -70,6 +71,7 @@ import {
   FileTextIcon,
   FilterIcon,
   FunnelIcon,
+  MoreVerticalIcon,
   RotateCcwIcon,
   SearchIcon,
   SlidersIcon,
@@ -719,7 +721,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                               setOpenFilterCol(openFilterCol === id ? null : id);
                             }}
                           >
-                            <FilterIcon className="tbx-icon" />
+                            <DotsVerticalIcon className="tbx-icon" />
                           </button>
 
                           {openFilterCol === id ? (

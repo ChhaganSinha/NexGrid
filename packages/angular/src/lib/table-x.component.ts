@@ -542,7 +542,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                           type="button"
                           class="tbx-col-filter-btn"
                           [class.tbx-col-filter-btn--active]="header.activeFilter !== undefined && header.activeFilter !== ''"
-                          [attr.aria-label]="'Filter ' + header.title"
+                          [attr.aria-label]="'Options and filter for ' + header.title"
                           (click)="toggleFilterPopover(header.id, $event)"
                         >
                           <svg
@@ -555,7 +555,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                             stroke-linejoin="round"
                             aria-hidden="true"
                           >
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
                           </svg>
                         </button>
 

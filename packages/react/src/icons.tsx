@@ -261,3 +261,18 @@ export function DownloadTrayIcon(props: TableXIconProps): React.JSX.Element {
     </Icon>
   );
 }
+
+/** Three vertical dots (⋮) icon for column filter & options menu trigger. */
+export function DotsVerticalIcon(props: TableXIconProps): React.JSX.Element {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="5" r="1.5" />
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="12" cy="19" r="1.5" />
+    </Icon>
+  );
+}
+
+export function MoreVerticalIcon(props: TableXIconProps): React.JSX.Element {
+  return <DotsVerticalIcon {...props} />;
+}

@@ -245,3 +245,19 @@ export function downloadTrayIcon(className = "tbx-icon"): SVGSVGElement {
     className,
   );
 }
+
+/** Three vertical dots (⋮) icon for column filter & options menu trigger. */
+export function dotsVerticalIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["circle", { cx: "12", cy: "5", r: "1.5" }],
+      ["circle", { cx: "12", cy: "12", r: "1.5" }],
+      ["circle", { cx: "12", cy: "19", r: "1.5" }],
+    ],
+    className,
+  );
+}
+
+export function moreVerticalIcon(className = "tbx-icon"): SVGSVGElement {
+  return dotsVerticalIcon(className);
+}
