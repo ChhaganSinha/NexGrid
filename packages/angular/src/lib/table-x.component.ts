@@ -616,8 +616,13 @@ const SEARCH_DEBOUNCE_MS = 350;
             @if (isLoading) {
               <tr>
                 <td class="tbx-state" [attr.colspan]="columnSpan">
-                  <span class="tbx-spinner"></span>
-                  <div>{{ strings.loadingText }}</div>
+                  <div class="tbx-dotted-loader" aria-hidden="true">
+                    <span class="tbx-dot"></span>
+                    <span class="tbx-dot"></span>
+                    <span class="tbx-dot"></span>
+                    <span class="tbx-dot"></span>
+                  </div>
+                  <div class="tbx-loading-text" aria-live="polite">{{ strings.loadingText }}</div>
                 </td>
               </tr>
             } @else if (rows.length === 0) {
@@ -669,8 +674,13 @@ const SEARCH_DEBOUNCE_MS = 350;
         @if (isLoading) {
           <div class="tbx-card">
             <div class="tbx-state">
-              <span class="tbx-spinner"></span>
-              <div>{{ strings.loadingText }}</div>
+              <div class="tbx-dotted-loader" aria-hidden="true">
+                <span class="tbx-dot"></span>
+                <span class="tbx-dot"></span>
+                <span class="tbx-dot"></span>
+                <span class="tbx-dot"></span>
+              </div>
+              <div class="tbx-loading-text" aria-live="polite">{{ strings.loadingText }}</div>
             </div>
           </div>
         } @else if (rows.length === 0) {

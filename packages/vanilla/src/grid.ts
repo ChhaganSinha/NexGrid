@@ -1224,11 +1224,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
       cols.length + (this.showSerial() ? 1 : 0) + (this.selectionEnabled() ? 1 : 0);
 
     if (this.isLoading) {
+      const dottedLoader = el("div", { class: "tbx-dotted-loader", attrs: { "aria-hidden": "true" } }, [
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+      ]);
       replaceChildren(this.tbody, [
         el("tr", {}, [
           el("td", { class: "tbx-state", attrs: { colspan: String(colSpan) } }, [
-            el("span", { class: "tbx-spinner" }),
-            el("div", { text: this.locale.loadingText }),
+            dottedLoader,
+            el("div", { class: "tbx-loading-text", text: this.locale.loadingText }),
           ]),
         ]),
       ]);
@@ -1469,11 +1475,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private renderCards(): void {
     if (this.isLoading) {
+      const dottedLoader = el("div", { class: "tbx-dotted-loader", attrs: { "aria-hidden": "true" } }, [
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+        el("span", { class: "tbx-dot" }),
+      ]);
       replaceChildren(this.cards, [
         el("div", { class: "tbx-card" }, [
           el("div", { class: "tbx-state" }, [
-            el("span", { class: "tbx-spinner" }),
-            el("div", { text: this.locale.loadingText }),
+            dottedLoader,
+            el("div", { class: "tbx-loading-text", text: this.locale.loadingText }),
           ]),
         ]),
       ]);

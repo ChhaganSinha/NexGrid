@@ -826,8 +826,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             {isLoading ? (
               <tr>
                 <td className="tbx-state" colSpan={Math.max(1, columnCount)}>
-                  <span className="tbx-spinner" aria-hidden="true" />
-                  <div aria-live="polite">{locale.loadingText}</div>
+                  <div className="tbx-dotted-loader" aria-hidden="true">
+                    <span className="tbx-dot" />
+                    <span className="tbx-dot" />
+                    <span className="tbx-dot" />
+                    <span className="tbx-dot" />
+                  </div>
+                  <div className="tbx-loading-text" aria-live="polite">{locale.loadingText}</div>
                 </td>
               </tr>
             ) : data.length === 0 ? (
@@ -905,8 +910,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         {isLoading ? (
           <div className="tbx-card">
             <div className="tbx-state">
-              <span className="tbx-spinner" aria-hidden="true" />
-              <div aria-live="polite">{locale.loadingText}</div>
+              <div className="tbx-dotted-loader" aria-hidden="true">
+                <span className="tbx-dot" />
+                <span className="tbx-dot" />
+                <span className="tbx-dot" />
+                <span className="tbx-dot" />
+              </div>
+              <div className="tbx-loading-text" aria-live="polite">{locale.loadingText}</div>
             </div>
           </div>
         ) : data.length === 0 ? (
