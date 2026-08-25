@@ -3,18 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NexGrid — vanilla HTML example</title>
+    <title>TableX — vanilla HTML example</title>
 
     <!--
       The shared stylesheet. Identical to the one the React and Angular
       adapters use, which is why every adapter renders the same grid.
     -->
-    <link rel="stylesheet" href="../../packages/vanilla/dist/nexgrid.css" />
+    <link rel="stylesheet" href="../../packages/vanilla/dist/tablex.css" />
 
     <style>
       /* Page chrome, plus the three classes the custom cell renderers use.
          The grid itself is re-skinned by overriding its CSS custom properties
-         (--nxg-primary, --nxg-radius, …), never by fighting its classes. */
+         (--tbx-primary, --tbx-radius, …), never by fighting its classes. */
       :root {
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       }
@@ -109,14 +109,14 @@
 
   <body>
     <main class="page">
-      <h1>NexGrid — vanilla HTML</h1>
+      <h1>TableX — vanilla HTML</h1>
       <p class="intro">
         One file, no build step, no framework. 200 students held in an inline array and served
         through a function that answers a <code>QueryState</code> exactly the way an HTTP endpoint
         would: search, sort, column filter, paging, with simulated latency.
       </p>
 
-      <!-- The grid mounts in here. It stays empty until createNexGrid runs. -->
+      <!-- The grid mounts in here. It stays empty until createTableX runs. -->
       <div id="grid"></div>
 
       <footer class="page-foot">
@@ -127,19 +127,19 @@
     </main>
 
     <!--
-      The browser bundle. It inlines @nexgrid/core and exposes everything on a
-      global called `NexGrid` — createNexGrid, the query reducers, the DOM
+      The browser bundle. It inlines @tablex/core and exposes everything on a
+      global called `TableX` — createTableX, the query reducers, the DOM
       helpers, the icon set. A classic script, so it works from file:// too.
     -->
-    <script src="../../packages/vanilla/dist/nexgrid.global.js"></script>
+    <script src="../../packages/vanilla/dist/tablex.global.js"></script>
 
     <script>
       (function () {
         "use strict";
 
-        if (!window.NexGrid) {
+        if (!window.TableX) {
           document.getElementById("grid").textContent =
-            "nexgrid.global.js did not load. Run `npm run build:vanilla` at the repository root.";
+            "tablex.global.js did not load. Run `npm run build:vanilla` at the repository root.";
           return;
         }
 
@@ -205,7 +205,7 @@
         // 2. The "endpoint" — answer a QueryState from that array.
         //
         //    The order is the part worth copying, and it is the same order
-        //    NexGrid.AspNetCore applies on the server:
+        //    TableX.AspNetCore applies on the server:
         //      search -> filter -> sort -> count -> page
         //    `total` is the FILTERED count across every page. That is what
         //    draws the pager; handing back items.length collapses the grid to
@@ -288,7 +288,7 @@
         // 3. Columns.
         //
         //    A `cell` renderer returns a string (written with textContent) or a
-        //    Node. Build nodes with NexGrid.el / svgEl / append — they only
+        //    Node. Build nodes with TableX.el / svgEl / append — they only
         //    ever write text, so a row value can never be parsed as markup.
         //    Never assemble a cell from an HTML string.
         //
@@ -297,7 +297,7 @@
         //    would move it out of one and into the other.
         // =====================================================================
 
-        var el = NexGrid.el;
+        var el = TableX.el;
         var dateFormat = new Intl.DateTimeFormat(undefined, {
           year: "numeric",
           month: "short",
@@ -363,7 +363,7 @@
             header: "",
             meta: { align: "right", width: 90 },
             cell: function (ctx) {
-              var button = el("button", { class: "nxg-btn", text: "Edit", attrs: { type: "button" } });
+              var button = el("button", { class: "tbx-btn", text: "Edit", attrs: { type: "button" } });
               button.addEventListener("click", function (event) {
                 // Without this the row click handler fires too.
                 event.stopPropagation();
@@ -383,7 +383,7 @@
         //    1 either way.
         // =====================================================================
 
-        var statusSelect = el("select", { class: "nxg-rows-select" }, [
+        var statusSelect = el("select", { class: "tbx-rows-select" }, [
           el("option", { text: "All statuses", attrs: { value: "" } }),
         ]);
         STATUSES.forEach(function (status) {
@@ -391,12 +391,12 @@
         });
         statusSelect.addEventListener("change", function () {
           applyQuery(
-            NexGrid.withFilter(query, "status", statusSelect.value === "" ? undefined : statusSelect.value)
+            TableX.withFilter(query, "status", statusSelect.value === "" ? undefined : statusSelect.value)
           );
         });
 
         var breakButton = el("button", {
-          class: "nxg-btn",
+          class: "tbx-btn",
           text: "Break next load",
           attrs: { type: "button" },
         });
@@ -408,7 +408,7 @@
         // A single Node is appended to the end of the toolbar, so anything with
         // more than one child needs a wrapper of its own.
         var toolbarActions = el("div", { class: "toolbar-extra" }, [
-          el("label", {}, [el("span", { class: "nxg-sr-only", text: "Filter by status" }), statusSelect]),
+          el("label", {}, [el("span", { class: "tbx-sr-only", text: "Filter by status" }), statusSelect]),
           breakButton,
         ]);
 
@@ -425,11 +425,11 @@
         //    its own loading state. That is what the ASP.NET example uses.
         // =====================================================================
 
-        var query = NexGrid.defaultQuery();
+        var query = TableX.defaultQuery();
         var requestId = 0;
         var failNext = false;
 
-        var grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+        var grid = TableX.createTableX(document.getElementById("grid"), {
           caption: "Students",
           columns: columns,
           data: [],
@@ -462,7 +462,7 @@
           var ticket = requestId;
 
           grid.update({ isLoading: true, error: false });
-          document.getElementById("wire").textContent = NexGrid.serializeQuery(next);
+          document.getElementById("wire").textContent = TableX.serializeQuery(next);
 
           window.setTimeout(function () {
             // Discard a response a newer request has already superseded.

@@ -2,7 +2,7 @@
 
 // ^ Not optional. A column's `cell` is a FUNCTION, and functions cannot cross
 // the server/client boundary. Defining these in a server file and passing them
-// to <NexGrid /> fails at runtime with:
+// to <TableX /> fails at runtime with:
 //
 //   Error: Functions cannot be passed directly to Client Components unless you
 //   explicitly expose it by marking it with "use server".
@@ -10,7 +10,7 @@
 // Keeping the columns in their own client module (rather than inline in the
 // grid component) is just tidiness — the directive is what matters.
 
-import type { NexGridReactColumn } from "@nexgrid/react";
+import type { TableXReactColumn } from "@tablex/react";
 
 import type { Student } from "@/lib/student-types";
 
@@ -24,7 +24,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
 });
 
-export function studentColumns(actions: StudentActions): NexGridReactColumn<Student>[] {
+export function studentColumns(actions: StudentActions): TableXReactColumn<Student>[] {
   return [
     {
       accessorKey: "name",
@@ -97,7 +97,7 @@ export function studentColumns(actions: StudentActions): NexGridReactColumn<Stud
         <div className="row-actions">
           <button
             type="button"
-            className="nxg-btn"
+            className="tbx-btn"
             onClick={(event) => {
               // Without this the row click handler fires too.
               event.stopPropagation();

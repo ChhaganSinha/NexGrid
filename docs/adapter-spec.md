@@ -1,11 +1,11 @@
-# NexGrid Adapter Specification
+# TableX Adapter Specification
 
-This document is the **normative contract** every NexGrid adapter (React,
+This document is the **normative contract** every TableX adapter (React,
 Angular, vanilla/ASP.NET) must implement. If an adapter and this spec
 disagree, the adapter is wrong.
 
 The engine — types, query reducers, pagination math, export, locale, theme
-CSS — lives in `@nexgrid/core` and MUST be imported, never reimplemented.
+CSS — lives in `@tablex/core` and MUST be imported, never reimplemented.
 
 ---
 
@@ -35,15 +35,15 @@ CSS — lives in `@nexgrid/core` and MUST be imported, never reimplemented.
 | 8 | Pagination footer | "Showing X to Y of Z entries" from `getRecordRange`; rows-per-page select over `PAGE_SIZES`; numbered buttons from `getPageNumbers` with ellipsis; prev/next; "Go to" page-jump input (submit on Enter or blur; invalid input resets to the current page). |
 | 9 | States | `isLoading` → spinner + locale `loadingText` (replaces rows only). Empty → locale `emptyText`. `error` → the WHOLE grid is replaced by an error card with locale `errorText` and a retry button when `onRetry` is provided. |
 | 10 | Row click | Optional `onRowClick(row)`; adds pointer cursor. |
-| 11 | Responsive | Table at ≥ 768 px; a card list below (one card per record, label/value per visible column, same custom cell renderers, same selection & row click). Handled by the shared CSS (`.nxg-table-wrap` / `.nxg-cards`) — adapters render BOTH structures. |
+| 11 | Responsive | Table at ≥ 768 px; a card list below (one card per record, label/value per visible column, same custom cell renderers, same selection & row click). Handled by the shared CSS (`.tbx-table-wrap` / `.tbx-cards`) — adapters render BOTH structures. |
 | 12 | Toolbar actions | A slot rendered at the end of the toolbar (children / template / node). |
 | 13 | Locale | Every user-facing string from `resolveLocale(partial)`; format with `formatMessage`. |
 | 14 | Notifications | The grid never renders toasts. It calls `onNotify({ type: "info" \| "success" \| "error", message })` (adapter-idiomatic: prop / EventEmitter / option). Default: no-op. |
-| 15 | A11y | `aria-label={caption}` on the table; accessible names on every icon-only control (from locale); `aria-sort` on sorted headers; visually-hidden text via `.nxg-sr-only`. |
+| 15 | A11y | `aria-label={caption}` on the table; accessible names on every icon-only control (from locale); `aria-sort` on sorted headers; visually-hidden text via `.tbx-sr-only`. |
 
 ## 3. Column definitions
 
-Core's `NexGridColumn<TData, TRender>` — structurally TanStack-compatible:
+Core's `TableXColumn<TData, TRender>` — structurally TanStack-compatible:
 
 ```ts
 {
@@ -58,19 +58,19 @@ Core's `NexGridColumn<TData, TRender>` — structurally TanStack-compatible:
 
 - React binds `TRender = React.ReactNode`; vanilla binds `string | Node`;
   Angular uses `header`/`cell` when they return strings and additionally
-  supports `TemplateRef` cell templates via the `*nexGridCell` directive.
+  supports `TemplateRef` cell templates via the `*tableXCell` directive.
 - Default cell rendering (no `cell`): `getCellText(getCellValue(col, row), {yes, no})`.
 - Width handling: `meta.width` → fixed px; else `minWidth ?? 120` and natural
   layout. `meta.align` sets `text-align` on `th`/`td` (and the
-  `.nxg-th-inner--center/right` class on the header inner wrapper).
+  `.tbx-th-inner--center/right` class on the header inner wrapper).
 
 ## 4. Adapter APIs
 
-### 4.1 `@nexgrid/react` — `<NexGrid />`
+### 4.1 `@tablex/react` — `<TableX />`
 
 ```ts
-export interface NexGridProps<TData> {
-  columns: NexGridColumn<TData, React.ReactNode>[];
+export interface TableXProps<TData> {
+  columns: TableXColumn<TData, React.ReactNode>[];
   data: TData[];                 // CURRENT page only
   total: number;                 // full filtered count
   query: QueryState;
@@ -95,22 +95,22 @@ export interface NexGridProps<TData> {
   onExportAll?: () => void | Promise<void>;  // replaces built-in export when set
   fetchEndpoint?: string;        // enables full-dataset export via fetchAllPages
   badgeRules?: readonly ExcelBadgeRule[];
-  locale?: Partial<NexGridLocale>;
+  locale?: Partial<TableXLocale>;
   onNotify?: (notice: { type: "info" | "success" | "error"; message: string }) => void;
-  theme?: "light" | "dark" | "auto";   // adds nxg-dark / nxg-auto class; default "light"
+  theme?: "light" | "dark" | "auto";   // adds tbx-dark / tbx-auto class; default "light"
 }
-export function NexGrid<TData>(props: NexGridProps<TData>): JSX.Element;
+export function TableX<TData>(props: TableXProps<TData>): JSX.Element;
 ```
 
 - File starts with `"use client"` (via build banner) so it drops into Next.js
   App Router pages untouched.
-- No dependency other than `@nexgrid/core`; `react` is a peer (>= 18).
+- No dependency other than `@tablex/core`; `react` is a peer (>= 18).
 - Dropdowns are self-contained (open on click, close on outside click and
   Escape, `role="menu"` / `role="menuitemcheckbox"` with `aria-checked`).
 
-### 4.2 `@nexgrid/angular` — `<nex-grid>`
+### 4.2 `@tablex/angular` — `<table-x>`
 
-Standalone component (Angular ≥ 17), selector `nex-grid`.
+Standalone component (Angular ≥ 17), selector `table-x`.
 
 - **Inputs** mirror the React props: `columns, data, total, query, caption,
   density, isLoading, error, enableSelection, enableSearch, searchPlaceholder,
@@ -121,27 +121,27 @@ Standalone component (Angular ≥ 17), selector `nex-grid`.
   `rowClick: EventEmitter<TData>`, `retry: EventEmitter<void>`,
   `notify: EventEmitter<{ type; message }>`, `exportAll: EventEmitter<void>`
   (when observed, replaces built-in export).
-- Custom cells: `NexGridCellDirective` (`*nexGridCell="'columnId'"`) declared
+- Custom cells: `TableXCellDirective` (`*tableXCell="'columnId'"`) declared
   as content children; the template receives `$implicit` = row and `value`.
-  Toolbar actions via a `[nexGridToolbar]` template or content projection.
+  Toolbar actions via a `[tableXToolbar]` template or content projection.
 
-### 4.3 `@nexgrid/vanilla` — `createNexGrid`
+### 4.3 `@tablex/vanilla` — `createTableX`
 
 ```ts
-export interface NexGridHandle<TData> {
-  update(patch: Partial<NexGridUpdate<TData>>): void; // data/total/query/isLoading/error
+export interface TableXHandle<TData> {
+  update(patch: Partial<TableXUpdate<TData>>): void; // data/total/query/isLoading/error
   refresh(): void;               // endpoint mode: refetch current query
   getQuery(): QueryState;
   getSelection(): string[];
   destroy(): void;
 }
-export function createNexGrid<TData>(
+export function createTableX<TData>(
   container: HTMLElement,
-  options: NexGridOptions<TData>,
-): NexGridHandle<TData>;
+  options: TableXOptions<TData>,
+): TableXHandle<TData>;
 ```
 
-- `NexGridOptions` mirrors the React props (callbacks instead of props), with
+- `TableXOptions` mirrors the React props (callbacks instead of props), with
   `cell?: (ctx) => string | Node` renderers, plus **either**:
   - controlled mode: `data`, `total`, `query`, `onQueryChange`; or
   - **endpoint mode**: `endpoint: string` — the grid fetches
@@ -150,15 +150,15 @@ export function createNexGrid<TData>(
 - Values render as **text nodes** — never `innerHTML` — unless a custom
   renderer returns a Node.
 - Ships ESM/CJS (core external) **and** a browser IIFE bundle
-  (`dist/nexgrid.global.js`, global `NexGrid`, core inlined, minified) plus a
-  copy of the core stylesheet at `dist/nexgrid.css` — these two files are what
-  `NexGrid.AspNetCore` embeds as static web assets.
+  (`dist/tablex.global.js`, global `TableX`, core inlined, minified) plus a
+  copy of the core stylesheet at `dist/tablex.css` — these two files are what
+  `TableX.AspNetCore` embeds as static web assets.
 
-### 4.4 `NexGrid.AspNetCore`
+### 4.4 `TableX.AspNetCore`
 
 Razor Class Library, `net8.0`, `<FrameworkReference Include="Microsoft.AspNetCore.App" />`.
 
-- **`NexGridQuery`** — binds `page`, `pageSize`, `sort` (repeatable
+- **`TableXQuery`** — binds `page`, `pageSize`, `sort` (repeatable
   `field:dir`), `q`, `filter[field]` from the query string (exactly core's
   wire format). Invalid values degrade the same way `parseQuery` does.
 - **`PagedResponse<T>`** — `Items, Page, PageSize, Total, TotalPages`
@@ -176,14 +176,14 @@ var result = await db.Students.AsNoTracking()
 // search -> filters -> sort -> count -> page in that order.
 ```
 
-- **Tag Helpers**: `<nex-grid caption="Students" endpoint="/api/students" ...>`
-  with `<nex-grid-column field="name" header="Name" sortable="true" align="Left"
+- **Tag Helpers**: `<table-x caption="Students" endpoint="/api/students" ...>`
+  with `<table-x-column field="name" header="Name" sortable="true" align="Left"
   width="..." />` children. Renders a container `div` + JSON config `<script
-  type="application/json">` + an init call into `NexGrid.createNexGrid` from
+  type="application/json">` + an init call into `TableX.createTableX` from
   the bundled IIFE. Assets served from the RCL's static web assets
-  (`_content/NexGrid.AspNetCore/nexgrid.global.js` and `nexgrid.css`).
-- The `.csproj` copies `packages/vanilla/dist/nexgrid.global.js` and
-  `dist/nexgrid.css` into `wwwroot/` before build **when they exist**
+  (`_content/TableX.AspNetCore/tablex.global.js` and `tablex.css`).
+- The `.csproj` copies `packages/vanilla/dist/tablex.global.js` and
+  `dist/tablex.css` into `wwwroot/` before build **when they exist**
   (`Condition="Exists(...)"`), so the .NET project still compiles in isolation.
 
 ## 5. Export flow (identical everywhere)
@@ -209,60 +209,60 @@ All adapters emit this structure (identical classes ⇒ identical rendering by
 the shared stylesheet). Structural order matters.
 
 ```text
-div.nxg-root [data-density=compact|default|comfortable] [.nxg-dark|.nxg-auto] [+ user className]
-├─ div.nxg-toolbar
-│  ├─ div.nxg-toolbar-group
-│  │  ├─ div.nxg-search                            (when enableSearch)
-│  │  │  ├─ svg.nxg-search-icon
-│  │  │  ├─ input.nxg-search-input [type=search] [aria-label="Search {caption}"]
-│  │  │  └─ button.nxg-search-clear > svg + span.nxg-sr-only   (when text present)
-│  │  ├─ div.nxg-menu-wrap                         (Columns)
-│  │  │  ├─ button.nxg-btn [aria-haspopup=menu] [aria-expanded] > svg.nxg-icon + span
-│  │  │  └─ div.nxg-menu [role=menu]               (when open)
-│  │  │     ├─ div.nxg-menu-label
-│  │  │     ├─ div.nxg-menu-separator
-│  │  │     └─ button.nxg-menu-item [role=menuitemcheckbox] [aria-checked]
-│  │  │        > svg.nxg-check + span              (one per hideable column)
-│  │  └─ div.nxg-menu-wrap                         (Density; same pattern, 3 items)
-│  └─ div.nxg-toolbar-group.nxg-toolbar-group--end
-│     ├─ div.nxg-menu-wrap                         (when enableExport)
-│     │  ├─ button.nxg-btn.nxg-btn--export [disabled while exporting]
-│     │  └─ div.nxg-menu.nxg-menu--end [role=menu]
-│     │     ├─ button.nxg-menu-item > svg.nxg-icon--excel + div.nxg-menu-item-title > strong + small
-│     │     └─ button.nxg-menu-item > svg.nxg-icon--csv  + div.nxg-menu-item-title > strong + small
+div.tbx-root [data-density=compact|default|comfortable] [.tbx-dark|.tbx-auto] [+ user className]
+├─ div.tbx-toolbar
+│  ├─ div.tbx-toolbar-group
+│  │  ├─ div.tbx-search                            (when enableSearch)
+│  │  │  ├─ svg.tbx-search-icon
+│  │  │  ├─ input.tbx-search-input [type=search] [aria-label="Search {caption}"]
+│  │  │  └─ button.tbx-search-clear > svg + span.tbx-sr-only   (when text present)
+│  │  ├─ div.tbx-menu-wrap                         (Columns)
+│  │  │  ├─ button.tbx-btn [aria-haspopup=menu] [aria-expanded] > svg.tbx-icon + span
+│  │  │  └─ div.tbx-menu [role=menu]               (when open)
+│  │  │     ├─ div.tbx-menu-label
+│  │  │     ├─ div.tbx-menu-separator
+│  │  │     └─ button.tbx-menu-item [role=menuitemcheckbox] [aria-checked]
+│  │  │        > svg.tbx-check + span              (one per hideable column)
+│  │  └─ div.tbx-menu-wrap                         (Density; same pattern, 3 items)
+│  └─ div.tbx-toolbar-group.tbx-toolbar-group--end
+│     ├─ div.tbx-menu-wrap                         (when enableExport)
+│     │  ├─ button.tbx-btn.tbx-btn--export [disabled while exporting]
+│     │  └─ div.tbx-menu.tbx-menu--end [role=menu]
+│     │     ├─ button.tbx-menu-item > svg.tbx-icon--excel + div.tbx-menu-item-title > strong + small
+│     │     └─ button.tbx-menu-item > svg.tbx-icon--csv  + div.tbx-menu-item-title > strong + small
 │     └─ {toolbarActions}
-├─ div.nxg-table-wrap
-│  └─ table.nxg-table [aria-label=caption]
+├─ div.tbx-table-wrap
+│  └─ table.tbx-table [aria-label=caption]
 │     ├─ thead > tr
-│     │  ├─ th.nxg-th.nxg-th--serial               (when showSerialNumber)
-│     │  ├─ th.nxg-th.nxg-th--select > input.nxg-checkbox   (when enableSelection)
-│     │  └─ th.nxg-th [.nxg-th--sortable] [aria-sort] [style width/minWidth/textAlign]
-│     │     └─ div.nxg-th-inner [--center|--right] > span + span > svg.nxg-sort-icon [--idle]
+│     │  ├─ th.tbx-th.tbx-th--serial               (when showSerialNumber)
+│     │  ├─ th.tbx-th.tbx-th--select > input.tbx-checkbox   (when enableSelection)
+│     │  └─ th.tbx-th [.tbx-th--sortable] [aria-sort] [style width/minWidth/textAlign]
+│     │     └─ div.tbx-th-inner [--center|--right] > span + span > svg.tbx-sort-icon [--idle]
 │     └─ tbody
-│        ├─ loading:  tr > td.nxg-state [colspan] > span.nxg-spinner + div
-│        ├─ empty:    tr > td.nxg-state [colspan]
-│        └─ rows:     tr.nxg-row [--selected] [--clickable]
-│           ├─ td.nxg-td.nxg-td--serial
-│           ├─ td.nxg-td.nxg-td--select > input.nxg-checkbox
-│           └─ td.nxg-td [style textAlign]
-├─ div.nxg-cards                                    (mobile mirror of tbody)
-│  └─ div.nxg-card [--selected] [--clickable]
-│     ├─ div.nxg-card-head > span.nxg-card-serial + span.nxg-card-select > input.nxg-checkbox
-│     └─ dl.nxg-card-rows > div.nxg-card-row > dt + dd
-└─ div.nxg-footer
-   ├─ div.nxg-range > span (Showing <strong>X</strong> to <strong>Y</strong> of
-   │                        <strong.nxg-range-total>Z</strong> entries)
-   │                + span.nxg-selected-badge        (when selection non-empty)
-   └─ div.nxg-pagination
-      ├─ div.nxg-rows-per-page > span + select.nxg-rows-select (PAGE_SIZES)
-      ├─ div.nxg-pager
-      │  ├─ button.nxg-page-nav (prev, disabled on first) > svg + span.nxg-sr-only
-      │  ├─ button.nxg-page-btn [--current] | span.nxg-page-ellipsis   (from getPageNumbers)
-      │  └─ button.nxg-page-nav (next, disabled on last)
-      └─ form.nxg-jump > label.nxg-jump-label + input.nxg-jump-input [type=number]
+│        ├─ loading:  tr > td.tbx-state [colspan] > span.tbx-spinner + div
+│        ├─ empty:    tr > td.tbx-state [colspan]
+│        └─ rows:     tr.tbx-row [--selected] [--clickable]
+│           ├─ td.tbx-td.tbx-td--serial
+│           ├─ td.tbx-td.tbx-td--select > input.tbx-checkbox
+│           └─ td.tbx-td [style textAlign]
+├─ div.tbx-cards                                    (mobile mirror of tbody)
+│  └─ div.tbx-card [--selected] [--clickable]
+│     ├─ div.tbx-card-head > span.tbx-card-serial + span.tbx-card-select > input.tbx-checkbox
+│     └─ dl.tbx-card-rows > div.tbx-card-row > dt + dd
+└─ div.tbx-footer
+   ├─ div.tbx-range > span (Showing <strong>X</strong> to <strong>Y</strong> of
+   │                        <strong.tbx-range-total>Z</strong> entries)
+   │                + span.tbx-selected-badge        (when selection non-empty)
+   └─ div.tbx-pagination
+      ├─ div.tbx-rows-per-page > span + select.tbx-rows-select (PAGE_SIZES)
+      ├─ div.tbx-pager
+      │  ├─ button.tbx-page-nav (prev, disabled on first) > svg + span.tbx-sr-only
+      │  ├─ button.tbx-page-btn [--current] | span.tbx-page-ellipsis   (from getPageNumbers)
+      │  └─ button.tbx-page-nav (next, disabled on last)
+      └─ form.tbx-jump > label.tbx-jump-label + input.tbx-jump-input [type=number]
 
 error state: the root renders ONLY
-div.nxg-state-card > p.nxg-state-text + button.nxg-btn (when onRetry)
+div.tbx-state-card > p.tbx-state-text + button.tbx-btn (when onRetry)
 ```
 
 ## 7. Icons (inline SVG, identical everywhere)
@@ -287,14 +287,14 @@ stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`,
 | arrow-up-down | `<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>` |
 | check | `<path d="M20 6 9 17l-5-5"/>` |
 
-Sizing comes from the CSS classes (`.nxg-icon`, `.nxg-search-icon`,
-`.nxg-sort-icon`, `.nxg-check`, `.nxg-icon--excel`, `.nxg-icon--csv`); pager
-chevrons use `width:16;height:16` inline or the `.nxg-icon` class.
+Sizing comes from the CSS classes (`.tbx-icon`, `.tbx-search-icon`,
+`.tbx-sort-icon`, `.tbx-check`, `.tbx-icon--excel`, `.tbx-icon--csv`); pager
+chevrons use `width:16;height:16` inline or the `.tbx-icon` class.
 
 ## 8. Parity checklist (Definition of Done per adapter)
 
 - [ ] All 15 features in §2, behaviorally identical
-- [ ] DOM matches §6; icons match §7; zero runtime deps beyond `@nexgrid/core`
+- [ ] DOM matches §6; icons match §7; zero runtime deps beyond `@tablex/core`
 - [ ] All strings via locale; all query mutations via core reducers
 - [ ] Export flow per §5, including fetch-all with cap and notifications
 - [ ] Compiles under strict TypeScript; package builds green

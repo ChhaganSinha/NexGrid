@@ -25,7 +25,7 @@ and coordinated disclosure within 90 days.
 - **CSV/Excel export** neutralizes spreadsheet formula injection: cell values
   beginning with `=`, `+`, `-`, `@`, tab, or CR are prefixed with `'` per OWASP
   guidance.
-- **Server extensions (`NexGrid.AspNetCore`)** only sort/filter fields that the
+- **Server extensions (`TableX.AspNetCore`)** only sort/filter fields that the
   host application explicitly allowlists — arbitrary property paths from the
   query string are never reflected into expressions.
 - The vanilla renderer writes cell values as **text nodes** (never `innerHTML`)

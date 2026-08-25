@@ -15,10 +15,10 @@ subset; anything you leave out falls back to English.
 ## How it works
 
 ```ts
-import { DEFAULT_LOCALE, resolveLocale, formatMessage, type NexGridLocale } from "@nexgrid/core";
+import { DEFAULT_LOCALE, resolveLocale, formatMessage, type TableXLocale } from "@tablex/core";
 
 /** Merge a partial locale over the defaults. */
-export function resolveLocale(partial?: Partial<NexGridLocale>): NexGridLocale;
+export function resolveLocale(partial?: Partial<TableXLocale>): TableXLocale;
 
 /** Tiny `{placeholder}` formatter for locale strings. */
 export function formatMessage(
@@ -28,7 +28,7 @@ export function formatMessage(
 ```
 
 Every adapter calls `resolveLocale(props.locale)` once and formats with
-`formatMessage`. The merge is **shallow and total**: `NexGridLocale` is a flat
+`formatMessage`. The merge is **shallow and total**: `TableXLocale` is a flat
 object of strings, so any key you supply wins and everything else is the
 default.
 
@@ -131,17 +131,17 @@ locale={{ showingRange: "{total} 件中 {start} 〜 {end} 件を表示" }}
 
 ```tsx
 // React
-<NexGrid locale={{ searchPlaceholder: "Rechercher…" }} {...props} />
+<TableX locale={{ searchPlaceholder: "Rechercher…" }} {...props} />
 ```
 
 ```html
 <!-- Angular -->
-<nex-grid [locale]="{ searchPlaceholder: 'Suchen…' }" …/>
+<table-x [locale]="{ searchPlaceholder: 'Suchen…' }" …/>
 ```
 
 ```js
 // Vanilla
-createNexGrid(document.getElementById("grid"), {
+createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -154,10 +154,10 @@ object, and the helper writes JSON configuration. Set `init="false"` and attach
 it when you start the grid:
 
 ```cshtml
-<nex-grid id="students-grid" caption="Étudiants" endpoint="/api/students" init="false">
-    <nex-grid-column field="name" header="Nom" />
-    <nex-grid-column field="email" header="Courriel" />
-</nex-grid>
+<table-x id="students-grid" caption="Étudiants" endpoint="/api/students" init="false">
+    <table-x-column field="name" header="Nom" />
+    <table-x-column field="email" header="Courriel" />
+</table-x>
 
 @section Scripts {
 <script>
@@ -173,7 +173,7 @@ it when you start the grid:
             rowsPerPage: "Lignes :"
         };
 
-        host.nexgrid = NexGrid.createNexGrid(host, config);
+        host.tablex = TableX.createTableX(host, config);
     })();
 </script>
 }
@@ -185,9 +185,9 @@ A complete locale, defined once and shared by every grid in the app.
 
 ```ts
 // locales/fr.ts
-import type { NexGridLocale } from "@nexgrid/core";
+import type { TableXLocale } from "@tablex/core";
 
-export const fr: NexGridLocale = {
+export const fr: TableXLocale = {
   // Toolbar
   searchPlaceholder: "Rechercher…",
   clearSearch: "Effacer la recherche",
@@ -237,8 +237,8 @@ export const fr: NexGridLocale = {
 };
 ```
 
-Annotating it `NexGridLocale` (not `Partial<NexGridLocale>`) makes the compiler
-tell you when a release adds a key. Use `Partial<NexGridLocale>` when you
+Annotating it `TableXLocale` (not `Partial<TableXLocale>`) makes the compiler
+tell you when a release adds a key. Use `Partial<TableXLocale>` when you
 deliberately want to translate only part of the UI.
 
 ```tsx
@@ -246,14 +246,14 @@ deliberately want to translate only part of the UI.
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 import { fr } from "./locales/fr";
 
@@ -264,7 +264,7 @@ interface Etudiant {
   actif: boolean;
 }
 
-const columns: NexGridReactColumn<Etudiant>[] = [
+const columns: TableXReactColumn<Etudiant>[] = [
   { accessorKey: "nom", header: "Nom", meta: { minWidth: 180 } },
   { accessorKey: "courriel", header: "Courriel" },
   // No `cell`: booleans render with locale.booleanYes / booleanNo -> Oui / Non,
@@ -297,7 +297,7 @@ export function GrilleEtudiants() {
   }, [load, query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Étudiants"
       columns={columns}
       data={page?.items ?? []}
@@ -319,20 +319,20 @@ The same object drops into Angular and vanilla unchanged:
 
 ```ts
 // Angular component field
-readonly locale: NexGridLocale = fr;
+readonly locale: TableXLocale = fr;
 ```
 
 ```html
-<nex-grid caption="Étudiants" [locale]="locale" …/>
+<table-x caption="Étudiants" [locale]="locale" …/>
 ```
 
 ```js
 // Vanilla
-import { createNexGrid } from "@nexgrid/vanilla";
-import "@nexgrid/vanilla/styles.css";
+import { createTableX } from "@tablex/vanilla";
+import "@tablex/vanilla/styles.css";
 import { fr } from "./locales/fr.js";
 
-const grid = createNexGrid(document.getElementById("grid"), {
+const grid = createTableX(document.getElementById("grid"), {
   caption: "Étudiants",
   endpoint: "/api/etudiants",
   columns: [
@@ -351,12 +351,12 @@ The locale is an ordinary prop, so a language switch is a re-render:
 "use client";
 
 import { useState } from "react";
-import type { NexGridLocale } from "@nexgrid/react";
+import type { TableXLocale } from "@tablex/react";
 
 import { de } from "./locales/de";
 import { fr } from "./locales/fr";
 
-const LOCALES: Record<"en" | "fr" | "de", NexGridLocale | undefined> = {
+const LOCALES: Record<"en" | "fr" | "de", TableXLocale | undefined> = {
   en: undefined,   // undefined = the built-in English defaults
   fr,
   de,
@@ -372,25 +372,25 @@ In vanilla, options are read at construction; to change locale, destroy and
 recreate:
 
 ```js
-let grid = createNexGrid(host, { ...options, locale: fr });
+let grid = createTableX(host, { ...options, locale: fr });
 
 function setLocale(locale) {
   const query = grid.getQuery();      // keep the user where they were
   grid.destroy();
-  grid = createNexGrid(host, { ...options, locale, query });
+  grid = createTableX(host, { ...options, locale, query });
 }
 ```
 
 ## Reusing your i18n framework
 
-`NexGridLocale` is a flat `Record<string, string>` in shape, so building it from
+`TableXLocale` is a flat `Record<string, string>` in shape, so building it from
 an existing catalogue is a map:
 
 ```ts
-import type { NexGridLocale } from "@nexgrid/core";
+import type { TableXLocale } from "@tablex/core";
 
 // `t` is any translate function: i18next, @angular/localize, vue-i18n, …
-export function gridLocale(t: (key: string) => string): NexGridLocale {
+export function gridLocale(t: (key: string) => string): TableXLocale {
   return {
     searchPlaceholder: t("grid.searchPlaceholder"),
     clearSearch: t("grid.clearSearch"),
@@ -432,13 +432,13 @@ export function gridLocale(t: (key: string) => string): NexGridLocale {
 }
 ```
 
-Keep NexGrid's `{token}` syntax in the catalogue values. The grid substitutes
+Keep TableX's `{token}` syntax in the catalogue values. The grid substitutes
 them itself; it does not know about ICU message format, `%s`, or `$t()`.
 
 To seed a catalogue, spread the defaults:
 
 ```ts
-import { DEFAULT_LOCALE } from "@nexgrid/core";
+import { DEFAULT_LOCALE } from "@tablex/core";
 
 console.log(JSON.stringify(DEFAULT_LOCALE, null, 2));
 ```
@@ -474,4 +474,4 @@ values. And a date column is not localized until you say so:
 
 - [Theming](theming.md) — the other half of "make it ours"
 - [Export](features/export.md) — every export string, and `serialHeader` in the workbook
-- [`@nexgrid/core` API](api/core.md) — `DEFAULT_LOCALE`, `resolveLocale`, `formatMessage`
+- [`@tablex/core` API](api/core.md) — `DEFAULT_LOCALE`, `resolveLocale`, `formatMessage`

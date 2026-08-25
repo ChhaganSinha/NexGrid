@@ -1,4 +1,4 @@
-// GET /api/students — the endpoint half of the NexGrid contract.
+// GET /api/students — the endpoint half of the TableX contract.
 //
 // The whole server-side parse is one line: `parseQuery` reads the exact wire
 // format `serializeQuery` writes, and degrades instead of failing. A
@@ -10,7 +10,7 @@
 //   { items, page, pageSize, total, totalPages }
 // where `total` is the FULL filtered count. That is what draws the pager.
 
-import { parseQuery } from "@nexgrid/core";
+import { parseQuery } from "@tablex/core";
 
 import { delay, queryStudents } from "@/lib/students";
 

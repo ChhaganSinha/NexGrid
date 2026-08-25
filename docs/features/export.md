@@ -63,15 +63,15 @@ By default an export contains **the current page**. Pass a list endpoint and the
 grid will page in the rest of the filtered dataset first:
 
 ```tsx
-<NexGrid fetchEndpoint="/api/students" {...props} />
+<TableX fetchEndpoint="/api/students" {...props} />
 ```
 
 ```html
-<nex-grid fetchEndpoint="/api/students" …/>
+<table-x fetchEndpoint="/api/students" …/>
 ```
 
 ```js
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",   // vanilla: fetchEndpoint defaults to this
   columns,
@@ -79,7 +79,7 @@ createNexGrid(container, {
 ```
 
 ```cshtml
-<nex-grid caption="Students" endpoint="/api/students" fetch-endpoint="/api/students">…</nex-grid>
+<table-x caption="Students" endpoint="/api/students" fetch-endpoint="/api/students">…</table-x>
 ```
 
 In vanilla, `fetchEndpoint` defaults to `endpoint`, so endpoint-mode grids get
@@ -130,7 +130,7 @@ own the flow with [`onExportAll`](#taking-over-the-export) and call
 `complete: false` in your own UI:
 
 ```ts
-import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@nexgrid/core";
+import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@tablex/core";
 
 async function collectEverything<T>(endpoint: string, query: QueryState) {
   const result = await fetchAllPages<T>(async (page, pageSize) => {
@@ -158,7 +158,7 @@ Only columns that are both **visible** (not hidden through the Columns menu or
 
 ```ts
 export function toExportColumns<TData, TRender>(
-  columns: readonly NexGridColumn<TData, TRender>[],
+  columns: readonly TableXColumn<TData, TRender>[],
   labels?: { yes: string; no: string },
 ): ExportColumn<TData>[] {
   return columns.filter(isExportable).map((col) => ({
@@ -216,7 +216,7 @@ Supplying `badgeRules` **replaces** the defaults rather than extending them.
 Spread them in if you want both:
 
 ```ts
-import { DEFAULT_BADGE_RULES, type ExcelBadgeRule } from "@nexgrid/core";
+import { DEFAULT_BADGE_RULES, type ExcelBadgeRule } from "@tablex/core";
 
 export const badgeRules: readonly ExcelBadgeRule[] = [
   { values: ["Enrolled", "Graduated"], background: "#dcfce7", color: "#15803d" },
@@ -227,7 +227,7 @@ export const badgeRules: readonly ExcelBadgeRule[] = [
 
 ```tsx
 // React
-<NexGrid badgeRules={badgeRules} exportFileName="student_roster" {...props} />
+<TableX badgeRules={badgeRules} exportFileName="student_roster" {...props} />
 ```
 
 ```ts
@@ -240,7 +240,7 @@ readonly badgeRules: readonly ExcelBadgeRule[] = [
 
 ```js
 // Vanilla
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -257,7 +257,7 @@ The workbook string is available on its own if you want to inspect or ship it
 elsewhere:
 
 ```ts
-import { toExcelHtml, toExportColumns } from "@nexgrid/core";
+import { toExcelHtml, toExportColumns } from "@tablex/core";
 
 const html = toExcelHtml({
   filename: "students",
@@ -319,15 +319,15 @@ Everything the export wants to say arrives at `onNotify` / `(notify)` as
 | CSV written | `success` | `exportCsvSuccess` |
 
 ```tsx
-<NexGrid onNotify={({ type, message }) => toast[type](message)} {...props} />
+<TableX onNotify={({ type, message }) => toast[type](message)} {...props} />
 ```
 
 ```html
-<nex-grid (notify)="toast($event)" …/>
+<table-x (notify)="toast($event)" …/>
 ```
 
 ```js
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -349,15 +349,15 @@ it for a real `.xlsx`, a background job, or a signed download URL.
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
   serializeQuery,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: number;
@@ -365,7 +365,7 @@ interface Student {
   email: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
 ];
@@ -399,7 +399,7 @@ export function StudentsGrid() {
   };
 
   return (
-    <NexGrid
+    <TableX
       caption="Students"
       columns={columns}
       data={page?.items ?? []}
@@ -415,21 +415,21 @@ export function StudentsGrid() {
 
 ```html
 <!-- Angular: merely LISTENING replaces the built-in export -->
-<nex-grid caption="Students" [columns]="columns" [data]="rows()" [total]="total()"
+<table-x caption="Students" [columns]="columns" [data]="rows()" [total]="total()"
           [query]="query()" (queryChange)="load($event)" (exportAll)="exportOnServer()" />
 ```
 
 ```js
 // Vanilla
-import { createNexGrid, serializeQuery } from "@nexgrid/vanilla";
-import "@nexgrid/vanilla/styles.css";
+import { createTableX, serializeQuery } from "@tablex/vanilla";
+import "@tablex/vanilla/styles.css";
 
 const columns = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
 ];
 
-const grid = createNexGrid(document.getElementById("grid"), {
+const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -481,4 +481,4 @@ the hook for audit logging, rate limiting, or requiring elevated permission.
 
 - [Columns](../columns.md#columns-and-export) — `meta.exportable`
 - [Localization](../localization.md) — every export string
-- [`@nexgrid/core` API](../api/core.md) — `fetchAllPages`, `toExportColumns`, `downloadCsv`, `downloadExcel`
+- [`@tablex/core` API](../api/core.md) — `fetchAllPages`, `toExportColumns`, `downloadCsv`, `downloadExcel`

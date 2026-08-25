@@ -1,4 +1,4 @@
-// The public prop surface of `<NexGrid />`.
+// The public prop surface of `<TableX />`.
 //
 // It lives in its own module so consumers can import the prop type without
 // pulling the component (and its `"use client"` boundary) into a server file,
@@ -8,16 +8,20 @@ import type { ReactNode } from "react";
 import type {
   Density,
   ExcelBadgeRule,
-  NexGridColumn,
-  NexGridLocale,
+  TableXColumn as TableXCoreColumn,
+  TableXLocale,
   QueryState,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 /** A column definition bound to React's render type. */
-export type NexGridReactColumn<TData> = NexGridColumn<TData, ReactNode>;
+export type TableXReactColumn<TData> = TableXCoreColumn<TData, ReactNode>;
+export type TableXColumn<TData> = TableXReactColumn<TData>;
+export type NexGridReactColumn<TData> = TableXReactColumn<TData>;
+export type NexGridColumn<TData> = TableXColumn<TData>;
 
-/** Severity of a {@link NexGridNotice}. */
-export type NexGridNoticeType = "info" | "success" | "error";
+/** Severity of a {@link TableXNotice}. */
+export type TableXNoticeType = "info" | "success" | "error";
+export type NexGridNoticeType = TableXNoticeType;
 
 /**
  * A message the grid wants surfaced to the user.
@@ -26,25 +30,27 @@ export type NexGridNoticeType = "info" | "success" | "error";
  * design system, and two competing toast stacks in one page is a worse bug
  * than no toast at all. Everything it would want to say arrives here instead.
  */
-export interface NexGridNotice {
-  type: NexGridNoticeType;
+export interface TableXNotice {
+  type: TableXNoticeType;
   message: string;
 }
+export type NexGridNotice = TableXNotice;
 
 /** Color scheme applied to the grid root. */
-export type NexGridTheme = "light" | "dark" | "auto";
+export type TableXTheme = "light" | "dark" | "auto";
+export type NexGridTheme = TableXTheme;
 
 /**
- * Props for {@link NexGrid}.
+ * Props for {@link TableX}.
  *
  * `data` / `total` / `query` / `onQueryChange` are **controlled**: the grid
  * renders exactly the page it is handed and reports intent back through
  * `onQueryChange`. It never fetches on its own (the one exception is the
  * export-everything path, which needs rows the current page does not have).
  */
-export interface NexGridProps<TData> {
+export interface TableXProps<TData> {
   /** Column definitions, in display order. */
-  columns: NexGridReactColumn<TData>[];
+  columns: TableXReactColumn<TData>[];
   /** The CURRENT page of rows only — never the full dataset. */
   data: TData[];
   /** Total filtered row count from the server; drives the pager. */
@@ -100,17 +106,20 @@ export interface NexGridProps<TData> {
   /** Take over exporting entirely; when set, the grid's own export flow never runs. */
   onExportAll?: () => void | Promise<void>;
   /**
-   * List endpoint used to page in the rest of the dataset when exporting more
-   * than the current page. Without it, exports contain the visible page only.
+   * Endpoint used to fetch the full filtered dataset for export when the current
+   * page is only part of it.
    */
   fetchEndpoint?: string;
-  /** Value-based cell styling for the Excel export. Defaults to core's `DEFAULT_BADGE_RULES`. */
+  /** Extra fetch options (headers, etc.) forwarded when calling {@link fetchEndpoint}. */
+  fetchOptions?: RequestInit;
+  /** Value-based badge styling rules for Excel export. */
   badgeRules?: readonly ExcelBadgeRule[];
 
-  /** Overrides for any user-facing string. */
-  locale?: Partial<NexGridLocale>;
-  /** Receives messages the grid would otherwise have no way to report. Default: no-op. */
-  onNotify?: (notice: NexGridNotice) => void;
-  /** `"dark"` and `"auto"` add `.nxg-dark` / `.nxg-auto` to the root. Default `"light"`. */
-  theme?: NexGridTheme;
+  /** Overrides for any user-facing string in the grid. */
+  locale?: Partial<TableXLocale>;
+  /** Visual theme. Default `"light"`. */
+  theme?: TableXTheme;
+  /** Receives notices (export progress, failures). Default: no-op. */
+  onNotify?: (notice: TableXNotice) => void;
 }
+export type NexGridProps<TData> = TableXProps<TData>;

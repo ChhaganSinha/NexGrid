@@ -17,7 +17,7 @@ ids that survives paging.
 
 ```tsx
 // React
-<NexGrid
+<TableX
   enableSelection
   onSelectionChange={(ids, allAcrossSelected) => console.log(ids, allAcrossSelected)}
   {...props}
@@ -26,12 +26,12 @@ ids that survives paging.
 
 ```html
 <!-- Angular -->
-<nex-grid enableSelection (selectionChange)="selected.set($event.ids)" …/>
+<table-x enableSelection (selectionChange)="selected.set($event.ids)" …/>
 ```
 
 ```js
 // Vanilla
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -42,7 +42,7 @@ createNexGrid(container, {
 
 ```cshtml
 <!-- ASP.NET Core -->
-<nex-grid caption="Students" endpoint="/api/students" enable-selection="true">…</nex-grid>
+<table-x caption="Students" endpoint="/api/students" enable-selection="true">…</table-x>
 ```
 
 Selection is **off** by default. Turning it on adds a checkbox column to the
@@ -64,7 +64,7 @@ function defaultRowId<TData>(row: TData): string {
 Rows with an `id` property just work. Anything else needs `getRowId`:
 
 ```tsx
-<NexGrid
+<TableX
   enableSelection
   getRowId={(row) => `${row.tenantId}:${row.studentNumber}`}
   {...props}
@@ -77,12 +77,12 @@ readonly rowId = (row: Student): string => `${row.tenantId}:${row.studentNumber}
 ```
 
 ```html
-<nex-grid enableSelection [getRowId]="rowId" …/>
+<table-x enableSelection [getRowId]="rowId" …/>
 ```
 
 ```js
 // Vanilla
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -163,14 +163,14 @@ function bulkDelete(ids: string[], allAcrossSelected: boolean, query: QueryState
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: number;
@@ -179,7 +179,7 @@ interface Student {
   status: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
   { accessorKey: "status", header: "Status", meta: { align: "center" } },
@@ -216,7 +216,7 @@ export function StudentsGrid() {
   };
 
   return (
-    <NexGrid
+    <TableX
       caption="Students"
       columns={columns}
       data={page?.items ?? []}
@@ -229,7 +229,7 @@ export function StudentsGrid() {
       toolbarActions={
         <button
           type="button"
-          className="nxg-btn"
+          className="tbx-btn"
           disabled={selected.length === 0}
           onClick={() => void archive()}
         >
@@ -241,34 +241,34 @@ export function StudentsGrid() {
 }
 ```
 
-The Angular equivalent is a `nexGridToolbar` template:
+The Angular equivalent is a `tableXToolbar` template:
 
 ```html
-<nex-grid caption="Students" enableSelection [columns]="columns" [data]="rows()"
+<table-x caption="Students" enableSelection [columns]="columns" [data]="rows()"
           [total]="total()" [query]="query()" (queryChange)="load($event)"
           (selectionChange)="selected.set($event.ids)">
-  <ng-template nexGridToolbar>
-    <button type="button" class="nxg-btn"
+  <ng-template tableXToolbar>
+    <button type="button" class="tbx-btn"
             [disabled]="selected().length === 0"
             (click)="archive()">
       Archive {{ selected().length || '' }}
     </button>
   </ng-template>
-</nex-grid>
+</table-x>
 ```
 
 In vanilla, `toolbarActions` takes a `Node` or a string:
 
 ```js
-import { createNexGrid, el } from "@nexgrid/vanilla";
+import { createTableX, el } from "@tablex/vanilla";
 
 const archiveButton = el("button", {
-  class: "nxg-btn",
+  class: "tbx-btn",
   attrs: { type: "button", disabled: true },
   text: "Archive",
 });
 
-const grid = createNexGrid(document.getElementById("grid"), {
+const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -285,7 +285,7 @@ archiveButton.addEventListener("click", () => {
 });
 ```
 
-Reusing `.nxg-btn` makes the action look native to the toolbar and inherit the
+Reusing `.tbx-btn` makes the action look native to the toolbar and inherit the
 theme tokens.
 
 ## Selection and row click
@@ -306,14 +306,14 @@ const ids = grid.getSelection();   // string[]
 The ASP.NET Core Tag Helper leaves the same handle on the container element:
 
 ```js
-const ids = document.getElementById("students-grid").nexgrid.getSelection();
+const ids = document.getElementById("students-grid").tablex.getSelection();
 ```
 
 ## Styling and accessibility
 
-- Selected rows get `.nxg-row--selected`, selected cards `.nxg-card--selected`;
-  both tint with `--nxg-primary`. See [Theming](../theming.md).
-- The footer badge is `.nxg-selected-badge`, text from `locale.selectedBadge`
+- Selected rows get `.tbx-row--selected`, selected cards `.tbx-card--selected`;
+  both tint with `--tbx-primary`. See [Theming](../theming.md).
+- The footer badge is `.tbx-selected-badge`, text from `locale.selectedBadge`
   (`"{count} selected"`).
 - The header checkbox is labelled `locale.selectAllLabel`; each row checkbox is
   labelled `locale.selectRowLabel` (`"Select row {id}"`).

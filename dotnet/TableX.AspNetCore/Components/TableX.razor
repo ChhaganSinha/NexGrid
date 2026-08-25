@@ -1,0 +1,157 @@
+@typeparam TItem
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Rendering
+@using Microsoft.JSInterop
+@using System.Globalization
+@inject IJSRuntime JS
+
+<CascadingValue Value="_columns" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+<div @ref="_containerRef" id="@_containerId" class="@GridClass" data-tablex-config="@_configId"></div>
+
+<script type="application/json" id="@_configId">@((MarkupString)JsonConfig)</script>
+
+@if (AutoInit)
+{
+    <script>
+        (function () {
+            var containerId = @((MarkupString)TableXConfigSerializer.ToJsString(_containerId));
+            var configId = @((MarkupString)TableXConfigSerializer.ToJsString(_configId));
+            var warning = "TableX: the browser bundle is not loaded. Reference " +
+                @((MarkupString)TableXConfigSerializer.ToJsString(TableXAssets.ScriptPath)) +
+                " from your App.razor, _Layout.cshtml or index.html before this grid renders.";
+
+            function start() {
+                var host = document.getElementById(containerId);
+                var data = document.getElementById(configId);
+                if (!host || !data) return;
+
+                var api = window.TableX;
+                if (!api || typeof api.createTableX !== "function") {
+                    if (window.console && window.console.error) window.console.error(warning);
+                    return;
+                }
+
+                if (!host.tablex) {
+                    host.tablex = api.createTableX(host, JSON.parse(data.textContent));
+                }
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", start);
+            } else {
+                start();
+            }
+        })();
+    </script>
+}
+
+@code {
+    private readonly TableXColumnCollection _columns = new();
+    private ElementReference _containerRef;
+    private readonly string _containerId = "tbx-blazor-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)[..12];
+    private string _configId => _containerId + "-config";
+
+    /// <summary>
+    /// Accessible name for the table, and the default export file prefix. Required.
+    /// </summary>
+    [Parameter]
+    public string Caption { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The endpoint the grid fetches itself, expecting a <see cref="PagedResponse{T}"/> body.
+    /// </summary>
+    [Parameter]
+    public string? Endpoint { get; set; }
+
+    /// <summary>
+    /// Endpoint used to collect the whole filtered dataset for export. Defaults to <see cref="Endpoint"/>.
+    /// </summary>
+    [Parameter]
+    public string? FetchEndpoint { get; set; }
+
+    /// <summary>
+    /// Extra class names for the grid root.
+    /// </summary>
+    [Parameter]
+    public string? GridClass { get; set; }
+
+    /// <summary>
+    /// Show the global search field. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool EnableSearch { get; set; } = true;
+
+    /// <summary>
+    /// Placeholder for the search field. Overrides the locale default.
+    /// </summary>
+    [Parameter]
+    public string? SearchPlaceholder { get; set; }
+
+    /// <summary>
+    /// Show row selection checkboxes. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool EnableSelection { get; set; }
+
+    /// <summary>
+    /// Show the Excel/CSV export menu. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool EnableExport { get; set; } = true;
+
+    /// <summary>
+    /// Export file prefix. Defaults to a slug of <see cref="Caption"/>.
+    /// </summary>
+    [Parameter]
+    public string? ExportFileName { get; set; }
+
+    /// <summary>
+    /// Show the automatic S.No. column. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool ShowSerialNumber { get; set; } = true;
+
+    /// <summary>
+    /// Initial row density. Defaults to <see cref="TableXDensity.Default"/>.
+    /// </summary>
+    [Parameter]
+    public TableXDensity Density { get; set; } = TableXDensity.Default;
+
+    /// <summary>
+    /// Colour scheme: Light, Dark, or Auto. Defaults to <see cref="TableXTheme.Light"/>.
+    /// </summary>
+    [Parameter]
+    public TableXTheme Theme { get; set; } = TableXTheme.Light;
+
+    /// <summary>
+    /// Emit the automatic initialization script. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool AutoInit { get; set; } = true;
+
+    /// <summary>
+    /// Child column declarations (<see cref="TableXColumn"/>).
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string JsonConfig => TableXConfigSerializer.Serialize(new TableXConfig
+    {
+        Caption = Caption,
+        Columns = _columns,
+        Endpoint = Endpoint,
+        FetchEndpoint = FetchEndpoint ?? Endpoint,
+        Density = TableXConfigSerializer.ToToken(Density),
+        Theme = TableXConfigSerializer.ToToken(Theme),
+        ClassName = GridClass,
+        EnableSearch = EnableSearch,
+        SearchPlaceholder = SearchPlaceholder,
+        EnableSelection = EnableSelection,
+        EnableExport = EnableExport,
+        ExportFileName = ExportFileName,
+        ShowSerialNumber = ShowSerialNumber,
+    });
+}

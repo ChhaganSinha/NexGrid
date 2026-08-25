@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// The two NexGrid packages are installed with `file:` specifiers, which npm
+// The two TableX packages are installed with `file:` specifiers, which npm
 // materialises as symlinks into ../../packages. Two consequences worth the
 // three lines of config:
 //
@@ -17,7 +17,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    exclude: ["@nexgrid/react", "@nexgrid/core"],
+    exclude: ["@tablex/react", "@tablex/core"],
   },
   server: {
     port: 5173,

@@ -53,12 +53,12 @@ Note `page: 1`. Changing the order changes which rows land on page 3, so
 staying on page 3 would show an arbitrary slice of a different ordering.
 
 Sort icons follow the state: idle is an up-down arrow at 40 % opacity, active is
-an up (asc) or down (desc) arrow in `--nxg-primary`.
+an up (asc) or down (desc) arrow in `--tbx-primary`.
 
 ## Which headers are sortable
 
 ```ts
-export function isSortable<TData, TRender>(col: NexGridColumn<TData, TRender>): boolean {
+export function isSortable<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
   return col.enableSorting !== false && getColumnId(col) !== "" && !isStructuralColumn(col);
 }
 ```
@@ -68,7 +68,7 @@ your endpoint cannot order by — a header that produces no change is worse than
 header with no affordance:
 
 ```ts
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name" },                        // sortable
   { accessorKey: "email", header: "Email", enableSorting: false }, // not
   { id: "actions", header: "", meta: { align: "right", width: 64 } }, // structural: never
@@ -80,7 +80,7 @@ never sortable, regardless of `enableSorting`.
 
 ```cshtml
 @* ASP.NET Core *@
-<nex-grid-column field="email" header="Email" sortable="false" />
+<table-x-column field="email" header="Email" sortable="false" />
 ```
 
 Keep the column set and the server allowlist in step: a column marked sortable
@@ -106,7 +106,7 @@ rather than failing:
 | `:desc` | dropped |
 | `a:b:desc` | `{ field: "a:b", dir: "desc" }` — the field is everything before the **last** colon |
 
-`NexGrid.AspNetCore` parses the token exactly this way, so a URL means the same
+`TableX.AspNetCore` parses the token exactly this way, so a URL means the same
 thing on the client and on the server.
 
 ## Setting an explicit sort
@@ -115,7 +115,7 @@ thing on the client and on the server.
 initial sort, a "newest first" button, a saved view — use `withSort`:
 
 ```ts
-import { defaultQuery, withSort, type QueryState } from "@nexgrid/core";
+import { defaultQuery, withSort, type QueryState } from "@tablex/core";
 
 // Newest first on first paint.
 const initial: QueryState = withSort(defaultQuery(), "createdAt", "desc");
@@ -126,7 +126,7 @@ const initial: QueryState = withSort(defaultQuery(), "createdAt", "desc");
 "use client";
 
 import { useState } from "react";
-import { NexGrid, defaultQuery, withSort, type QueryState } from "@nexgrid/react";
+import { TableX, defaultQuery, withSort, type QueryState } from "@tablex/react";
 
 export function StudentsGrid() {
   const [query, setQuery] = useState<QueryState>(() =>
@@ -138,7 +138,7 @@ export function StudentsGrid() {
       <button type="button" onClick={() => setQuery((q) => withSort(q, "score", "desc"))}>
         Top scores first
       </button>
-      {/* <NexGrid query={query} onQueryChange={setQuery} … /> */}
+      {/* <TableX query={query} onQueryChange={setQuery} … /> */}
     </>
   );
 }
@@ -147,16 +147,16 @@ export function StudentsGrid() {
 In the ASP.NET Core Tag Helper the initial sort is one attribute:
 
 ```cshtml
-<nex-grid caption="Students" endpoint="/api/students" sort="createdAt:desc">
-    <nex-grid-column field="name" header="Name" />
-    <nex-grid-column field="createdAt" header="Enrolled" />
-</nex-grid>
+<table-x caption="Students" endpoint="/api/students" sort="createdAt:desc">
+    <table-x-column field="name" header="Name" />
+    <table-x-column field="createdAt" header="Enrolled" />
+</table-x>
 ```
 
 Reading the primary sort back, for a "sorted by" label or an analytics event:
 
 ```ts
-import { primarySort } from "@nexgrid/core";
+import { primarySort } from "@tablex/core";
 
 const sort = primarySort(query);   // SortSpec | undefined
 const label = sort ? `${sort.field} (${sort.dir})` : "default order";
@@ -172,7 +172,7 @@ The **header UI** drives a single sort: `withToggledSort` replaces the array.
 Multi-sort is therefore something you compose yourself and hand in:
 
 ```ts
-import { type QueryState } from "@nexgrid/core";
+import { type QueryState } from "@tablex/core";
 
 const query: QueryState = {
   page: 1,
@@ -215,7 +215,7 @@ Resolve the field through a map you wrote. Never index a data structure with the
 raw string:
 
 ```ts
-import { parseQuery } from "@nexgrid/core";
+import { parseQuery } from "@tablex/core";
 
 const SORTABLE = {
   name: "name",
@@ -244,4 +244,4 @@ Full worked endpoints: [Server integration](../server-integration.md).
 
 - [Columns](../columns.md) — `enableSorting`, ids, structural columns
 - [Pagination](pagination.md) — why a sort change resets to page 1
-- [`@nexgrid/core` API](../api/core.md) — `withToggledSort`, `withSort`, `primarySort`
+- [`@tablex/core` API](../api/core.md) — `withToggledSort`, `withSort`, `primarySort`

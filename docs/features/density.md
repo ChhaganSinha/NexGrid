@@ -28,19 +28,19 @@ The grid writes the choice to `data-density` on the root element, and the
 stylesheet does the rest:
 
 ```css
-.nxg-root[data-density="compact"] .nxg-td {
+.tbx-root[data-density="compact"] .tbx-td {
   padding-top: 8px;
   padding-bottom: 8px;
   font-size: 12px;
 }
 
-.nxg-root[data-density="default"] .nxg-td {
+.tbx-root[data-density="default"] .tbx-td {
   padding-top: 12px;
   padding-bottom: 12px;
   font-size: 14px;
 }
 
-.nxg-root[data-density="comfortable"] .nxg-td {
+.tbx-root[data-density="comfortable"] .tbx-td {
   padding-top: 16px;
   padding-bottom: 16px;
   font-size: 14px;
@@ -59,17 +59,17 @@ proportions, so switching to compact does not shrink the controls.
 
 ```tsx
 // React
-<NexGrid density="compact" {...props} />
+<TableX density="compact" {...props} />
 ```
 
 ```html
 <!-- Angular -->
-<nex-grid density="compact" …/>
+<table-x density="compact" …/>
 ```
 
 ```js
 // Vanilla
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -79,7 +79,7 @@ createNexGrid(container, {
 
 ```cshtml
 <!-- ASP.NET Core -->
-<nex-grid caption="Students" endpoint="/api/students" density="Compact">…</nex-grid>
+<table-x caption="Students" endpoint="/api/students" density="Compact">…</table-x>
 ```
 
 The Tag Helper attribute takes `Compact`, `Default` or `Comfortable`, matched
@@ -104,15 +104,15 @@ store the user's choice yourself and pass it back as the initial value:
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
   type Density,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: number;
@@ -120,7 +120,7 @@ interface Student {
   email: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
 ];
@@ -154,7 +154,7 @@ export function StudentsGrid() {
   }, [load, query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Students"
       columns={columns}
       data={page?.items ?? []}
@@ -169,10 +169,10 @@ export function StudentsGrid() {
 ```
 
 There is no `onDensityChange` callback. To observe the current density, watch
-the `data-density` attribute on `.nxg-root`:
+the `data-density` attribute on `.tbx-root`:
 
 ```js
-const root = document.querySelector(".nxg-root");
+const root = document.querySelector(".tbx-root");
 new MutationObserver(() => {
   localStorage.setItem("students-grid-density", root.dataset.density);
 }).observe(root, { attributes: true, attributeFilter: ["data-density"] });
@@ -185,13 +185,13 @@ CSS can hang off it:
 
 ```css
 /* Tighten a custom cell's own chrome when the grid is compact. */
-.nxg-root[data-density="compact"] .pill {
+.tbx-root[data-density="compact"] .pill {
   padding: 1px 6px;
   font-size: 11px;
 }
 
 /* Give comfortable mode more breathing room in the card layout too. */
-.nxg-root[data-density="comfortable"] .nxg-card {
+.tbx-root[data-density="comfortable"] .tbx-card {
   padding: 18px;
 }
 ```
@@ -200,7 +200,7 @@ To change the built-in steps themselves, override the rules with the same
 specificity — no `!important` needed:
 
 ```css
-.nxg-root[data-density="compact"] .nxg-td {
+.tbx-root[data-density="compact"] .tbx-td {
   padding-top: 6px;
   padding-bottom: 6px;
   font-size: 11px;
@@ -220,7 +220,7 @@ hints, so a localized grid can drop or translate them:
 | `densityComfortable` | `"Comfortable (52px)"` |
 
 ```tsx
-<NexGrid
+<TableX
   locale={{
     densityButton: "Dichte: {density}",
     densityCompact: "Kompakt",
@@ -232,7 +232,7 @@ hints, so a localized grid can drop or translate them:
 ```
 
 `{density}` is substituted with the current density name; the trigger button
-carries `.nxg-capitalize`, so a lower-case value still reads correctly.
+carries `.tbx-capitalize`, so a lower-case value still reads correctly.
 
 ## Related
 

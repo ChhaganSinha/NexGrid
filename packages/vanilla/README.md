@@ -1,7 +1,7 @@
-# @nexgrid/vanilla
+# @tablex/vanilla
 
 A professional, **server-driven** data grid for plain JavaScript — no framework, no
-build step required, and zero runtime dependencies beyond [`@nexgrid/core`](../core).
+build step required, and zero runtime dependencies beyond [`@tablex/core`](../core).
 
 The grid never holds your dataset. Every user action (search, sort, page, page
 size) becomes a `QueryState`; you answer with one page of rows and a total, or
@@ -16,7 +16,7 @@ you point the grid at an endpoint and let it fetch for itself.
 - **Safe by construction:** cell values are written as text nodes. There is no
   `innerHTML` path for row data anywhere in this package.
 
-This is also the bundle that powers `NexGrid.AspNetCore`.
+This is also the bundle that powers `TableX.AspNetCore`.
 
 ---
 
@@ -25,24 +25,24 @@ This is also the bundle that powers `NexGrid.AspNetCore`.
 ### npm
 
 ```bash
-npm install @nexgrid/vanilla
+npm install @tablex/vanilla
 ```
 
 ```js
-import { createNexGrid } from "@nexgrid/vanilla";
-import "@nexgrid/vanilla/styles.css";
+import { createTableX } from "@tablex/vanilla";
+import "@tablex/vanilla/styles.css";
 ```
 
 ### Script tag / CDN
 
-The browser bundle inlines `@nexgrid/core` and exposes everything on a global
-called `NexGrid`.
+The browser bundle inlines `@tablex/core` and exposes everything on a global
+called `TableX`.
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/nexgrid.css" />
-<script src="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/nexgrid.global.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.css" />
+<script src="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.global.js"></script>
 <script>
-  const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+  const grid = TableX.createTableX(document.getElementById("grid"), {
     caption: "Students",
     endpoint: "/api/students",
     columns: [{ accessorKey: "name", header: "Name" }],
@@ -50,7 +50,7 @@ called `NexGrid`.
 </script>
 ```
 
-Serving the files yourself? Copy `dist/nexgrid.global.js` and `dist/nexgrid.css`
+Serving the files yourself? Copy `dist/tablex.global.js` and `dist/tablex.css`
 out of the package — that pair is self-contained.
 
 ---
@@ -59,8 +59,8 @@ out of the package — that pair is self-contained.
 
 ### Endpoint mode — the grid fetches its own data
 
-Point it at any endpoint that accepts NexGrid's query string and answers with a
-`PagedResponse`. That is the wire format `NexGrid.AspNetCore` binds and returns
+Point it at any endpoint that accepts TableX's query string and answers with a
+`PagedResponse`. That is the wire format `TableX.AspNetCore` binds and returns
 out of the box:
 
 ```text
@@ -70,7 +70,7 @@ GET /api/students?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 ```
 
 ```js
-const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+const grid = TableX.createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   columns: [
@@ -96,9 +96,9 @@ what you gave it and emits intent; **it does not move on its own** — fetch the
 new page and call `handle.update()`:
 
 ```js
-let query = NexGrid.defaultQuery();
+let query = TableX.defaultQuery();
 
-const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+const grid = TableX.createTableX(document.getElementById("grid"), {
   caption: "Students",
   columns,
   data: [],
@@ -113,7 +113,7 @@ const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
 async function load(next) {
   grid.update({ isLoading: true });
   try {
-    const res = await fetch(NexGrid.buildQueryUrl("/api/students", next));
+    const res = await fetch(TableX.buildQueryUrl("/api/students", next));
     const body = await res.json();
     grid.update({ data: body.items, total: body.total, query: next, isLoading: false, error: false });
   } catch {
@@ -132,14 +132,14 @@ app's router.
 
 ## Options
 
-`createNexGrid(container, options)` — `container` is any element; the grid
-appends one `div.nxg-root` to it.
+`createTableX(container, options)` — `container` is any element; the grid
+appends one `div.tbx-root` to it.
 
 ### Required
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `columns` | `NexGridColumn<TData, string \| Node>[]` | Column definitions, in display order. |
+| `columns` | `TableXColumn<TData, string \| Node>[]` | Column definitions, in display order. |
 | `caption` | `string` | Accessible name for the table; also the default export file prefix. |
 
 ### Data source — pick one mode
@@ -158,8 +158,8 @@ appends one `div.nxg-root` to it.
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `density` | `"compact" \| "default" \| "comfortable"` | `"default"` | Initial row density; the user can change it from the toolbar. |
-| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Adds `nxg-dark` / `nxg-auto` to the root. |
-| `className` | `string` | — | Extra classes appended to `.nxg-root`. |
+| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Adds `tbx-dark` / `tbx-auto` to the root. |
+| `className` | `string` | — | Extra classes appended to `.tbx-root`. |
 | `isLoading` | `boolean` | `false` | Controlled mode: show the loading state (rows only). |
 | `error` | `boolean` | `false` | Controlled mode: replace the whole grid with the error card. |
 | `onRetry` | `() => void` | — | Adds a retry button to the error card. In endpoint mode a retry button is shown regardless and refetches. |
@@ -191,7 +191,7 @@ appends one `div.nxg-root` to it.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `locale` | `Partial<NexGridLocale>` | `DEFAULT_LOCALE` | Overrides for any user-facing string. |
+| `locale` | `Partial<TableXLocale>` | `DEFAULT_LOCALE` | Overrides for any user-facing string. |
 | `onNotify` | `(notice: { type, message }) => void` | no-op | The grid never renders toasts; it reports through this. |
 
 #### Export flow
@@ -211,7 +211,7 @@ appends one `div.nxg-root` to it.
 
 ## Handle API
 
-`createNexGrid` returns a handle:
+`createTableX` returns a handle:
 
 | Method | Description |
 | --- | --- |
@@ -267,7 +267,7 @@ Return a **string** for text, or a **`Node`** when you need markup:
   accessorKey: "status",
   header: "Status",
   cell: ({ row, getValue }) => {
-    const badge = NexGrid.el("span", { class: "badge", text: String(getValue()) });
+    const badge = TableX.el("span", { class: "badge", text: String(getValue()) });
     badge.dataset.status = row.original.status;
     return badge;
   },
@@ -296,26 +296,26 @@ The stylesheet is one file of CSS custom properties. Re-skin the grid by
 overriding tokens — no class overrides, no `!important`:
 
 ```css
-.nxg-root {
-  --nxg-primary: #7c3aed;
-  --nxg-radius: 6px;
-  --nxg-font: "Inter", system-ui, sans-serif;
+.tbx-root {
+  --tbx-primary: #7c3aed;
+  --tbx-radius: 6px;
+  --tbx-font: "Inter", system-ui, sans-serif;
 }
 ```
 
 | Token | Purpose |
 | --- | --- |
-| `--nxg-font`, `--nxg-font-mono` | Type stacks (mono is used for serial numbers). |
-| `--nxg-bg`, `--nxg-card`, `--nxg-card-2` | Input, surface and header-row backgrounds. |
-| `--nxg-border` | Every border and divider. |
-| `--nxg-fg`, `--nxg-muted`, `--nxg-muted-fg` | Text, subtle fills, secondary text. |
-| `--nxg-primary`, `--nxg-primary-fg` | Accent: sort icons, current page, selection tint. |
-| `--nxg-danger` | Destructive accent. |
-| `--nxg-radius`, `--nxg-radius-sm` | Corner rounding. |
-| `--nxg-shadow`, `--nxg-focus-ring` | Elevation and the focus ring. |
+| `--tbx-font`, `--tbx-font-mono` | Type stacks (mono is used for serial numbers). |
+| `--tbx-bg`, `--tbx-card`, `--tbx-card-2` | Input, surface and header-row backgrounds. |
+| `--tbx-border` | Every border and divider. |
+| `--tbx-fg`, `--tbx-muted`, `--tbx-muted-fg` | Text, subtle fills, secondary text. |
+| `--tbx-primary`, `--tbx-primary-fg` | Accent: sort icons, current page, selection tint. |
+| `--tbx-danger` | Destructive accent. |
+| `--tbx-radius`, `--tbx-radius-sm` | Corner rounding. |
+| `--tbx-shadow`, `--tbx-focus-ring` | Elevation and the focus ring. |
 
 Dark mode: pass `theme: "dark"` for an always-dark grid, `theme: "auto"` to
-follow the OS preference, or put `.nxg-dark` / `.nxg-auto` on any ancestor to
+follow the OS preference, or put `.tbx-dark` / `.tbx-auto` on any ancestor to
 switch several grids at once.
 
 Density is a data attribute (`data-density="compact|default|comfortable"`) on the
@@ -331,7 +331,7 @@ root, so it can be styled or observed from outside the grid.
   arrow-key/Home/End roving focus, Escape to close (focus returns to the
   trigger) and outside-click to dismiss
 - `aria-current="page"` on the active pager button, visually hidden labels via
-  `.nxg-sr-only`, and decorative SVGs marked `aria-hidden`
+  `.tbx-sr-only`, and decorative SVGs marked `aria-hidden`
 - Focus survives re-renders: toolbar inputs are never rebuilt, and controls that
   are rebuilt (checkboxes, headers, pager buttons) are re-focused afterwards
 
@@ -340,7 +340,7 @@ root, so it can be styled or observed from outside the grid.
 ## Also exported
 
 Because the browser bundle has no module system to reach the engine through,
-this package re-exports the parts of `@nexgrid/core` a page actually needs —
+this package re-exports the parts of `@tablex/core` a page actually needs —
 `defaultQuery`, `parseQuery`, `serializeQuery`, `buildQueryUrl`, `withPage`,
 `withSearch`, `withToggledSort`, `withSort`, `withPageSize`, `withFilter`,
 `getPageNumbers`, `getRecordRange`, `serialNumber`, `totalPagesFor`,
@@ -351,9 +351,9 @@ Mirroring the grid into the address bar is therefore three lines:
 
 ```js
 onQueryChange: (next) => {
-  history.replaceState(null, "", "?" + NexGrid.serializeQuery(next));
+  history.replaceState(null, "", "?" + TableX.serializeQuery(next));
 }
-// …and on load: query: NexGrid.parseQuery(location.search)
+// …and on load: query: TableX.parseQuery(location.search)
 ```
 
 ## Author & Maintainer
@@ -366,5 +366,5 @@ onQueryChange: (next) => {
 
 ## License
 
-[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+[MIT](https://github.com/ChhaganSinha/TableX/blob/main/LICENSE) © 2026 Chhagan Sinha
 

@@ -1,14 +1,14 @@
-// Nothing NexGrid-specific has to be registered here.
+// Nothing TableX-specific has to be registered here.
 //
-// `NexGridQuery` binds itself (it carries its own [ModelBinder]), the Tag
+// `TableXQuery` binds itself (it carries its own [ModelBinder]), the Tag
 // Helpers are discovered from _ViewImports.cshtml, and the browser bundle and
 // stylesheet are static web assets that `UseStaticFiles` already serves.
 //
-// The one line that is about this example rather than about NexGrid is the
+// The one line that is about this example rather than about TableX is the
 // in-memory store: a real app would register a DbContext instead, and the
 // controller would not change.
 
-using NexGrid.Example.Mvc.Models;
+using TableX.Example.Mvc.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +25,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// Serves both wwwroot/ and the RCL's _content/NexGrid.AspNetCore/ assets.
+// Serves both wwwroot/ and the RCL's _content/TableX.AspNetCore/ assets.
 app.UseStaticFiles();
 
 app.UseRouting();

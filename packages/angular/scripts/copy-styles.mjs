@@ -1,12 +1,12 @@
 // Ship the shared stylesheet inside the built package so Angular consumers can
-// add "node_modules/@nexgrid/angular/styles.css" to their styles array or
-// `import "@nexgrid/angular/styles.css"`.
+// add "node_modules/@tablex/angular/styles.css" to their styles array or
+// `import "@tablex/angular/styles.css"`.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = join(here, "..", "..", "core", "styles", "nexgrid.css");
+const src = join(here, "..", "..", "core", "styles", "tablex.css");
 const dest = join(here, "..", "dist", "styles.css");
 const distPkgPath = join(here, "..", "dist", "package.json");
 
@@ -21,4 +21,3 @@ if (existsSync(distPkgPath)) {
   writeFileSync(distPkgPath, JSON.stringify(pkg, null, 2) + "\n");
   console.log(`Updated ${distPkgPath} exports with ./styles.css`);
 }
-

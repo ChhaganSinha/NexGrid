@@ -1,7 +1,7 @@
 {
-  "name": "@nexgrid/vanilla",
+  "name": "@tablex/vanilla",
   "version": "0.1.0",
-  "description": "Zero-dependency vanilla JS/DOM renderer for NexGrid — the professional, server-driven data grid. Also powers NexGrid.AspNetCore.",
+  "description": "Zero-dependency vanilla JS/DOM renderer for TableX — the professional, server-driven data grid. Also powers TableX.AspNetCore.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
@@ -14,6 +14,7 @@
     "url": "https://github.com/ChhaganSinha/NexGrid/issues"
   },
   "keywords": [
+    "tablex",
     "datagrid",
     "data-grid",
     "table",
@@ -27,16 +28,16 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "unpkg": "./dist/nexgrid.global.js",
-  "jsdelivr": "./dist/nexgrid.global.js",
+  "unpkg": "./dist/tablex.global.js",
+  "jsdelivr": "./dist/tablex.global.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./styles.css": "./dist/nexgrid.css",
-    "./global": "./dist/nexgrid.global.js",
+    "./styles.css": "./dist/tablex.css",
+    "./global": "./dist/tablex.global.js",
     "./package.json": "./package.json"
   },
   "files": [
@@ -50,7 +51,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@nexgrid/core": "0.1.0"
+    "@tablex/core": "0.1.0"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

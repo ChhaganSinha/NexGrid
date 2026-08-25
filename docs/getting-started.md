@@ -19,13 +19,13 @@ action into a `QueryState`, and hands it to you.
 
 | Platform | Command | Stylesheet |
 | --- | --- | --- |
-| React / Next.js | `npm install @nexgrid/react` | `import "@nexgrid/react/styles.css"` |
-| Angular 17+ | `npm install @nexgrid/angular` | add `node_modules/@nexgrid/angular/styles.css` to `angular.json` → `styles` |
-| Vanilla (bundler) | `npm install @nexgrid/vanilla` | `import "@nexgrid/vanilla/styles.css"` |
-| Vanilla (script tag) | — | `<link rel="stylesheet" href=".../dist/nexgrid.css">` |
-| ASP.NET Core 8+ | `dotnet add package NexGrid.AspNetCore` | `~/_content/NexGrid.AspNetCore/nexgrid.css` |
+| React / Next.js | `npm install @tablex/react` | `import "@tablex/react/styles.css"` |
+| Angular 17+ | `npm install @tablex/angular` | add `node_modules/@tablex/angular/styles.css` to `angular.json` → `styles` |
+| Vanilla (bundler) | `npm install @tablex/vanilla` | `import "@tablex/vanilla/styles.css"` |
+| Vanilla (script tag) | — | `<link rel="stylesheet" href=".../dist/tablex.css">` |
+| ASP.NET Core 8+ | `dotnet add package TableX.AspNetCore` | `~/_content/TableX.AspNetCore/tablex.css` |
 
-`@nexgrid/core` arrives as a dependency of every adapter — you only install it
+`@tablex/core` arrives as a dependency of every adapter — you only install it
 directly if you want to import engine helpers the adapter does not re-export.
 React needs React >= 18 as a peer; Angular needs `@angular/core`,
 `@angular/common` >= 17 and `rxjs` >= 7.
@@ -45,14 +45,14 @@ Two files: a column set and a component. The grid is fully controlled — hold a
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 export interface Student {
   id: number;
@@ -63,7 +63,7 @@ export interface Student {
   joinedAt: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
   { accessorKey: "email", header: "Email" },
   {
@@ -108,7 +108,7 @@ export function StudentsGrid() {
   }, [load, query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Students"
       columns={columns}
       data={page?.items ?? []}
@@ -143,11 +143,11 @@ export default function App() {
 }
 ```
 
-Full prop table: [`@nexgrid/react` API](api/react.md).
+Full prop table: [`@tablex/react` API](api/react.md).
 
 ## Next.js (App Router)
 
-The published bundle starts with `"use client"`, so `<NexGrid />` imports
+The published bundle starts with `"use client"`, so `<TableX />` imports
 directly into a client component with no wrapper. Reuse `StudentsGrid` from the
 [React section](#react) verbatim and render it from a Server Component:
 
@@ -167,7 +167,7 @@ export default function Page() {
 
 ```tsx
 // app/layout.tsx
-import "@nexgrid/react/styles.css";
+import "@tablex/react/styles.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -191,7 +191,7 @@ A matching route handler, so the page works end to end:
 ```ts
 // app/api/students/route.ts
 import { NextResponse } from "next/server";
-import { parseQuery, type PagedResponse } from "@nexgrid/core";
+import { parseQuery, type PagedResponse } from "@tablex/core";
 
 import type { Student } from "../../students/students-grid";
 
@@ -246,7 +246,7 @@ To put the query in the URL instead of component state, swap the state hook:
 
 import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { parseQuery, serializeQuery } from "@nexgrid/react";
+import { parseQuery, serializeQuery } from "@tablex/react";
 
 export function useUrlQuery() {
   const searchParams = useSearchParams();
@@ -274,7 +274,7 @@ Register the stylesheet in `angular.json`:
         "build": {
           "options": {
             "styles": [
-              "node_modules/@nexgrid/angular/styles.css",
+              "node_modules/@tablex/angular/styles.css",
               "src/styles.css"
             ]
           }
@@ -291,7 +291,7 @@ A service that fetches one page:
 // students.service.ts
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
 
 export interface Student {
   id: number;
@@ -318,24 +318,24 @@ A standalone component that renders it:
 // students.component.ts
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import {
-  NexGridCellDirective,
-  NexGridComponent,
-  NexGridToolbarDirective,
+  TableXCellDirective,
+  TableXComponent,
+  TableXToolbarDirective,
   defaultQuery,
-  type NexGridAngularColumn,
-  type NexGridNotice,
+  type TableXAngularColumn,
+  type TableXNotice,
   type QueryState,
-} from "@nexgrid/angular";
+} from "@tablex/angular";
 
 import { StudentsService, type Student } from "./students.service";
 
 @Component({
   selector: "app-students",
   standalone: true,
-  imports: [NexGridComponent, NexGridCellDirective, NexGridToolbarDirective],
+  imports: [TableXComponent, TableXCellDirective, TableXToolbarDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <nex-grid
+    <table-x
       caption="Students"
       fetchEndpoint="/api/students"
       enableSelection
@@ -351,20 +351,20 @@ import { StudentsService, type Student } from "./students.service";
       (selectionChange)="selected.set($event.ids)"
       (notify)="toast($event)"
     >
-      <ng-container *nexGridCell="'status'; of: rows(); let value = value">
+      <ng-container *tableXCell="'status'; of: rows(); let value = value">
         <span class="pill" [class.pill--ok]="value === 'Active'">{{ value }}</span>
       </ng-container>
 
-      <ng-template nexGridToolbar>
-        <button type="button" class="nxg-btn" (click)="create()">Add student</button>
+      <ng-template tableXToolbar>
+        <button type="button" class="tbx-btn" (click)="create()">Add student</button>
       </ng-template>
-    </nex-grid>
+    </table-x>
   `,
 })
 export class StudentsComponent {
   private readonly service = inject(StudentsService);
 
-  readonly columns: NexGridAngularColumn<Student>[] = [
+  readonly columns: TableXAngularColumn<Student>[] = [
     { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
     { accessorKey: "email", header: "Email" },
     { accessorKey: "status", header: "Status", meta: { align: "center", width: 130 } },
@@ -408,7 +408,7 @@ export class StudentsComponent {
     console.log("create");
   }
 
-  toast(notice: NexGridNotice): void {
+  toast(notice: TableXNotice): void {
     console.info(notice.type, notice.message);
   }
 }
@@ -427,7 +427,7 @@ void bootstrapApplication(StudentsComponent, {
 });
 ```
 
-Full input/output table: [`@nexgrid/angular` API](api/angular.md).
+Full input/output table: [`@tablex/angular` API](api/angular.md).
 
 ## ASP.NET Core 8+
 
@@ -442,11 +442,11 @@ package as static web assets — nothing to copy or build:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"]</title>
-    <link rel="stylesheet" href="@NexGridAssets.StylesheetPath" />
+    <link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
 </head>
 <body>
     @RenderBody()
-    <script src="@NexGridAssets.ScriptPath"></script>
+    <script src="@TableXAssets.ScriptPath"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
@@ -456,8 +456,8 @@ Register the Tag Helpers once, in `Views/_ViewImports.cshtml` (or
 `Pages/_ViewImports.cshtml`):
 
 ```cshtml
-@using NexGrid.AspNetCore
-@addTagHelper *, NexGrid.AspNetCore
+@using TableX.AspNetCore
+@addTagHelper *, TableX.AspNetCore
 ```
 
 The endpoint:
@@ -466,7 +466,7 @@ The endpoint:
 // Controllers/StudentsController.cs
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using NexGrid.AspNetCore;
+using TableX.AspNetCore;
 
 namespace MyApp.Controllers;
 
@@ -475,7 +475,7 @@ namespace MyApp.Controllers;
 public sealed class StudentsController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public Task<PagedResponse<StudentRow>> Get(NexGridQuery query, CancellationToken ct) =>
+    public Task<PagedResponse<StudentRow>> Get(TableXQuery query, CancellationToken ct) =>
         db.Students
             .AsNoTracking()
             .Select(s => new StudentRow(s.Id, s.Name, s.Email, s.Status, s.Score, s.CreatedAt))
@@ -500,35 +500,35 @@ public sealed record StudentRow(
 
 <h1>Students</h1>
 
-<nex-grid caption="Students" endpoint="/api/students" enable-selection="true">
-    <nex-grid-column field="name" header="Name" min-width="180" />
-    <nex-grid-column field="email" header="Email" />
-    <nex-grid-column field="status" header="Status" align="Center" />
-    <nex-grid-column field="score" header="Score" align="Right" width="90" />
-    <nex-grid-column field="createdAt" header="Enrolled" />
-</nex-grid>
+<table-x caption="Students" endpoint="/api/students" enable-selection="true">
+    <table-x-column field="name" header="Name" min-width="180" />
+    <table-x-column field="email" header="Email" />
+    <table-x-column field="status" header="Status" align="Center" />
+    <table-x-column field="score" header="Score" align="Right" width="90" />
+    <table-x-column field="createdAt" header="Enrolled" />
+</table-x>
 ```
 
 ### Blazor (.NET 8 Server / WebAssembly / Auto)
 
-Add `@using NexGrid.AspNetCore.Components` to your `_Imports.razor`:
+Add `@using TableX.AspNetCore.Components` to your `_Imports.razor`:
 
 ```razor
 @* Pages/Students.razor *@
 @page "/students"
-@using NexGrid.AspNetCore.Components
+@using TableX.AspNetCore.Components
 
 <PageTitle>Students</PageTitle>
 
 <h1>Students</h1>
 
-<NexGrid TItem="StudentRow" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true">
-    <NexGridColumn Field="name" Header="Name" MinWidth="180" />
-    <NexGridColumn Field="email" Header="Email" />
-    <NexGridColumn Field="status" Header="Status" Align="NexGridColumnAlign.Center" />
-    <NexGridColumn Field="score" Header="Score" Align="NexGridColumnAlign.Right" Width="90" />
-    <NexGridColumn Field="createdAt" Header="Enrolled" />
-</NexGrid>
+<TableX TItem="StudentRow" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true">
+    <TableXColumn Field="name" Header="Name" MinWidth="180" />
+    <TableXColumn Field="email" Header="Email" />
+    <TableXColumn Field="status" Header="Status" Align="TableXColumnAlign.Center" />
+    <TableXColumn Field="score" Header="Score" Align="TableXColumnAlign.Right" Width="90" />
+    <TableXColumn Field="createdAt" Header="Enrolled" />
+</TableX>
 ```
 
 That is the whole integration. The grid fetches its own data, manages its
@@ -546,7 +546,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
-app.UseStaticFiles();      // serves _content/NexGrid.AspNetCore/*
+app.UseStaticFiles();      // serves _content/TableX.AspNetCore/*
 app.MapDefaultControllerRoute();
 app.Run();
 ```
@@ -555,12 +555,12 @@ app.Run();
 > the development-time asset provider nor a published `wwwroot` applies, and the
 > two files 404. Publish, or set `ASPNETCORE_ENVIRONMENT=Development`.
 
-Full attribute tables: [`NexGrid.AspNetCore` API](api/aspnet.md).
+Full attribute tables: [`TableX.AspNetCore` API](api/aspnet.md).
 
 ## Vanilla JavaScript
 
-No build step needed. The browser bundle inlines `@nexgrid/core` and exposes
-everything on a global called `NexGrid`.
+No build step needed. The browser bundle inlines `@tablex/core` and exposes
+everything on a global called `TableX`.
 
 ```html
 <!DOCTYPE html>
@@ -569,15 +569,15 @@ everything on a global called `NexGrid`.
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Students</title>
-  <link rel="stylesheet" href="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/nexgrid.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.css" />
 </head>
 <body>
   <h1>Students</h1>
   <div id="grid"></div>
 
-  <script src="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/nexgrid.global.js"></script>
+  <script src="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.global.js"></script>
   <script>
-    const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+    const grid = TableX.createTableX(document.getElementById("grid"), {
       caption: "Students",
       endpoint: "/api/students",
       columns: [
@@ -587,9 +587,9 @@ everything on a global called `NexGrid`.
         { accessorKey: "score", header: "Score", meta: { align: "right", width: 90 } },
       ],
       enableSelection: true,
-      query: NexGrid.parseQuery(location.search),
+      query: TableX.parseQuery(location.search),
       onQueryChange: (next) => {
-        history.replaceState(null, "", `?${NexGrid.serializeQuery(next)}`);
+        history.replaceState(null, "", `?${TableX.serializeQuery(next)}`);
       },
       onSelectionChange: (ids) => console.log("selected", ids),
       onNotify: ({ type, message }) => console.info(type, message),
@@ -604,10 +604,10 @@ everything on a global called `NexGrid`.
 Through a bundler instead:
 
 ```js
-import { createNexGrid, parseQuery, serializeQuery } from "@nexgrid/vanilla";
-import "@nexgrid/vanilla/styles.css";
+import { createTableX, parseQuery, serializeQuery } from "@tablex/vanilla";
+import "@tablex/vanilla/styles.css";
 
-const grid = createNexGrid(document.getElementById("grid"), {
+const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   columns: [
@@ -622,7 +622,7 @@ const grid = createNexGrid(document.getElementById("grid"), {
 Call `grid.destroy()` when the containing view goes away — it aborts any
 in-flight request and releases every listener the grid put on `document`.
 
-Full option table: [`@nexgrid/vanilla` API](api/vanilla.md).
+Full option table: [`@tablex/vanilla` API](api/vanilla.md).
 
 ## What you need on the server
 
@@ -634,8 +634,8 @@ Whatever the platform, the endpoint contract is the same:
 3. Answer with `{ items, page, pageSize, total, totalPages }`, where `total` is
    the **full filtered count**.
 
-On ASP.NET Core, `NexGridQuery` + `ToPagedResponseAsync` do all three. Elsewhere,
-`parseQuery` from `@nexgrid/core` handles step 1 with the same degradation rules.
+On ASP.NET Core, `TableXQuery` + `ToPagedResponseAsync` do all three. Elsewhere,
+`parseQuery` from `@tablex/core` handles step 1 with the same degradation rules.
 Worked endpoints for ASP.NET Core, Node/Express and Next.js are in
 [Server integration](server-integration.md).
 

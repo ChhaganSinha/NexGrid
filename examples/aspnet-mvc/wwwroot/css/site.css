@@ -1,8 +1,8 @@
 /* Page chrome only. The grid is styled by
-   _content/NexGrid.AspNetCore/nexgrid.css, referenced in _Layout.cshtml, and
+   _content/TableX.AspNetCore/tablex.css, referenced in _Layout.cshtml, and
    is re-skinned by overriding its CSS custom properties:
 
-     .nxg-root { --nxg-primary: #7c3aed; --nxg-radius: 8px; }
+     .tbx-root { --tbx-primary: #7c3aed; --tbx-radius: 8px; }
 */
 
 :root {

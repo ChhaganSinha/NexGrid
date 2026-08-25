@@ -1,7 +1,7 @@
 # Server integration
 
 Implement two things — a query string in, a `PagedResponse` out — and every
-NexGrid adapter works against your endpoint with no glue code.
+TableX adapter works against your endpoint with no glue code.
 
 - [The wire format](#the-wire-format)
 - [Parsing rules](#parsing-rules)
@@ -40,7 +40,7 @@ export function buildQueryUrl(endpoint: string, query: QueryState): string;
 keeps working:
 
 ```ts
-import { buildQueryUrl, defaultQuery, withSearch } from "@nexgrid/core";
+import { buildQueryUrl, defaultQuery, withSearch } from "@tablex/core";
 
 const query = withSearch(defaultQuery(), "smith");
 buildQueryUrl("/api/students?cohort=2026", query);
@@ -68,7 +68,7 @@ grid that 500s on `?page=abc` is a grid that 500s in a bug report.
 | `?q=` | `q` absent |
 | `?filter[status]=` | present in `filter` with an empty value |
 
-`NexGrid.AspNetCore`'s `NexGridQuery` mirrors these rules exactly — including
+`TableX.AspNetCore`'s `TableXQuery` mirrors these rules exactly — including
 the `parseInt` prefix behaviour — so a URL means the same thing on both sides of
 the wire.
 
@@ -166,11 +166,11 @@ the grid's paging runs — the grid pages whatever query you hand it.
 
 ## ASP.NET Core
 
-`NexGrid.AspNetCore` implements everything above. Install it and there is
+`TableX.AspNetCore` implements everything above. Install it and there is
 nothing to register in `Program.cs`:
 
 ```bash
-dotnet add package NexGrid.AspNetCore
+dotnet add package TableX.AspNetCore
 ```
 
 ### Controller
@@ -178,7 +178,7 @@ dotnet add package NexGrid.AspNetCore
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using NexGrid.AspNetCore;
+using TableX.AspNetCore;
 
 namespace MyApp.Controllers;
 
@@ -202,7 +202,7 @@ public sealed record StudentRow(
 public sealed class StudentsController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public Task<PagedResponse<StudentRow>> Get(NexGridQuery query, CancellationToken ct) =>
+    public Task<PagedResponse<StudentRow>> Get(TableXQuery query, CancellationToken ct) =>
         db.Students
             .AsNoTracking()
             .Where(s => s.TenantId == TenantId)          // authorization first, always
@@ -219,8 +219,8 @@ public sealed class StudentsController(AppDbContext db) : ControllerBase
 }
 ```
 
-`NexGridQuery` carries `[ModelBinder(typeof(NexGridQueryModelBinder))]`, so an
-undecorated parameter binds. `[FromQuery] NexGridQuery query` works identically —
+`TableXQuery` carries `[ModelBinder(typeof(TableXQueryModelBinder))]`, so an
+undecorated parameter binds. `[FromQuery] TableXQuery query` works identically —
 the attribute only names the binding source, which the binder reads straight off
 `HttpContext.Request.Query`.
 
@@ -247,11 +247,11 @@ database reuses one query plan for every search term.
 
 ### Minimal API
 
-`NexGridQuery` implements the `BindAsync(HttpContext)` hook minimal APIs look for:
+`TableXQuery` implements the `BindAsync(HttpContext)` hook minimal APIs look for:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
-using NexGrid.AspNetCore;
+using TableX.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(
@@ -259,10 +259,10 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
-app.UseStaticFiles();       // serves _content/NexGrid.AspNetCore/*
+app.UseStaticFiles();       // serves _content/TableX.AspNetCore/*
 app.MapRazorPages();
 
-app.MapGet("/api/students", (NexGridQuery query, AppDbContext db, CancellationToken ct) =>
+app.MapGet("/api/students", (TableXQuery query, AppDbContext db, CancellationToken ct) =>
     db.Students
         .AsNoTracking()
         .ToPagedResponseAsync(query, options => options
@@ -281,7 +281,7 @@ Call the parser yourself:
 ```csharp
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using NexGrid.AspNetCore;
+using TableX.AspNetCore;
 
 public sealed class StudentsModel(AppDbContext db) : PageModel
 {
@@ -289,7 +289,7 @@ public sealed class StudentsModel(AppDbContext db) : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
-        var query = NexGridQuery.Parse(Request.Query);
+        var query = TableXQuery.Parse(Request.Query);
         Result = await db.Students
             .AsNoTracking()
             .ToPagedResponseAsync(query, options => options
@@ -300,7 +300,7 @@ public sealed class StudentsModel(AppDbContext db) : PageModel
 }
 ```
 
-`NexGridQuery.Parse(string)` takes a raw query string (with or without the
+`TableXQuery.Parse(string)` takes a raw query string (with or without the
 leading `?`), which is convenient in tests.
 
 ### Allowlist details
@@ -317,7 +317,7 @@ leading `?`), which is convenient in tests.
   delegate ignores every sort, search and filter and just pages.
 - **`Searchable` OR's `Contains`** across the registered string members.
 
-Full member list: [`NexGrid.AspNetCore` API](api/aspnet.md).
+Full member list: [`TableX.AspNetCore` API](api/aspnet.md).
 
 ## Node / Express
 
@@ -331,7 +331,7 @@ instead:
 ```ts
 // server.ts
 import express from "express";
-import { parseQuery, type PagedResponse, type QueryState } from "@nexgrid/core";
+import { parseQuery, type PagedResponse, type QueryState } from "@tablex/core";
 
 import { pool } from "./db.js";   // a `pg` Pool
 
@@ -434,7 +434,7 @@ Three details that matter:
 Prefer a query builder? The same shape, with Kysely:
 
 ```ts
-import { parseQuery, type PagedResponse } from "@nexgrid/core";
+import { parseQuery, type PagedResponse } from "@tablex/core";
 import { db } from "./db.js";   // Kysely<Database>
 
 export async function listStudents(rawQueryString: string, tenantId: number) {
@@ -487,7 +487,7 @@ accepts directly — and it preserves `filter[status]` verbatim.
 ```ts
 // app/api/students/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { parseQuery, type PagedResponse, type QueryState } from "@nexgrid/core";
+import { parseQuery, type PagedResponse, type QueryState } from "@tablex/core";
 import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -568,7 +568,7 @@ Notes for the App Router specifically:
 ```ts
 // pages/api/students.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { parseQuery, type PagedResponse } from "@nexgrid/core";
+import { parseQuery, type PagedResponse } from "@tablex/core";
 
 import { listStudents } from "@/lib/students";
 
@@ -588,20 +588,20 @@ export default async function handler(
 
 ## OData v4 Integration
 
-NexGrid includes built-in adapters for **OData v4** (`toODataParams`, `buildODataUrl`, and `fromODataResponse`).
+TableX includes built-in adapters for **OData v4** (`toODataParams`, `buildODataUrl`, and `fromODataResponse`).
 
 ### Client Setup (React / Angular / Vanilla)
 
 ```tsx
 import { useEffect, useState } from "react";
-import { NexGrid } from "@nexgrid/react";
+import { TableX } from "@tablex/react";
 import {
   defaultQuery,
   buildODataUrl,
   fromODataResponse,
   type QueryState,
   type PagedResponse,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 export function ODataGrid() {
   const [query, setQuery] = useState<QueryState>(defaultQuery());
@@ -624,7 +624,7 @@ export function ODataGrid() {
   }, [query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="OData Students"
       columns={columns}
       data={page?.items ?? []}
@@ -693,8 +693,8 @@ service StudentService {
 
 ```tsx
 import { useEffect, useState } from "react";
-import { NexGrid } from "@nexgrid/react";
-import { defaultQuery, type QueryState, type PagedResponse } from "@nexgrid/core";
+import { TableX } from "@tablex/react";
+import { defaultQuery, type QueryState, type PagedResponse } from "@tablex/core";
 import { createPromiseClient } from "@connectrpc/connect";
 import { StudentService } from "./gen/students_connect";
 
@@ -728,7 +728,7 @@ export function GrpcGrid({ transport }: { transport: any }) {
   }, [query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="gRPC Students"
       columns={columns}
       data={page?.items ?? []}
@@ -745,13 +745,13 @@ export function GrpcGrid({ transport }: { transport: any }) {
 
 ## GraphQL Integration
 
-Connecting NexGrid to GraphQL APIs (Apollo, Relay, Hot Chocolate):
+Connecting TableX to GraphQL APIs (Apollo, Relay, Hot Chocolate):
 
 ```tsx
 import { gql, useQuery } from "@apollo/client";
 import { useState } from "react";
-import { NexGrid } from "@nexgrid/react";
-import { defaultQuery, type QueryState } from "@nexgrid/core";
+import { TableX } from "@tablex/react";
+import { defaultQuery, type QueryState } from "@tablex/core";
 
 const GET_STUDENTS = gql`
   query GetStudents($page: Int!, $pageSize: Int!, $sort: [String!], $q: String, $status: String) {
@@ -781,7 +781,7 @@ export function GraphQLGrid() {
   const page = data?.students;
 
   return (
-    <NexGrid
+    <TableX
       caption="GraphQL Students"
       columns={columns}
       data={page?.items ?? []}
@@ -817,5 +817,5 @@ export function GraphQLGrid() {
 
 - [Concepts](concepts.md) — why the contract looks like this
 - [Sorting](features/sorting.md) · [Search](features/search.md) · [Pagination](features/pagination.md)
-- [`NexGrid.AspNetCore` API](api/aspnet.md) · [`@nexgrid/core` API](api/core.md)
+- [`TableX.AspNetCore` API](api/aspnet.md) · [`@tablex/core` API](api/core.md)
 

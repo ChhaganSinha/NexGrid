@@ -1,6 +1,6 @@
 // The whole integration: one standalone component, no NgModule.
 //
-// `<nex-grid>` is fully controlled. Every user action — a sort click, a page
+// `<table-x>` is fully controlled. Every user action — a sort click, a page
 // change, a debounced keystroke, a page-size change — arrives as ONE
 // `queryChange` carrying a ready-to-send `QueryState`. Fetch it, push `data`
 // and `total` back in. The grid never sorts, filters or pages on its own.
@@ -9,7 +9,7 @@
 //
 //  * A column's `cell` function may only return a string here, because Angular
 //    cannot render an arbitrary value returned from a function. Anything richer
-//    is a `*nexGridCell` TEMPLATE, keyed by column id. The same template draws
+//    is a `*tableXCell` TEMPLATE, keyed by column id. The same template draws
 //    the table cell and the mobile card row, so the two cannot drift apart.
 //  * The grid's stylesheet is registered in angular.json, not in this
 //    component's `styles`. Component styles are scoped by emulated
@@ -19,18 +19,18 @@ import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
-  NexGridCellDirective,
-  NexGridComponent,
-  NexGridToolbarDirective,
+  TableXCellDirective,
+  TableXComponent,
+  TableXToolbarDirective,
   defaultQuery,
   serializeQuery,
-  type NexGridAngularColumn,
-  type NexGridNotice,
+  type TableXAngularColumn,
+  type TableXNotice,
   type QueryState,
-} from "@nexgrid/angular";
-// Reducers live in the engine package. `@nexgrid/angular` re-exports the few a
-// host needs on day one; everything else comes from `@nexgrid/core` directly.
-import { withFilter } from "@nexgrid/core";
+} from "@tablex/angular";
+// Reducers live in the engine package. `@tablex/angular` re-exports the few a
+// host needs on day one; everything else comes from `@tablex/core` directly.
+import { withFilter } from "@tablex/core";
 import { EMPTY, Subject, catchError, switchMap, tap } from "rxjs";
 
 import { STATUSES, StudentsService, type Student } from "./students.service";
@@ -38,18 +38,18 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [DatePipe, NexGridComponent, NexGridCellDirective, NexGridToolbarDirective],
+  imports: [DatePipe, TableXComponent, TableXCellDirective, TableXToolbarDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="page">
-      <h1>NexGrid — Angular</h1>
+      <h1>TableX — Angular</h1>
       <p class="intro">
         200 students served by an in-memory service that honours the same
         <code>QueryState</code> a real endpoint would: search, sort, column filter, paging. The
         live query is printed under the grid — watch it change as you interact.
       </p>
 
-      <nex-grid
+      <table-x
         caption="Students"
         exportFileName="students"
         searchPlaceholder="Search name, email or department…"
@@ -66,31 +66,31 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
         (selectionChange)="selected.set($event.ids)"
         (notify)="notice.set($event)"
       >
-        <!-- Custom cells, keyed by column id. `of: rows()` is a type anchor
-             only — it makes `let row` a fully typed Student. -->
-        <ng-container *nexGridCell="'name'; of: rows(); let row">
+        <!-- Custom cells, keyed by column id. "of: rows()" is a type anchor
+             only — it makes let row a fully typed Student. -->
+        <ng-container *tableXCell="'name'; of: rows(); let row">
           <div class="cell-stack">
             <strong>{{ row.name }}</strong>
             <small>{{ row.email }}</small>
           </div>
         </ng-container>
 
-        <ng-container *nexGridCell="'status'; of: rows(); let row">
+        <ng-container *tableXCell="'status'; of: rows(); let row">
           <span class="badge badge--{{ row.status.toLowerCase() }}">{{ row.status }}</span>
         </ng-container>
 
         <!-- Sorting happens on the server against the raw ISO value, so the
              display format is free. -->
-        <ng-container *nexGridCell="'enrolledAt'; of: rows(); let row">
+        <ng-container *tableXCell="'enrolledAt'; of: rows(); let row">
           <time [attr.datetime]="row.enrolledAt">{{ row.enrolledAt | date: 'dd MMM yyyy' }}</time>
         </ng-container>
 
-        <!-- `actions` is a structural id: never sorted, never exported, never
+        <!-- "actions" is a structural id: never sorted, never exported, never
              listed in the Columns menu. stopPropagation keeps the button from
              also firing (rowClick). -->
-        <ng-container *nexGridCell="'actions'; of: rows(); let row">
+        <ng-container *tableXCell="'actions'; of: rows(); let row">
           <div class="row-actions">
-            <button type="button" class="nxg-btn" (click)="edit(row); $event.stopPropagation()">
+            <button type="button" class="tbx-btn" (click)="edit(row); $event.stopPropagation()">
               Edit
             </button>
           </div>
@@ -98,11 +98,11 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
 
         <!-- Rendered at the end of the toolbar. The grid has no filter UI of
              its own: a column filter is just another QueryState change. -->
-        <ng-template nexGridToolbar>
+        <ng-template tableXToolbar>
           <label>
-            <span class="nxg-sr-only">Filter by status</span>
+            <span class="tbx-sr-only">Filter by status</span>
             <select
-              class="nxg-rows-select"
+              class="tbx-rows-select"
               [value]="statusFilter()"
               (change)="onStatusFilter($event)"
             >
@@ -113,9 +113,9 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
             </select>
           </label>
 
-          <button type="button" class="nxg-btn" (click)="breakNextLoad()">Break next load</button>
+          <button type="button" class="tbx-btn" (click)="breakNextLoad()">Break next load</button>
         </ng-template>
-      </nex-grid>
+      </table-x>
 
       <footer class="page-foot">
         <p>
@@ -137,9 +137,9 @@ export class AppComponent {
   /**
    * Column definitions, structurally compatible with TanStack Table's
    * `ColumnDef`. `header` and `cell` return strings here; richer cells are the
-   * `*nexGridCell` templates above.
+   * `*tableXCell` templates above.
    */
-  readonly columns: NexGridAngularColumn<Student>[] = [
+  readonly columns: TableXAngularColumn<Student>[] = [
     { accessorKey: "name", header: "Student", meta: { minWidth: 200 } },
     { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220 } },
     { accessorKey: "department", header: "Department", meta: { minWidth: 160 } },
@@ -166,7 +166,7 @@ export class AppComponent {
   readonly loading = signal(false);
   readonly failed = signal(false);
   readonly selected = signal<string[]>([]);
-  readonly notice = signal<NexGridNotice | null>(null);
+  readonly notice = signal<TableXNotice | null>(null);
 
   readonly statuses = STATUSES;
 

@@ -1,6 +1,6 @@
 // The grid's complete icon set, inlined as components.
 //
-// WHY INLINE: NexGrid ships with zero runtime dependencies, so an icon package
+// WHY INLINE: TableX ships with zero runtime dependencies, so an icon package
 // (lucide-react, heroicons) is not an option. It would also be a parity hazard —
 // the Angular and vanilla adapters draw these same shapes from §7 of the
 // adapter spec, and a version bump in one package's icon set would silently
@@ -11,24 +11,25 @@
 
 import * as React from "react";
 
-/** Props accepted by every NexGrid icon. */
-export interface NexGridIconProps {
+/** Props accepted by every TableX icon. */
+export interface TableXIconProps {
   /**
-   * Class supplying size and color — `.nxg-icon`, `.nxg-sort-icon`,
-   * `.nxg-check`, `.nxg-icon--excel`, `.nxg-icon--csv`, `.nxg-search-icon`.
+   * Class supplying size and color — `.tbx-icon`, `.tbx-sort-icon`,
+   * `.tbx-check`, `.tbx-icon--excel`, `.tbx-icon--csv`, `.tbx-search-icon`.
    * An SVG with no sizing resolves to 300x150, so every icon needs either a
-   * class or {@link NexGridIconProps.size}.
+   * class or {@link TableXIconProps.size}.
    */
   className?: string;
   /** Explicit pixel size, for the pager chevrons which have no sizing class. */
   size?: number;
 }
+export type NexGridIconProps = TableXIconProps;
 
 function Icon({
   className,
   size,
   children,
-}: NexGridIconProps & { children: React.ReactNode }): React.JSX.Element {
+}: TableXIconProps & { children: React.ReactNode }): React.JSX.Element {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -50,7 +51,7 @@ function Icon({
 }
 
 /** Magnifier — the search field's leading adornment. */
-export function SearchIcon(props: NexGridIconProps): React.JSX.Element {
+export function SearchIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <circle cx="11" cy="11" r="8" />
@@ -59,8 +60,8 @@ export function SearchIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Cross — clears the search field. */
-export function XIcon(props: NexGridIconProps): React.JSX.Element {
+/** Cross used by the "clear search" button. */
+export function XIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M18 6 6 18" />
@@ -69,8 +70,8 @@ export function XIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Horizontal sliders — opens the column visibility menu. */
-export function SlidersIcon(props: NexGridIconProps): React.JSX.Element {
+/** Horizontal sliders — the Columns menu trigger. */
+export function SlidersIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <line x1="21" x2="14" y1="4" y2="4" />
@@ -86,8 +87,8 @@ export function SlidersIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Funnel — opens the density menu. */
-export function FilterIcon(props: NexGridIconProps): React.JSX.Element {
+/** Funnel — the Density menu trigger. */
+export function FilterIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -95,8 +96,8 @@ export function FilterIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Downward tray — opens the export menu. */
-export function DownloadIcon(props: NexGridIconProps): React.JSX.Element {
+/** Download tray — the Export menu trigger. */
+export function DownloadIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -106,8 +107,8 @@ export function DownloadIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Gridded document — the formatted Excel export option. */
-export function FileSpreadsheetIcon(props: NexGridIconProps): React.JSX.Element {
+/** Spreadsheet document — the Excel export option. */
+export function FileSpreadsheetIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -120,8 +121,8 @@ export function FileSpreadsheetIcon(props: NexGridIconProps): React.JSX.Element 
   );
 }
 
-/** Lined document — the raw CSV export option. */
-export function FileTextIcon(props: NexGridIconProps): React.JSX.Element {
+/** Text document — the CSV export option. */
+export function FileTextIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -134,7 +135,7 @@ export function FileTextIcon(props: NexGridIconProps): React.JSX.Element {
 }
 
 /** Left chevron — previous page. */
-export function ChevronLeftIcon(props: NexGridIconProps): React.JSX.Element {
+export function ChevronLeftIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="m15 18-6-6 6-6" />
@@ -143,7 +144,7 @@ export function ChevronLeftIcon(props: NexGridIconProps): React.JSX.Element {
 }
 
 /** Right chevron — next page. */
-export function ChevronRightIcon(props: NexGridIconProps): React.JSX.Element {
+export function ChevronRightIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="m9 18 6-6-6-6" />
@@ -151,8 +152,8 @@ export function ChevronRightIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Up arrow — column sorted ascending. */
-export function ArrowUpIcon(props: NexGridIconProps): React.JSX.Element {
+/** Up arrow — ascending sort. */
+export function ArrowUpIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="m5 12 7-7 7 7" />
@@ -161,8 +162,8 @@ export function ArrowUpIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Down arrow — column sorted descending. */
-export function ArrowDownIcon(props: NexGridIconProps): React.JSX.Element {
+/** Down arrow — descending sort. */
+export function ArrowDownIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M12 5v14" />
@@ -171,8 +172,8 @@ export function ArrowDownIcon(props: NexGridIconProps): React.JSX.Element {
   );
 }
 
-/** Opposed arrows — column is sortable but not currently sorted. */
-export function ArrowUpDownIcon(props: NexGridIconProps): React.JSX.Element {
+/** Opposed arrows — sortable but not currently sorted. */
+export function ArrowUpDownIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="m21 16-4 4-4-4" />
@@ -184,7 +185,7 @@ export function ArrowUpDownIcon(props: NexGridIconProps): React.JSX.Element {
 }
 
 /** Tick — the checked marker in menu checkbox items. */
-export function CheckIcon(props: NexGridIconProps): React.JSX.Element {
+export function CheckIcon(props: TableXIconProps): React.JSX.Element {
   return (
     <Icon {...props}>
       <path d="M20 6 9 17l-5-5" />

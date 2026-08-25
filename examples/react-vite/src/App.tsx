@@ -7,14 +7,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   defaultQuery,
   withFilter,
-  type NexGridNotice,
-  type NexGridTheme,
+  type TableXNotice,
+  type TableXTheme,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
+} from "@tablex/react";
 
 import { studentColumns } from "./columns";
 import { STATUSES, fetchStudents, scheduleFailure, type Student } from "./mock-api";
@@ -25,8 +25,8 @@ export function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [notice, setNotice] = useState<NexGridNotice | null>(null);
-  const [theme, setTheme] = useState<NexGridTheme>("light");
+  const [notice, setNotice] = useState<TableXNotice | null>(null);
+  const [theme, setTheme] = useState<TableXTheme>("light");
 
   // Every fetch gets a ticket. A response whose ticket is no longer the current
   // one is discarded, so a fast sequence of keystrokes can never end with an
@@ -75,9 +75,9 @@ export function App() {
   const toolbarActions = (
     <>
       <label className="filter">
-        <span className="nxg-sr-only">Filter by status</span>
+        <span className="tbx-sr-only">Filter by status</span>
         <select
-          className="nxg-rows-select"
+          className="tbx-rows-select"
           value={statusFilter}
           onChange={(event) => onStatusChange(event.target.value)}
         >
@@ -92,7 +92,7 @@ export function App() {
 
       <button
         type="button"
-        className="nxg-btn"
+        className="tbx-btn"
         onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
       >
         {theme === "dark" ? "Light" : "Dark"}
@@ -100,7 +100,7 @@ export function App() {
 
       <button
         type="button"
-        className="nxg-btn"
+        className="tbx-btn"
         onClick={() => {
           scheduleFailure();
           void load(query);
@@ -114,7 +114,7 @@ export function App() {
   return (
     <main className="page">
       <header className="page-head">
-        <h1>NexGrid — React + Vite</h1>
+        <h1>TableX — React + Vite</h1>
         <p>
           200 students served by an in-memory mock API that honours the same{" "}
           <code>QueryState</code> a real endpoint would: search, sort, column filter, paging. The
@@ -122,7 +122,7 @@ export function App() {
         </p>
       </header>
 
-      <NexGrid<Student>
+      <TableX<Student>
         caption="Students"
         columns={columns}
         data={page?.items ?? []}

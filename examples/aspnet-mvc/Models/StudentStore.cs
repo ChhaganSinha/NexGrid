@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace NexGrid.Example.Mvc.Models;
+namespace TableX.Example.Mvc.Models;
 
 /// <summary>
 /// A 200-row in-memory dataset, standing in for a database.

@@ -2,21 +2,21 @@
 
 // The client half of the boundary.
 //
-// `<NexGrid />` is published with its own "use client" banner, so it can be
+// `<TableX />` is published with its own "use client" banner, so it can be
 // imported from a Server Component without a wrapper. This file exists for the
 // other reasons: it holds state (`useState`), it passes render functions
 // (`columns`, `toolbarActions`), and it fetches on interaction.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   defaultQuery,
   serializeQuery,
   withFilter,
-  type NexGridNotice,
+  type TableXNotice,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
+} from "@tablex/react";
 
 // Imported from the shared types module, NOT from lib/students.ts — that one
 // builds the dataset at import time and belongs on the server only.
@@ -30,7 +30,7 @@ export function StudentsGrid({ initial }: { initial: PagedResponse<Student> }) {
   const [page, setPage] = useState<PagedResponse<Student>>(initial);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [notice, setNotice] = useState<NexGridNotice | null>(null);
+  const [notice, setNotice] = useState<TableXNotice | null>(null);
 
   // The server already rendered page 1 for the default query, so the first
   // effect run must not refetch it.
@@ -80,7 +80,7 @@ export function StudentsGrid({ initial }: { initial: PagedResponse<Student> }) {
 
   return (
     <>
-      <NexGrid<Student>
+      <TableX<Student>
         caption="Students"
         columns={columns}
         data={page.items}
@@ -102,9 +102,9 @@ export function StudentsGrid({ initial }: { initial: PagedResponse<Student> }) {
         }
         toolbarActions={
           <label>
-            <span className="nxg-sr-only">Filter by status</span>
+            <span className="tbx-sr-only">Filter by status</span>
             <select
-              className="nxg-rows-select"
+              className="tbx-rows-select"
               value={statusFilter}
               onChange={(event) => {
                 const value = event.target.value;

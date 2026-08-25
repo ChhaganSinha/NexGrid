@@ -1,7 +1,7 @@
 // Every user-facing string in the grid, overridable per instance so the grid
 // can be localized without forking any adapter.
 
-export interface NexGridLocale {
+export interface TableXLocale {
   searchPlaceholder: string;
   clearSearch: string;
   columnsButton: string;
@@ -47,8 +47,9 @@ export interface NexGridLocale {
   exportExcelSuccess: string;
   exportCsvSuccess: string;
 }
+export type NexGridLocale = TableXLocale;
 
-export const DEFAULT_LOCALE: NexGridLocale = {
+export const DEFAULT_LOCALE: TableXLocale = {
   searchPlaceholder: "Search records…",
   clearSearch: "Clear search",
   columnsButton: "Columns",
@@ -95,7 +96,7 @@ export const DEFAULT_LOCALE: NexGridLocale = {
 };
 
 /** Merge a partial locale over the defaults. */
-export function resolveLocale(partial?: Partial<NexGridLocale>): NexGridLocale {
+export function resolveLocale(partial?: Partial<TableXLocale>): TableXLocale {
   return partial ? { ...DEFAULT_LOCALE, ...partial } : DEFAULT_LOCALE;
 }
 

@@ -1,6 +1,6 @@
-// A fake list endpoint that speaks NexGrid's contract.
+// A fake list endpoint that speaks TableX's contract.
 //
-// This file is the whole point of the example. NexGrid is server-driven: it
+// This file is the whole point of the example. TableX is server-driven: it
 // hands you a `QueryState` and expects a `PagedResponse<T>` back. Whether that
 // round trip crosses a network is irrelevant to the grid, so a plain function
 // over an in-memory array is a complete, honest server — and it makes the rules
@@ -12,10 +12,10 @@
 //      one page.
 //   3. Sort, then slice the page window out of the ordered set.
 //   4. Only sort/filter on ALLOWLISTED fields. Column ids arrive from the URL
-//      and are untrusted — `NexGrid.AspNetCore` makes the same rule structural
+//      and are untrusted — `TableX.AspNetCore` makes the same rule structural
 //      with `.Sortable(...)` / `.Filterable(...)`.
 
-import type { PagedResponse, QueryState } from "@nexgrid/core";
+import type { PagedResponse, QueryState } from "@tablex/core";
 
 /** The row type this example pages through. */
 export interface Student {
@@ -181,7 +181,7 @@ export function queryStudents(
     }
     // A stable tiebreaker. Without one, paging through an "unordered" result
     // can show the same row twice — the same reason `DefaultSort` exists in
-    // NexGrid.AspNetCore.
+    // TableX.AspNetCore.
     return left.id - right.id;
   });
 

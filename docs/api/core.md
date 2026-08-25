@@ -1,15 +1,15 @@
-# `@nexgrid/core` API reference
+# `@tablex/core` API reference
 
-The framework-agnostic engine behind every NexGrid adapter: the server contract,
+The framework-agnostic engine behind every TableX adapter: the server contract,
 the column model, the query reducers, pagination math, the wire format, the
 export pipeline, and the locale.
 
 ```bash
-npm install @nexgrid/core
+npm install @tablex/core
 ```
 
 ```ts
-import { defaultQuery, serializeQuery, type QueryState } from "@nexgrid/core";
+import { defaultQuery, serializeQuery, type QueryState } from "@tablex/core";
 ```
 
 Every adapter already depends on core and re-exports the parts a host normally
@@ -20,7 +20,7 @@ something the adapter does not re-export — `fetchAllPages`, `toExportColumns`,
 The stylesheet ships here too:
 
 ```css
-@import "@nexgrid/core/styles.css";
+@import "@tablex/core/styles.css";
 ```
 
 - [Server contract](#server-contract)
@@ -81,12 +81,12 @@ export const DENSITY_ROW_HEIGHT: Record<Density, number>;   // 36 / 44 / 52
 ## Column model
 
 ```ts
-export interface NexGridCellContext<TData> {
+export interface TableXCellContext<TData> {
   row: { original: TData };
   getValue: () => unknown;
 }
 
-export interface NexGridColumnMeta {
+export interface TableXColumnMeta {
   width?: number;
   minWidth?: number;
   flex?: number;
@@ -99,13 +99,13 @@ export interface NexGridColumnMeta {
   filterOptions?: readonly string[];
 }
 
-export interface NexGridColumn<TData, TRender = unknown> {
+export interface TableXColumn<TData, TRender = unknown> {
   id?: string;
   accessorKey?: string;
   header?: string | ((ctx: Record<string, never>) => TRender);
-  cell?: (ctx: NexGridCellContext<TData>) => TRender;
+  cell?: (ctx: TableXCellContext<TData>) => TRender;
   enableSorting?: boolean;
-  meta?: NexGridColumnMeta;
+  meta?: TableXColumnMeta;
 }
 
 export const STRUCTURAL_COLUMN_IDS: readonly string[];   // ["select", "actions"]
@@ -124,7 +124,7 @@ export const STRUCTURAL_COLUMN_IDS: readonly string[];   // ["select", "actions"
 | `isHideable` | `(col) => boolean` | `meta.hideable !== false`, id non-empty, not structural. |
 | `isExportable` | `(col) => boolean` | `meta.exportable !== false`, id non-empty, not structural. |
 | `initialHiddenColumns` | `(columns) => Record<string, boolean>` | Map of ids with `meta.hidden === true`. |
-| `visibleColumns` | `(columns, hidden) => NexGridColumn[]` | Filters out ids marked `true` in `hidden`. Columns with no id are kept. |
+| `visibleColumns` | `(columns, hidden) => TableXColumn[]` | Filters out ids marked `true` in `hidden`. Columns with no id are kept. |
 
 ```ts
 export function getCellText(
@@ -146,8 +146,8 @@ import {
   getColumnTitle,
   initialHiddenColumns,
   visibleColumns,
-  type NexGridColumn,
-} from "@nexgrid/core";
+  type TableXColumn,
+} from "@tablex/core";
 
 interface Student {
   id: number;
@@ -155,7 +155,7 @@ interface Student {
   active: boolean;
 }
 
-const columns: NexGridColumn<Student, string>[] = [
+const columns: TableXColumn<Student, string>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "active", header: "Active" },
   { accessorKey: "id", header: "Id", meta: { hidden: true } },
@@ -210,7 +210,7 @@ import {
   withSearch,
   withToggledSort,
   type QueryState,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 let query: QueryState = defaultQuery();
 query = withSearch(query, "smith");                     // q: "smith", page: 1
@@ -245,7 +245,7 @@ page, the last page, and a window of one page either side of the current page,
 with `"..."` in the gaps.
 
 ```ts
-import { getPageNumbers, getRecordRange, serialNumber } from "@nexgrid/core";
+import { getPageNumbers, getRecordRange, serialNumber } from "@tablex/core";
 
 getPageNumbers(1, 5);      // [1, 2, 3, 4, 5]
 getPageNumbers(5, 20);     // [1, "...", 4, 5, 6, "...", 20]
@@ -279,7 +279,7 @@ filter entry.
 `buildQueryUrl` preserves parameters already present on the endpoint.
 
 ```ts
-import { buildQueryUrl, parseQuery, serializeQuery, withSearch, defaultQuery } from "@nexgrid/core";
+import { buildQueryUrl, parseQuery, serializeQuery, withSearch, defaultQuery } from "@tablex/core";
 
 const query = withSearch(defaultQuery(), "smith");
 serializeQuery(query);
@@ -320,7 +320,7 @@ returns a default-sized page, and an export would end up with 10 rows labelled
 "all".
 
 ```ts
-import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@nexgrid/core";
+import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@tablex/core";
 
 interface Student {
   id: number;
@@ -358,7 +358,7 @@ export interface ExportColumn<T> {
 }
 
 export function toExportColumns<TData, TRender>(
-  columns: readonly NexGridColumn<TData, TRender>[],
+  columns: readonly TableXColumn<TData, TRender>[],
   labels?: { yes: string; no: string },
 ): ExportColumn<TData>[];
 ```
@@ -438,8 +438,8 @@ import {
   filePrefixFromCaption,
   timestampedFilename,
   toExportColumns,
-  type NexGridColumn,
-} from "@nexgrid/core";
+  type TableXColumn,
+} from "@tablex/core";
 
 interface Student {
   id: number;
@@ -447,7 +447,7 @@ interface Student {
   status: string;
 }
 
-const columns: NexGridColumn<Student, string>[] = [
+const columns: TableXColumn<Student, string>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "status", header: "Status" },
 ];
@@ -466,9 +466,9 @@ More: [Export](../features/export.md).
 ## Locale
 
 ```ts
-export interface NexGridLocale { /* 36 string keys */ }
-export const DEFAULT_LOCALE: NexGridLocale;
-export function resolveLocale(partial?: Partial<NexGridLocale>): NexGridLocale;
+export interface TableXLocale { /* 36 string keys */ }
+export const DEFAULT_LOCALE: TableXLocale;
+export function resolveLocale(partial?: Partial<TableXLocale>): TableXLocale;
 export function formatMessage(
   template: string,
   values: Record<string, string | number>,
@@ -479,7 +479,7 @@ export function formatMessage(
 substitutes `{name}` tokens and leaves unknown tokens untouched.
 
 ```ts
-import { formatMessage, resolveLocale } from "@nexgrid/core";
+import { formatMessage, resolveLocale } from "@tablex/core";
 
 const locale = resolveLocale({ showingRange: "Affichage de {start} à {end} sur {total}" });
 formatMessage(locale.showingRange, { start: 21, end: 40, total: "1 284" });
@@ -501,7 +501,7 @@ export {
   isSortable, isHideable, isExportable, isStructuralColumn,
   initialHiddenColumns, visibleColumns,
 };
-export type { NexGridColumn, NexGridColumnMeta, NexGridCellContext };
+export type { TableXColumn, TableXColumnMeta, TableXCellContext };
 
 // Query reducers
 export {
@@ -530,7 +530,7 @@ export { downloadBlob, timestampedFilename, filePrefixFromCaption };
 
 // Locale
 export { DEFAULT_LOCALE, resolveLocale, formatMessage };
-export type { NexGridLocale };
+export type { TableXLocale };
 ```
 
 Package entry points: `.` (ESM + CJS + types), `./styles.css`,
@@ -538,5 +538,5 @@ Package entry points: `.` (ESM + CJS + types), `./styles.css`,
 
 ## Related
 
-- [`@nexgrid/react`](react.md) · [`@nexgrid/angular`](angular.md) · [`@nexgrid/vanilla`](vanilla.md) · [`NexGrid.AspNetCore`](aspnet.md)
+- [`@tablex/react`](react.md) · [`@tablex/angular`](angular.md) · [`@tablex/vanilla`](vanilla.md) · [`TableX.AspNetCore`](aspnet.md)
 - [Concepts](../concepts.md) · [Columns](../columns.md) · [Server integration](../server-integration.md)

@@ -1,6 +1,6 @@
 # Concepts
 
-Everything in NexGrid follows from one decision: **the grid never holds your
+Everything in TableX follows from one decision: **the grid never holds your
 dataset**. This page explains what that buys you, the two types the whole
 library rests on, and the exact path a keystroke takes to become a rendered
 page of rows.
@@ -22,7 +22,7 @@ change meaning. "Sort by name" sorts the 25 rows on screen. "Search" filters
 what happens to be in memory. The export writes out the page the user could
 already see.
 
-NexGrid inverts it. The grid holds:
+TableX inverts it. The grid holds:
 
 - **one page of rows** (`data`)
 - **the total filtered count** (`total`)
@@ -46,24 +46,24 @@ The consequences are worth stating plainly:
 
 ```mermaid
 graph TD
-    subgraph engine["@nexgrid/core — the engine"]
+    subgraph engine["@tablex/core — the engine"]
         T["types.ts<br/>QueryState · PagedResponse · PAGE_SIZES"]
         Q["query.ts<br/>withToggledSort · withSearch · withPage<br/>withPageSize · withFilter"]
-        C["column.ts<br/>NexGridColumn · isSortable · visibleColumns"]
+        C["column.ts<br/>TableXColumn · isSortable · visibleColumns"]
         P["pagination.ts<br/>getPageNumbers · getRecordRange · serialNumber"]
         S["serialize.ts<br/>serializeQuery · parseQuery · buildQueryUrl"]
         X["export/<br/>toExportColumns · downloadCsv · downloadExcel"]
         I["i18n.ts<br/>DEFAULT_LOCALE · resolveLocale · formatMessage"]
-        CSS["styles/nexgrid.css<br/>every --nxg-* token"]
+        CSS["styles/tablex.css<br/>every --tbx-* token"]
     end
 
     subgraph adapters["Renderers — thin by design"]
-        R["@nexgrid/react<br/>&lt;NexGrid /&gt;"]
-        A["@nexgrid/angular<br/>&lt;nex-grid&gt;"]
-        V["@nexgrid/vanilla<br/>createNexGrid()"]
+        R["@tablex/react<br/>&lt;TableX /&gt;"]
+        A["@tablex/angular<br/>&lt;table-x&gt;"]
+        V["@tablex/vanilla<br/>createTableX()"]
     end
 
-    N["NexGrid.AspNetCore<br/>&lt;nex-grid&gt; Tag Helper + IQueryable extensions"]
+    N["TableX.AspNetCore<br/>&lt;table-x&gt; Tag Helper + IQueryable extensions"]
 
     engine --> R
     engine --> A
@@ -84,10 +84,10 @@ keeps four renderers from drifting into four products.
 ## The contract: `QueryState` and `PagedResponse`
 
 These two types are the entire integration surface. Implement them and any
-NexGrid adapter works against your API with no glue code.
+TableX adapter works against your API with no glue code.
 
 ```ts
-// From @nexgrid/core
+// From @tablex/core
 export const PAGE_SIZES = [10, 25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
@@ -149,8 +149,8 @@ without an `endpoint`):
 sequenceDiagram
     autonumber
     actor User
-    participant Grid as NexGrid adapter
-    participant Core as "@nexgrid/core"
+    participant Grid as TableX adapter
+    participant Core as "@tablex/core"
     participant Host as Your component
     participant API as Your endpoint
 
@@ -212,7 +212,7 @@ actually match.
 ## The reducers are the API
 
 `QueryState` is a plain object, so nothing stops you writing
-`{ ...query, page: 4 }`. Do not. The reducers in `@nexgrid/core` are where the
+`{ ...query, page: 4 }`. Do not. The reducers in `@tablex/core` are where the
 cross-platform behavior lives:
 
 ```ts
@@ -225,7 +225,7 @@ import {
   withFilter,
   totalPagesFor,
   type QueryState,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 let query: QueryState = defaultQuery();
 // { page: 1, pageSize: 10, sort: [] }
@@ -256,7 +256,7 @@ Three invariants they enforce, on every platform:
    not an error state anyone should have to handle.
 3. Page numbers clamp to `[1, totalPages]`.
 
-Full signatures: [`@nexgrid/core` API reference](api/core.md).
+Full signatures: [`@tablex/core` API reference](api/core.md).
 
 ## Controlled vs. endpoint mode
 
@@ -272,10 +272,10 @@ Endpoint mode still emits `onQueryChange`, so you can mirror the query into the
 address bar without taking over fetching:
 
 ```js
-import { createNexGrid, parseQuery, serializeQuery } from "@nexgrid/vanilla";
-import "@nexgrid/vanilla/styles.css";
+import { createTableX, parseQuery, serializeQuery } from "@tablex/vanilla";
+import "@tablex/vanilla/styles.css";
 
-const grid = createNexGrid(document.getElementById("grid"), {
+const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
   endpoint: "/api/students",
   query: parseQuery(location.search),

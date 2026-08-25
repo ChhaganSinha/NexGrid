@@ -1,10 +1,10 @@
-# @nexgrid/core
+# @tablex/core
 
-The framework-agnostic engine behind [NexGrid](https://github.com/ChhaganSinha/NexGrid) —
+The framework-agnostic engine behind [TableX](https://github.com/ChhaganSinha/NexGrid) —
 a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.
 
-You normally install a framework adapter (`@nexgrid/react`, `@nexgrid/angular`,
-`@nexgrid/vanilla`) which depends on this package. Install `@nexgrid/core`
+You normally install a framework adapter (`@tablex/react`, `@tablex/angular`,
+`@tablex/vanilla`) which depends on this package. Install `@tablex/core`
 directly when you only need the contract types, the query reducers, or the
 export engine (e.g. in server code or tests).
 
@@ -13,25 +13,25 @@ export engine (e.g. in server code or tests).
 | Area | Exports |
 | ---- | ------- |
 | **Server contract** | `QueryState`, `PagedResponse<T>`, `SortSpec`, `PAGE_SIZES`, `Density` |
-| **Column model** | `NexGridColumn<T>` (TanStack-compatible shape), `getColumnId`, `getColumnTitle`, `getCellText`, visibility helpers |
+| **Column model** | `TableXColumn<T>` (TanStack-compatible shape), `getColumnId`, `getColumnTitle`, `getCellText`, visibility helpers |
 | **Query reducers** | `withToggledSort`, `withSearch`, `withPage`, `withPageSize`, `withFilter` — pure functions so every adapter behaves identically |
 | **Pagination math** | `getPageNumbers` (ellipsis model), `getRecordRange`, `serialNumber` |
-| **Wire format** | `serializeQuery` / `parseQuery` / `buildQueryUrl` — the exact format `NexGrid.AspNetCore` binds on the server |
+| **Wire format** | `serializeQuery` / `parseQuery` / `buildQueryUrl` — the exact format `TableX.AspNetCore` binds on the server |
 | **Export engine** | RFC 4180 CSV (BOM + formula-injection defense) and formatted Excel (.xls) with value-based badge styling |
 | **Full-dataset collection** | `fetchAllPages` — walks a paginated endpoint at the max allowlisted page size, with a hard row cap |
-| **Locale** | `NexGridLocale`, `DEFAULT_LOCALE`, `formatMessage` |
-| **Theme** | `@nexgrid/core/styles.css` — the shared stylesheet, themed entirely via `--nxg-*` CSS custom properties |
+| **Locale** | `TableXLocale`, `DEFAULT_LOCALE`, `formatMessage` |
+| **Theme** | `@tablex/core/styles.css` — the shared stylesheet, themed entirely via `--tbx-*` CSS custom properties |
 
 ## Install
 
 ```bash
-npm install @nexgrid/core
+npm install @tablex/core
 ```
 
 ## The server contract
 
 ```ts
-import type { QueryState, PagedResponse } from "@nexgrid/core";
+import type { QueryState, PagedResponse } from "@tablex/core";
 
 // Client -> server (querystring): ?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 // Server -> client (JSON):
@@ -48,14 +48,14 @@ interface PagedResponse<T> {
 
 ```css
 /* Override tokens anywhere above the grid — no class overrides needed. */
-.my-app .nxg-root {
-  --nxg-primary: #7c3aed;
-  --nxg-radius: 8px;
+.my-app .tbx-root {
+  --tbx-primary: #7c3aed;
+  --tbx-radius: 8px;
 }
 ```
 
-Add the `nxg-dark` class on the grid root (or an ancestor) for dark mode, or
-`nxg-auto` to follow the OS preference.
+Add the `tbx-dark` class on the grid root (or an ancestor) for dark mode, or
+`tbx-auto` to follow the OS preference.
 
 ## Author & Maintainer
 
@@ -66,4 +66,3 @@ Add the `nxg-dark` class on the grid root (or an ancestor) for dark mode, or
 ## License
 
 [MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
-

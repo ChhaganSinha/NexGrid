@@ -1,14 +1,14 @@
-# Migrating from TanStack Table (v8) to NexGrid
+# Migrating from TanStack Table (v8) to TableX
 
 If you are coming from [TanStack Table](https://tanstack.com/table/latest), you are already familiar with column definitions, accessor keys, and headless table concepts.
 
-NexGrid shares the column definition structure with TanStack Table, but removes hundreds of lines of boilerplate by providing the UI, server-driven synchronization, responsive layouts, theming, and multi-format exports out of the box.
+TableX shares the column definition structure with TanStack Table, but removes hundreds of lines of boilerplate by providing the UI, server-driven synchronization, responsive layouts, theming, and multi-format exports out of the box.
 
 ---
 
 ## Key Differences at a Glance
 
-| Feature | TanStack Table (v8) | NexGrid |
+| Feature | TanStack Table (v8) | TableX |
 | :--- | :--- | :--- |
 | **Model** | Headless (you write all JSX, CSS, table tags) | Complete Component + Theme (zero boilerplate) |
 | **Architecture** | Client-side in-memory by default; manual server plumbing | **Server-driven by design** via `QueryState` |
@@ -21,7 +21,7 @@ NexGrid shares the column definition structure with TanStack Table, but removes 
 
 ## Column Definition Comparison
 
-NexGrid column definitions are structurally compatible with TanStack Table v8:
+TableX column definitions are structurally compatible with TanStack Table v8:
 
 ### TanStack Table (v8)
 ```tsx
@@ -44,11 +44,11 @@ const columns = [
 ];
 ```
 
-### NexGrid
+### TableX
 ```tsx
-import type { NexGridColumn } from "@nexgrid/core";
+import type { TableXColumn } from "@tablex/core";
 
-const columns: NexGridColumn<Student, React.ReactNode>[] = [
+const columns: TableXColumn<Student, React.ReactNode>[] = [
   {
     accessorKey: "name",
     header: "Full Name",
@@ -67,7 +67,7 @@ const columns: NexGridColumn<Student, React.ReactNode>[] = [
 ```
 
 > [!TIP]
-> Notice that `accessorKey`, `header`, and `cell: ({ getValue, row }) => ...` match TanStack Table's convention. You can move your existing column definitions to NexGrid with virtually zero changes.
+> Notice that `accessorKey`, `header`, and `cell: ({ getValue, row }) => ...` match TanStack Table's convention. You can move your existing column definitions to TableX with virtually zero changes.
 
 ---
 
@@ -128,13 +128,13 @@ return (
 );
 ```
 
-### After: NexGrid (~20 lines)
+### After: TableX (~20 lines)
 
 ```tsx
 import { useState, useEffect } from "react";
-import { NexGrid } from "@nexgrid/react";
-import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from "@nexgrid/core";
-import "@nexgrid/react/styles.css";
+import { TableX } from "@tablex/react";
+import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from "@tablex/core";
+import "@tablex/react/styles.css";
 
 export function StudentsTable() {
   const [query, setQuery] = useState<QueryState>(defaultQuery());
@@ -150,7 +150,7 @@ export function StudentsTable() {
   }, [query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Students Directory"
       columns={columns}
       data={page?.items ?? []}
@@ -169,17 +169,17 @@ export function StudentsTable() {
 
 ## Summary of Migration Steps
 
-1. **Install `@nexgrid/react` and `@nexgrid/core`**:
+1. **Install `@tablex/react` and `@tablex/core`**:
    ```bash
-   npm install @nexgrid/react @nexgrid/core
+   npm install @tablex/react @tablex/core
    ```
 2. **Import the stylesheet**:
    ```tsx
-   import "@nexgrid/react/styles.css";
+   import "@tablex/react/styles.css";
    ```
 3. **Copy your `columns` array**:
-   Replace `@tanstack/react-table` imports with `NexGridColumn<T>` from `@nexgrid/core`.
+   Replace `@tanstack/react-table` imports with `TableXColumn<T>` from `@tablex/core`.
 4. **Replace the table rendering**:
-   Replace the `useReactTable` hook and manual JSX with `<NexGrid />`.
+   Replace the `useReactTable` hook and manual JSX with `<TableX />`.
 5. **Connect your endpoint**:
    Use `buildQueryUrl(endpoint, query)` to fetch data as a `PagedResponse<T>`.

@@ -12,7 +12,7 @@
 // worth copying: search and filter decide WHICH rows match, so they run before
 // the count that draws the pager; sort decides what the page window slices.
 
-import type { PagedResponse, QueryState } from "@nexgrid/core";
+import type { PagedResponse, QueryState } from "@tablex/core";
 
 import { DEPARTMENTS, STATUSES, type Student } from "./student-types";
 
@@ -20,7 +20,7 @@ type StudentField = keyof Student;
 
 // The allowlists. Column ids arrive from a public query string, so nothing is
 // sortable, searchable or filterable unless it is named here — the same
-// boundary `NexGridQueryOptions<T>` draws on the ASP.NET Core side.
+// boundary `TableXQueryOptions<T>` draws on the ASP.NET Core side.
 const SORTABLE: readonly StudentField[] = [
   "name",
   "email",

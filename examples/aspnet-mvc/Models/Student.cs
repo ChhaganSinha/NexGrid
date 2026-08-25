@@ -1,4 +1,4 @@
-namespace NexGrid.Example.Mvc.Models;
+namespace TableX.Example.Mvc.Models;
 
 /// <summary>
 /// The row type the grid pages through.
@@ -6,7 +6,7 @@ namespace NexGrid.Example.Mvc.Models;
 /// <remarks>
 /// Property names matter: ASP.NET Core serializes them camelCase by default, so
 /// <c>EnrolledAt</c> reaches the browser as <c>enrolledAt</c> — which is exactly
-/// what <c>&lt;nex-grid-column field="enrolledAt" /&gt;</c> has to say.
+/// what <c>&lt;table-x-column field="enrolledAt" /&gt;</c> has to say.
 /// </remarks>
 public sealed class Student
 {

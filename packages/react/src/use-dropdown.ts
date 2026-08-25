@@ -19,7 +19,7 @@ export interface Dropdown {
   toggle: () => void;
   /** Close programmatically, e.g. after a menu item is activated. */
   close: () => void;
-  /** Attach to the `.nxg-menu-wrap` element; defines what counts as "outside". */
+  /** Attach to the `.tbx-menu-wrap` element; defines what counts as "outside". */
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** Attach to the trigger button so Escape can return focus to it. */
   triggerRef: React.RefObject<HTMLButtonElement | null>;

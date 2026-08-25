@@ -1,4 +1,4 @@
-// A fake list endpoint that speaks NexGrid's contract, wrapped in an
+// A fake list endpoint that speaks TableX's contract, wrapped in an
 // Observable so it drops into an Angular app exactly where `HttpClient` would.
 //
 // The rules a real endpoint has to follow are all visible here:
@@ -13,7 +13,7 @@
 // Swapping this for a real API is a one-method change — see the README.
 
 import { Injectable } from "@angular/core";
-import type { PagedResponse, QueryState } from "@nexgrid/angular";
+import type { PagedResponse, QueryState } from "@tablex/angular";
 import { Observable, delay, of } from "rxjs";
 
 /** The row type this example pages through. */

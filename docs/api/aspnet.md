@@ -1,25 +1,25 @@
-# `NexGrid.AspNetCore` API reference
+# `TableX.AspNetCore` API reference
 
 > The canonical attribute tables and the long-form rationale live in the package
 > README:
-> **[`dotnet/NexGrid.AspNetCore/README.md`](../../dotnet/NexGrid.AspNetCore/README.md)**.
+> **[`dotnet/TableX.AspNetCore/README.md`](../../dotnet/TableX.AspNetCore/README.md)**.
 > This page is the type surface and the details that only matter once you are
 > wiring it up.
 
 ```bash
-dotnet add package NexGrid.AspNetCore
+dotnet add package TableX.AspNetCore
 ```
 
 A Razor Class Library targeting `net8.0`, with a `FrameworkReference` on
 `Microsoft.AspNetCore.App` and **zero package dependencies**. It gives you three
 things: a query binder, `IQueryable` paging extensions, and Tag Helpers over the
-`@nexgrid/vanilla` browser bundle, which ships inside the package as a static
+`@tablex/vanilla` browser bundle, which ships inside the package as a static
 web asset.
 
 - [Setup](#setup)
 - [Models](#models)
 - [Query extensions](#query-extensions)
-- [`NexGridQueryOptions<T>`](#nexgridqueryoptionst)
+- [`TableXQueryOptions<T>`](#tablexqueryoptionst)
 - [Tag Helpers](#tag-helpers)
 - [Assets](#assets)
 - [Async without an EF Core dependency](#async-without-an-ef-core-dependency)
@@ -30,15 +30,15 @@ web asset.
 Layout — both files ship inside the package; there is nothing to copy or build:
 
 ```cshtml
-<link rel="stylesheet" href="@NexGridAssets.StylesheetPath" />
-<script src="@NexGridAssets.ScriptPath"></script>
+<link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
+<script src="@TableXAssets.ScriptPath"></script>
 ```
 
 `_ViewImports.cshtml`, once:
 
 ```cshtml
-@using NexGrid.AspNetCore
-@addTagHelper *, NexGrid.AspNetCore
+@using TableX.AspNetCore
+@addTagHelper *, TableX.AspNetCore
 ```
 
 Static web assets are served by `app.UseStaticFiles()`, which the default
@@ -51,9 +51,9 @@ Nothing needs registering in `Program.cs`.
 
 ## Models
 
-### `NexGridQuery`
+### `TableXQuery`
 
-Binds NexGrid's wire format straight off the query string, in all three hosting
+Binds TableX's wire format straight off the query string, in all three hosting
 styles.
 
 | Member | Signature | Notes |
@@ -65,33 +65,33 @@ styles.
 | `Filter` | `IReadOnlyDictionary<string, string> { get; init; }` | Case-insensitive keys. |
 | `PrimarySort` | `SortSpec?` | `Sort[0]`, or `null`. |
 | `GetFilter(string field)` | `string?` | One filter value, or `null`. Case-insensitive. |
-| `Parse(IQueryCollection? query)` | `static NexGridQuery` | Parse from a request. |
-| `Parse(string? queryString)` | `static NexGridQuery` | Raw query string, with or without `?`. Handy in tests. |
-| `BindAsync(HttpContext)` | `static ValueTask<NexGridQuery?>` | Minimal API binding hook; the framework calls it. |
+| `Parse(IQueryCollection? query)` | `static TableXQuery` | Parse from a request. |
+| `Parse(string? queryString)` | `static TableXQuery` | Raw query string, with or without `?`. Handy in tests. |
+| `BindAsync(HttpContext)` | `static ValueTask<TableXQuery?>` | Minimal API binding hook; the framework calls it. |
 | `ToQueryString()` | `string` | Render back to a query string. |
-| `Default` | `static NexGridQuery` | Page 1, default size, no sort/search/filter. |
+| `Default` | `static TableXQuery` | Page 1, default size, no sort/search/filter. |
 | `PageKey`, `PageSizeKey`, `SortKey`, `SearchKey`, `FilterKeyPrefix` | `const string` | `"page"`, `"pageSize"`, `"sort"`, `"q"`, `"filter["`. |
 
-Binding never fails — parsing mirrors `@nexgrid/core`'s `parseQuery` exactly,
+Binding never fails — parsing mirrors `@tablex/core`'s `parseQuery` exactly,
 including how it degrades. A hand-edited URL produces a usable grid, not a 400.
 The full degradation table is in the
-[README](../../dotnet/NexGrid.AspNetCore/README.md#binding-never-fails) and in
+[README](../../dotnet/TableX.AspNetCore/README.md#binding-never-fails) and in
 [Server integration](../server-integration.md#parsing-rules).
 
 ```csharp
 // MVC / API controllers — the type carries [ModelBinder], so no attribute is needed
 [HttpGet]
-public Task<PagedResponse<Student>> Get(NexGridQuery query, CancellationToken ct) => /* … */;
+public Task<PagedResponse<Student>> Get(TableXQuery query, CancellationToken ct) => /* … */;
 
 // Minimal APIs — BindAsync is found automatically
-app.MapGet("/api/students", (NexGridQuery query, AppDbContext db, CancellationToken ct) => /* … */);
+app.MapGet("/api/students", (TableXQuery query, AppDbContext db, CancellationToken ct) => /* … */);
 
 // Razor Pages, middleware, jobs — parse it yourself
-var query = NexGridQuery.Parse(Request.Query);
-var fromString = NexGridQuery.Parse("?page=2&pageSize=25&sort=name:asc");
+var query = TableXQuery.Parse(Request.Query);
+var fromString = TableXQuery.Parse("?page=2&pageSize=25&sort=name:asc");
 ```
 
-`[FromQuery] NexGridQuery query` binds identically: the attribute only names the
+`[FromQuery] TableXQuery query` binds identically: the attribute only names the
 binding source, which this binder reads directly off `HttpContext.Request.Query`.
 
 ### `PagedResponse<T>`
@@ -153,26 +153,26 @@ public static class PageSizes
 }
 ```
 
-The same allowlist as `@nexgrid/core`'s `PAGE_SIZES`.
+The same allowlist as `@tablex/core`'s `PAGE_SIZES`.
 
-### `NexGridQueryModelBinder`
+### `TableXQueryModelBinder`
 
-The MVC binder. Attached to `NexGridQuery` by attribute — you never register it.
+The MVC binder. Attached to `TableXQuery` by attribute — you never register it.
 
 ## Query extensions
 
 ```csharp
-public static class NexGridQueryableExtensions
+public static class TableXQueryableExtensions
 {
     public static PagedResponse<T> ToPagedResponse<T>(
         this IQueryable<T> source,
-        NexGridQuery query,
-        Action<NexGridQueryOptions<T>>? configure = null);
+        TableXQuery query,
+        Action<TableXQueryOptions<T>>? configure = null);
 
     public static Task<PagedResponse<T>> ToPagedResponseAsync<T>(
         this IQueryable<T> source,
-        NexGridQuery query,
-        Action<NexGridQueryOptions<T>>? configure = null,
+        TableXQuery query,
+        Action<TableXQueryOptions<T>>? configure = null,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -187,14 +187,14 @@ user is not looking at.
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using NexGrid.AspNetCore;
+using TableX.AspNetCore;
 
 [ApiController]
 [Route("api/students")]
 public sealed class StudentsController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public Task<PagedResponse<StudentRow>> Get(NexGridQuery query, CancellationToken ct) =>
+    public Task<PagedResponse<StudentRow>> Get(TableXQuery query, CancellationToken ct) =>
         db.Students
             .AsNoTracking()
             .Where(s => s.TenantId == TenantId)          // authorization first, always
@@ -216,7 +216,7 @@ public sealed record StudentRow(
 Calling `ToPagedResponse(query)` with **no** `configure` delegate ignores every
 sort, search and filter and just pages. Nothing is allowed by default.
 
-## `NexGridQueryOptions<T>`
+## `TableXQueryOptions<T>`
 
 The allowlist. `Sortable`, `Searchable` and `Filterable` build dictionaries from
 expressions **the server wrote**; applying a query is a lookup, and an
@@ -241,7 +241,7 @@ Behaviour worth knowing:
   drops the filter rather than failing the request. `string`, enums, `bool`,
   numeric types, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly` and `TimeOnly`
   are supported.
-- **`?filter[status]=`** (empty) is kept in `NexGridQuery.Filter` but ignored
+- **`?filter[status]=`** (empty) is kept in `TableXQuery.Filter` but ignored
   when the query is applied.
 - **Values are parameters, not constants.** They are lifted into the expression
   tree the way a C# closure is, so the database reuses one query plan for every
@@ -256,11 +256,11 @@ Behaviour worth knowing:
 
 ## Tag Helpers
 
-### `<nex-grid>` — `NexGridTagHelper`
+### `<table-x>` — `TableXTagHelper`
 
 Renders three things: a `<div>` for the bundle to mount into, a
 `<script type="application/json">` block holding the configuration, and a short
-init script that calls `NexGrid.createNexGrid`.
+init script that calls `TableX.createTableX`.
 
 Configuration never goes inside executable JavaScript. It travels in an inert
 JSON block written with `System.Text.Json`'s default encoder, which escapes `<`,
@@ -268,18 +268,18 @@ JSON block written with `System.Text.Json`'s default encoder, which escapes `<`,
 early, whatever it contains.
 
 Full attribute table:
-[README › `<nex-grid>`](../../dotnet/NexGrid.AspNetCore/README.md#nex-grid).
+[README › `<table-x>`](../../dotnet/TableX.AspNetCore/README.md#table-x).
 
 ```cshtml
-<nex-grid caption="Students" endpoint="/api/students" enable-selection="true"
+<table-x caption="Students" endpoint="/api/students" enable-selection="true"
           sort="createdAt:desc" page-size="25" theme="Auto" density="Compact">
-    <nex-grid-column field="name" header="Name" min-width="180" />
-    <nex-grid-column field="email" header="Email" />
-    <nex-grid-column field="status" header="Status" align="Center"
+    <table-x-column field="name" header="Name" min-width="180" />
+    <table-x-column field="email" header="Email" />
+    <table-x-column field="status" header="Status" align="Center"
                      filterable="true" filter-options="Active,Pending,Disabled" />
-    <nex-grid-column field="score" header="Score" align="Right" width="90" />
-    <nex-grid-column field="createdAt" header="Enrolled" />
-</nex-grid>
+    <table-x-column field="score" header="Score" align="Right" width="90" />
+    <table-x-column field="createdAt" header="Enrolled" />
+</table-x>
 ```
 
 Details:
@@ -287,27 +287,27 @@ Details:
 | | |
 | --- | --- |
 | `caption` | **Required.** Omitting it throws `InvalidOperationException` at render time — it is the table's accessible name, and failing loudly beats shipping a grid without one. |
-| `id` | Defaults to a generated `nxg-<12 hex chars>`. The config block's id is always `<container id>-config`, and the container also carries `data-nexgrid-config`. |
-| `density`, `theme`, `align` | Parsed into `NexGridDensity` / `NexGridTheme` / `NexGridColumnAlign` case-insensitively. An unrecognised value throws with the list of valid ones. |
-| `grid-class` | Extra classes for the grid **root** (`.nxg-root`). The element's own `class` stays on the mount point — they are different elements. |
-| `page`, `page-size`, `sort`, `search` | Seed the initial query. A `NexGridQueryConfig` is emitted only when at least one differs from the defaults; otherwise the bundle's own `defaultQuery()` applies. `page-size` is coerced through `PageSizes.Coerce`. |
+| `id` | Defaults to a generated `tbx-<12 hex chars>`. The config block's id is always `<container id>-config`, and the container also carries `data-tablex-config`. |
+| `density`, `theme`, `align` | Parsed into `TableXDensity` / `TableXTheme` / `TableXColumnAlign` case-insensitively. An unrecognised value throws with the list of valid ones. |
+| `grid-class` | Extra classes for the grid **root** (`.tbx-root`). The element's own `class` stays on the mount point — they are different elements. |
+| `page`, `page-size`, `sort`, `search` | Seed the initial query. A `TableXQueryConfig` is emitted only when at least one differs from the defaults; otherwise the bundle's own `defaultQuery()` applies. `page-size` is coerced through `PageSizes.Coerce`. |
 | `init` | `false` emits the container and the config block **without** the init script, so you can attach functions and start the grid yourself. |
 | `nonce` | CSP nonce for the init script. |
-| `<nex-grid-column>` | The only permitted child (`[RestrictChildren]`), and source order is column order. |
+| `<table-x-column>` | The only permitted child (`[RestrictChildren]`), and source order is column order. |
 
-The grid handle is left on the container as `element.nexgrid`:
+The grid handle is left on the container as `element.tablex`:
 
 ```js
-document.getElementById("students-grid").nexgrid.refresh();
+document.getElementById("students-grid").tablex.refresh();
 ```
 
 If the bundle is missing, the init script logs a console error naming the script
 path rather than throwing.
 
-### `<nex-grid-column>` — `NexGridColumnTagHelper`
+### `<table-x-column>` — `TableXColumnTagHelper`
 
-Maps one-to-one onto a `NexGridColumn` and its `meta`. Full attribute table:
-[README › `<nex-grid-column>`](../../dotnet/NexGrid.AspNetCore/README.md#nex-grid-column).
+Maps one-to-one onto a `TableXColumn` and its `meta`. Full attribute table:
+[README › `<table-x-column>`](../../dotnet/TableX.AspNetCore/README.md#table-x-column).
 
 `field` is required and must match the **JSON** property name your endpoint
 returns (`createdAt`, not `CreatedAt`) — it is the row accessor, the `sort=` id
@@ -319,10 +319,10 @@ A cell renderer is a function, and functions do not survive JSON. Use
 `init="false"`:
 
 ```cshtml
-<nex-grid id="students-grid" caption="Students" endpoint="/api/students" init="false">
-    <nex-grid-column field="name" header="Name" />
-    <nex-grid-column field="status" header="Status" align="Center" />
-</nex-grid>
+<table-x id="students-grid" caption="Students" endpoint="/api/students" init="false">
+    <table-x-column field="name" header="Name" />
+    <table-x-column field="status" header="Status" align="Center" />
+</table-x>
 
 @section Scripts {
 <script>
@@ -341,37 +341,37 @@ A cell renderer is a function, and functions do not survive JSON. Use
         config.onNotify = function (notice) { window.toast(notice.type, notice.message); };
         config.onRowClick = function (row) { window.location.assign("/students/" + row.id); };
 
-        host.nexgrid = NexGrid.createNexGrid(host, config);
+        host.tablex = TableX.createTableX(host, config);
     })();
 </script>
 }
 ```
 
-Everything `@nexgrid/vanilla` accepts is available on that object: `onNotify`,
+Everything `@tablex/vanilla` accepts is available on that object: `onNotify`,
 `onRowClick`, `onSelectionChange`, `locale`, `badgeRules`, `fetchOptions`, and
-the rest — see [`@nexgrid/vanilla` API](vanilla.md#nexgridoptionstdata).
+the rest — see [`@tablex/vanilla` API](vanilla.md#tablexoptionstdata).
 
 ### Enums
 
 ```csharp
-public enum NexGridDensity { Default, Compact, Comfortable }
-public enum NexGridTheme { Light, Dark, Auto }
-public enum NexGridColumnAlign { Left, Center, Right }
+public enum TableXDensity { Default, Compact, Comfortable }
+public enum TableXTheme { Light, Dark, Auto }
+public enum TableXColumnAlign { Left, Center, Right }
 ```
 
 ## Assets
 
 ```csharp
-public static class NexGridAssets
+public static class TableXAssets
 {
-    public const string ContentRoot   = "/_content/NexGrid.AspNetCore";
-    public const string StylesheetPath = ContentRoot + "/nexgrid.css";
-    public const string ScriptPath     = ContentRoot + "/nexgrid.global.js";
-    public const string GlobalName     = "NexGrid";
+    public const string ContentRoot   = "/_content/TableX.AspNetCore";
+    public const string StylesheetPath = ContentRoot + "/tablex.css";
+    public const string ScriptPath     = ContentRoot + "/tablex.global.js";
+    public const string GlobalName     = "TableX";
 }
 ```
 
-Reference the bundle **once** per page, from the layout. `<nex-grid>` does not
+Reference the bundle **once** per page, from the layout. `<table-x>` does not
 emit it — a page with three grids should load one copy of the script.
 
 ## Async without an EF Core dependency
@@ -395,7 +395,7 @@ var students = new[]
     new Student { Id = 2, Name = "Alan", Email = "alan@example.com", Score = 91 },
 }.AsQueryable();
 
-var query = NexGridQuery.Parse("?page=1&pageSize=10&sort=name:desc&q=a");
+var query = TableXQuery.Parse("?page=1&pageSize=10&sort=name:desc&q=a");
 
 var page = students.ToPagedResponse(query, options => options
     .Sortable(s => s.Name)
@@ -413,22 +413,22 @@ Assert.Equal("Alan", page.Items[0].Name);
 | Type | Razor Class Library |
 | Target | `net8.0`, `FrameworkReference` on `Microsoft.AspNetCore.App` |
 | Package dependencies | none |
-| Static web assets | `nexgrid.global.js`, `nexgrid.css` |
+| Static web assets | `tablex.global.js`, `tablex.css` |
 | License | MIT |
 
-The `.csproj` copies `packages/vanilla/dist/nexgrid.global.js` and
-`dist/nexgrid.css` into `wwwroot/` before every build, guarded by `Exists(...)`,
+The `.csproj` copies `packages/vanilla/dist/tablex.global.js` and
+`dist/tablex.css` into `wwwroot/` before every build, guarded by `Exists(...)`,
 so a checkout where the JavaScript has not been built still compiles — it just
 produces a package with no browser payload. Building from source:
 
 ```bash
 npm install
 npm run build:core && npm run build:vanilla
-dotnet build dotnet/NexGrid.sln -c Release
+dotnet build dotnet/TableX.sln -c Release
 ```
 
 ## Related
 
-- [Package README](../../dotnet/NexGrid.AspNetCore/README.md) — the canonical attribute tables
-- [`@nexgrid/vanilla` API](vanilla.md) — the bundle this package embeds
+- [Package README](../../dotnet/TableX.AspNetCore/README.md) — the canonical attribute tables
+- [`@tablex/vanilla` API](vanilla.md) — the bundle this package embeds
 - [Server integration](../server-integration.md) · [Getting started › ASP.NET Core](../getting-started.md#aspnet-core-8)

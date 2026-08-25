@@ -16,7 +16,7 @@
 //   * With `onRowClick` set, interactive content inside a cell must call
 //     `event.stopPropagation()` or a button press also opens the row.
 
-import type { NexGridReactColumn } from "@nexgrid/react";
+import type { TableXReactColumn } from "@tablex/react";
 
 import type { Student } from "./mock-api";
 
@@ -33,7 +33,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 /** Build the column set. Memoize the result — a new array every render is churn. */
-export function studentColumns(actions: StudentActions): NexGridReactColumn<Student>[] {
+export function studentColumns(actions: StudentActions): TableXReactColumn<Student>[] {
   return [
     {
       accessorKey: "name",
@@ -115,7 +115,7 @@ export function studentColumns(actions: StudentActions): NexGridReactColumn<Stud
         <div className="row-actions">
           <button
             type="button"
-            className="nxg-btn"
+            className="tbx-btn"
             onClick={(event) => {
               event.stopPropagation();
               actions.onEdit(row.original);
@@ -125,7 +125,7 @@ export function studentColumns(actions: StudentActions): NexGridReactColumn<Stud
           </button>
           <button
             type="button"
-            className="nxg-btn"
+            className="tbx-btn"
             onClick={(event) => {
               event.stopPropagation();
               actions.onRemove(row.original);

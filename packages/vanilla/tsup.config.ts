@@ -11,14 +11,14 @@ export default defineConfig([
     target: "es2020",
     treeshake: true,
   },
-  // Browser bundle for script-tag / ASP.NET usage: core inlined, global `NexGrid`.
+  // Browser bundle for script-tag / ASP.NET usage: core inlined, global `TableX`.
   {
-    entry: { nexgrid: "src/index.ts" },
+    entry: { tablex: "src/index.ts" },
     format: ["iife"],
-    globalName: "NexGrid",
+    globalName: "TableX",
     minify: true,
     sourcemap: true,
     target: "es2018",
-    noExternal: [/@nexgrid\/core/],
+    noExternal: [/@tablex\/core/],
   },
 ]);

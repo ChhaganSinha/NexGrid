@@ -1,4 +1,4 @@
-# `@nexgrid/angular` API reference
+# `@tablex/angular` API reference
 
 > The canonical input/output tables, with prose for every member, live in the
 > package README:
@@ -7,19 +7,19 @@
 > details that catch people out.
 
 ```bash
-npm install @nexgrid/angular
+npm install @tablex/angular
 ```
 
 ```ts
-import { NexGridCellDirective, NexGridComponent, NexGridToolbarDirective } from "@nexgrid/angular";
+import { TableXCellDirective, TableXComponent, TableXToolbarDirective } from "@tablex/angular";
 ```
 
 - [Exports](#exports)
-- [`NexGridComponent`](#nexgridcomponent)
+- [`TableXComponent`](#tablexcomponent)
 - [Directives](#directives)
 - [Types](#types)
 - [View-model types](#view-model-types)
-- [Re-exported from `@nexgrid/core`](#re-exported-from-nexgridcore)
+- [Re-exported from `@tablex/core`](#re-exported-from-tablexcore)
 - [Gotchas](#gotchas)
 - [Packaging](#packaging)
 
@@ -27,14 +27,14 @@ import { NexGridCellDirective, NexGridComponent, NexGridToolbarDirective } from 
 
 | Export | Kind | Notes |
 | --- | --- | --- |
-| `NexGridComponent` | standalone component | Selector `nex-grid`. |
-| `NexGridCellDirective` | standalone directive | `[nexGridCell]` — custom cell templates. |
-| `NexGridToolbarDirective` | standalone directive | `[nexGridToolbar]` — toolbar actions template. |
-| `NexGridAngularColumn<TData>` | type | `NexGridColumn<TData, string>`. |
-| `NexGridCellTemplateContext<TData>` | type | The `*nexGridCell` template context. |
-| `NexGridNotice` | type | `{ type: "info" \| "success" \| "error"; message: string }`. |
-| `NexGridSelectionChange` | type | `{ ids: string[]; allAcrossSelected: boolean }`. |
-| `NexGridTheme` | type | `"light" \| "dark" \| "auto"`. |
+| `TableXComponent` | standalone component | Selector `table-x`. |
+| `TableXCellDirective` | standalone directive | `[tableXCell]` — custom cell templates. |
+| `TableXToolbarDirective` | standalone directive | `[tableXToolbar]` — toolbar actions template. |
+| `TableXAngularColumn<TData>` | type | `TableXColumn<TData, string>`. |
+| `TableXCellTemplateContext<TData>` | type | The `*tableXCell` template context. |
+| `TableXNotice` | type | `{ type: "info" \| "success" \| "error"; message: string }`. |
+| `TableXSelectionChange` | type | `{ ids: string[]; allAcrossSelected: boolean }`. |
+| `TableXTheme` | type | `"light" \| "dark" \| "auto"`. |
 | view-model types | types | See [View-model types](#view-model-types). |
 
 Import the three symbols individually into a component's `imports` array. They
@@ -46,16 +46,16 @@ array of components, directives, pipes, or NgModules`).
 ```ts
 @Component({
   standalone: true,
-  imports: [NexGridComponent, NexGridCellDirective, NexGridToolbarDirective],
+  imports: [TableXComponent, TableXCellDirective, TableXToolbarDirective],
   // …
 })
 export class StudentsComponent {}
 ```
 
-## `NexGridComponent`
+## `TableXComponent`
 
-Standalone, `ChangeDetectionStrategy.OnPush`, selector `nex-grid`. The **host
-element itself** carries `.nxg-root`, so a `class` on `<nex-grid>` lands on the
+Standalone, `ChangeDetectionStrategy.OnPush`, selector `table-x`. The **host
+element itself** carries `.tbx-root`, so a `class` on `<table-x>` lands on the
 grid root — there is no `className` input.
 
 Full descriptions and defaults:
@@ -65,7 +65,7 @@ Full descriptions and defaults:
 ### Inputs
 
 ```ts
-@Input({ required: true }) columns: NexGridAngularColumn<TData>[] = [];
+@Input({ required: true }) columns: TableXAngularColumn<TData>[] = [];
 @Input({ required: true }) data: TData[] = [];
 @Input({ required: true }) total = 0;
 @Input({ required: true }) query: QueryState = defaultQuery();
@@ -82,9 +82,9 @@ Full descriptions and defaults:
 @Input() exportFileName?: string;
 @Input() fetchEndpoint?: string;
 @Input() badgeRules?: readonly ExcelBadgeRule[];
-@Input() locale?: Partial<NexGridLocale>;
+@Input() locale?: Partial<TableXLocale>;
 @Input() getRowId: (row: TData) => string = defaultRowId;
-@Input() theme: NexGridTheme = "light";
+@Input() theme: TableXTheme = "light";
 @Input({ transform: booleanAttribute }) rowClickable = false;
 ```
 
@@ -95,10 +95,10 @@ Flag inputs use `booleanAttribute`, so `enableSelection` and
 
 ```ts
 @Output() readonly queryChange = new EventEmitter<QueryState>();
-@Output() readonly selectionChange = new EventEmitter<NexGridSelectionChange>();
+@Output() readonly selectionChange = new EventEmitter<TableXSelectionChange>();
 @Output() readonly rowClick = new EventEmitter<TData>();
 @Output() readonly retry = new EventEmitter<void>();
-@Output() readonly notify = new EventEmitter<NexGridNotice>();
+@Output() readonly notify = new EventEmitter<TableXNotice>();
 @Output() readonly exportAll = new EventEmitter<void>();
 ```
 
@@ -117,19 +117,19 @@ data. That is the host's job, through `queryChange`.
 
 ## Directives
 
-### `NexGridCellDirective` — `[nexGridCell]`
+### `TableXCellDirective` — `[tableXCell]`
 
 ```ts
-@Input({ required: true }) nexGridCell = "";        // the column id
-@Input() nexGridCellOf?: readonly TData[];          // TYPE ANCHOR ONLY
-readonly template: TemplateRef<NexGridCellTemplateContext<TData>>;
+@Input({ required: true }) tableXCell = "";        // the column id
+@Input() tableXCellOf?: readonly TData[];          // TYPE ANCHOR ONLY
+readonly template: TemplateRef<TableXCellTemplateContext<TData>>;
 ```
 
-Declared as a **content child** of `<nex-grid>` and looked up by column id. The
+Declared as a **content child** of `<table-x>` and looked up by column id. The
 template renders that column in both the table and the mobile card list.
 
 ```html
-<ng-container *nexGridCell="'status'; of: rows(); let row; let value = value; let i = rowIndex">
+<ng-container *tableXCell="'status'; of: rows(); let row; let value = value; let i = rowIndex">
   <span class="pill">{{ value }}</span>
 </ng-container>
 ```
@@ -137,63 +137,63 @@ template renders that column in both the table and the mobile card list.
 The plain-attribute form on an `<ng-template>` is equivalent:
 
 ```html
-<ng-template nexGridCell="status" [nexGridCellOf]="rows()" let-row let-value="value">
+<ng-template tableXCell="status" [tableXCellOf]="rows()" let-row let-value="value">
   <span class="pill">{{ value }}</span>
 </ng-template>
 ```
 
-> **Do not combine the two.** `<ng-template *nexGridCell="…">` asks Angular for
+> **Do not combine the two.** `<ng-template *tableXCell="…">` asks Angular for
 > a template that *contains* a template; the grid renders the outer one and the
 > cell comes out empty.
 
-`nexGridCellOf` is never read at runtime — it exists so the compiler can infer
+`tableXCellOf` is never read at runtime — it exists so the compiler can infer
 `TData`. Bind the same array you pass to `[data]` and the context becomes fully
 typed under `strictTemplates`. Without it, the row is `any`.
 
-### `NexGridToolbarDirective` — `[nexGridToolbar]`
+### `TableXToolbarDirective` — `[tableXToolbar]`
 
 A template rendered at the end of the toolbar, after the export menu. Plain
 content projection works too.
 
 ```html
-<nex-grid caption="Students" [columns]="columns" [data]="rows()" [total]="total()"
+<table-x caption="Students" [columns]="columns" [data]="rows()" [total]="total()"
           [query]="query()" (queryChange)="load($event)">
-  <ng-template nexGridToolbar>
-    <button type="button" class="nxg-btn" (click)="create()">Add student</button>
+  <ng-template tableXToolbar>
+    <button type="button" class="tbx-btn" (click)="create()">Add student</button>
   </ng-template>
-</nex-grid>
+</table-x>
 ```
 
-Reuse `.nxg-btn` and the button inherits the theme tokens exactly.
+Reuse `.tbx-btn` and the button inherits the theme tokens exactly.
 
 ## Types
 
 ```ts
-export type NexGridAngularColumn<TData> = NexGridColumn<TData, string>;
+export type TableXAngularColumn<TData> = TableXColumn<TData, string>;
 
-export interface NexGridCellTemplateContext<TData = any> {
+export interface TableXCellTemplateContext<TData = any> {
   $implicit: TData;                          // let-row
   value: unknown;                            // let-value="value"
-  column: NexGridAngularColumn<TData>;       // let-col="column"
+  column: TableXAngularColumn<TData>;       // let-col="column"
   rowIndex: number;                          // let-i="rowIndex" — index WITHIN THE PAGE
 }
 
-export interface NexGridNotice {
+export interface TableXNotice {
   type: "info" | "success" | "error";
   message: string;
 }
 
-export interface NexGridSelectionChange {
+export interface TableXSelectionChange {
   ids: string[];                 // across pages, in selection order
   allAcrossSelected: boolean;    // reserved; always false today
 }
 
-export type NexGridTheme = "light" | "dark" | "auto";
+export type TableXTheme = "light" | "dark" | "auto";
 ```
 
 `TRender` is `string` because Angular cannot render an arbitrary value returned
 from a function into the DOM. A `header` or `cell` function may return **text**;
-anything richer is a `*nexGridCell` template.
+anything richer is a `*tableXCell` template.
 
 ## View-model types
 
@@ -203,52 +203,52 @@ need them for normal use:
 
 ```ts
 import type {
-  NexGridCellView,
-  NexGridColumnToggle,
-  NexGridDensityOption,
-  NexGridHeaderView,
-  NexGridPagerItem,
-  NexGridRangePart,
-  NexGridRowView,
-} from "@nexgrid/angular";
+  TableXCellView,
+  TableXColumnToggle,
+  TableXDensityOption,
+  TableXHeaderView,
+  TableXPagerItem,
+  TableXRangePart,
+  TableXRowView,
+} from "@tablex/angular";
 ```
 
 | Type | Models |
 | --- | --- |
-| `NexGridHeaderView` | One header cell: `key`, `id`, `title`, `sortable`, `sortState`, `ariaSort`, `align`. |
-| `NexGridRowView<TData>` | One row: `key`, `id`, `data`, `serial`, `selected`, `selectLabel`, `cells`. |
-| `NexGridCellView<TData>` | One cell: `key`, `header`, `align`, `template`, `context`, `text`. |
-| `NexGridColumnToggle` | One Columns-menu entry: `key`, `id`, `title`, `visible`. |
-| `NexGridDensityOption` | One Density-menu entry: `value`, `label`, `selected`. |
-| `NexGridPagerItem` | One pager control: `key`, `gap`, `page`, `current`, `label`. |
-| `NexGridRangePart` | One fragment of the "Showing X to Y of Z" line: `key`, `strong`, `total`, `value`. |
+| `TableXHeaderView` | One header cell: `key`, `id`, `title`, `sortable`, `sortState`, `ariaSort`, `align`. |
+| `TableXRowView<TData>` | One row: `key`, `id`, `data`, `serial`, `selected`, `selectLabel`, `cells`. |
+| `TableXCellView<TData>` | One cell: `key`, `header`, `align`, `template`, `context`, `text`. |
+| `TableXColumnToggle` | One Columns-menu entry: `key`, `id`, `title`, `visible`. |
+| `TableXDensityOption` | One Density-menu entry: `value`, `label`, `selected`. |
+| `TableXPagerItem` | One pager control: `key`, `gap`, `page`, `current`, `label`. |
+| `TableXRangePart` | One fragment of the "Showing X to Y of Z" line: `key`, `strong`, `total`, `value`. |
 
-## Re-exported from `@nexgrid/core`
+## Re-exported from `@tablex/core`
 
 A deliberately small set — the symbols a host touches on day one:
 
 ```ts
-import { PAGE_SIZES, buildQueryUrl, defaultQuery, parseQuery, serializeQuery } from "@nexgrid/angular";
+import { PAGE_SIZES, buildQueryUrl, defaultQuery, parseQuery, serializeQuery } from "@tablex/angular";
 
 import type {
-  Density, ExcelBadgeRule, NexGridColumn, NexGridColumnMeta, NexGridLocale,
+  Density, ExcelBadgeRule, TableXColumn, TableXColumnMeta, TableXLocale,
   PageSize, PagedResponse, QueryState, SortDir, SortSpec,
-} from "@nexgrid/angular";
+} from "@tablex/angular";
 ```
 
 Everything else — the reducers (`withToggledSort`, `withSearch`, `withPage`,
 `withPageSize`, `withFilter`), `totalPagesFor`, `primarySort`, the export
-helpers, `DEFAULT_LOCALE`, `resolveLocale` — comes from `@nexgrid/core`
+helpers, `DEFAULT_LOCALE`, `resolveLocale` — comes from `@tablex/core`
 directly. It is already installed as a dependency of this package:
 
 ```ts
-import { withSort, totalPagesFor, DEFAULT_LOCALE } from "@nexgrid/core";
+import { withSort, totalPagesFor, DEFAULT_LOCALE } from "@tablex/core";
 ```
 
 ## Gotchas
 
 **The stylesheet must be global.** Add
-`node_modules/@nexgrid/angular/styles.css` to the `styles` array of your build
+`node_modules/@tablex/angular/styles.css` to the `styles` array of your build
 target in `angular.json`. Component styles are scoped by emulated view
 encapsulation and will not reach the grid's markup, so a `styleUrls` entry
 silently does nothing.
@@ -270,7 +270,7 @@ readonly rowId = (row: Student): string => `${row.tenantId}:${row.studentNumber}
 ```
 
 ```html
-<nex-grid [getRowId]="rowId" …/>
+<table-x [getRowId]="rowId" …/>
 ```
 
 **`OnPush` means new references.** The component is `OnPush`; mutating the
@@ -282,8 +282,8 @@ load) are the idiomatic answer.
 | | |
 | --- | --- |
 | Build | ng-packagr; FESM2022 + `index.d.ts` |
-| Stylesheet | `node_modules/@nexgrid/angular/styles.css` (a copy of the core sheet) |
-| Runtime dependencies | `@nexgrid/core`, `tslib` |
+| Stylesheet | `node_modules/@tablex/angular/styles.css` (a copy of the core sheet) |
+| Runtime dependencies | `@tablex/core`, `tslib` |
 | Peer dependencies | `@angular/common >= 17`, `@angular/core >= 17`, `rxjs >= 7` |
 | Node | `>= 18` |
 | License | MIT |
@@ -291,5 +291,5 @@ load) are the idiomatic answer.
 ## Related
 
 - [Package README](../../packages/angular/README.md) — the canonical input/output tables
-- [`@nexgrid/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
+- [`@tablex/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
 - [Getting started › Angular](../getting-started.md#angular-17)

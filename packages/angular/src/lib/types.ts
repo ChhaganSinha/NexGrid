@@ -1,11 +1,11 @@
 // Public types that exist ONLY because Angular renders through templates and
 // EventEmitters.
 //
-// Everything about the data contract itself — `QueryState`, `NexGridColumn`,
-// the locale, the export options — lives in `@nexgrid/core` and is re-exported
+// Everything about the data contract itself — `QueryState`, `TableXColumn`,
+// the locale, the export options — lives in `@tablex/core` and is re-exported
 // from this package's public API. Nothing here reimplements engine behavior.
 
-import type { NexGridColumn } from "@nexgrid/core";
+import type { TableXColumn } from "@tablex/core";
 
 /**
  * A NexGrid column as the Angular adapter binds it.
@@ -15,7 +15,7 @@ import type { NexGridColumn } from "@nexgrid/core";
  * `*nexGridCell` template instead of a render function, because Angular cannot
  * render an arbitrary value returned from a function into the DOM.
  */
-export type NexGridAngularColumn<TData> = NexGridColumn<TData, string>;
+export type TableXAngularColumn<TData> = TableXColumn<TData, string>;
 
 /**
  * The context handed to a `*nexGridCell` template.
@@ -31,7 +31,7 @@ export type NexGridAngularColumn<TData> = NexGridColumn<TData, string>;
  * (`*nexGridCell="'status'; of: rows"`) to get a fully typed row.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface NexGridCellTemplateContext<TData = any> {
+export interface TableXCellTemplateContext<TData = any> {
   /** The row being rendered — `let-row` picks this up. */
   $implicit: TData;
   /** The raw value the column reads for this row (`let-value="value"`). */
@@ -43,13 +43,13 @@ export interface NexGridCellTemplateContext<TData = any> {
 }
 
 /** A user-facing notice the grid wants shown. The grid never renders toasts itself. */
-export interface NexGridNotice {
+export interface TableXNotice {
   type: "info" | "success" | "error";
   message: string;
 }
 
 /** Payload of the `selectionChange` output. */
-export interface NexGridSelectionChange {
+export interface TableXSelectionChange {
   /** Ids of every selected row, across pages, in selection order. */
   ids: string[];
   /**
@@ -60,4 +60,10 @@ export interface NexGridSelectionChange {
 }
 
 /** Theme mode: fixed light, fixed dark, or follow the OS preference. */
-export type NexGridTheme = "light" | "dark" | "auto";
+export type TableXTheme = "light" | "dark" | "auto";
+
+export type NexGridAngularColumn<TData> = TableXAngularColumn<TData>;
+export type NexGridCellTemplateContext<TData = any> = TableXCellTemplateContext<TData>;
+export type NexGridNotice = TableXNotice;
+export type NexGridSelectionChange = TableXSelectionChange;
+export type NexGridTheme = TableXTheme;

@@ -1,4 +1,4 @@
-# NexGrid — Next.js App Router example
+# TableX — Next.js App Router example
 
 A Next.js 15 App Router app showing the three pieces a real integration needs:
 
@@ -7,7 +7,7 @@ A Next.js 15 App Router app showing the three pieces a real integration needs:
 2. **A Client Component grid** (`app/students-grid.tsx`) that owns the
    `QueryState` and fetches every page after the first.
 3. **A route handler** (`app/api/students/route.ts`) that parses the incoming
-   query with `parseQuery` from `@nexgrid/core` and answers with a
+   query with `parseQuery` from `@tablex/core` and answers with a
    `PagedResponse`.
 
 ## Run it
@@ -26,8 +26,8 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-`package.json` resolves `@nexgrid/react` and `@nexgrid/core` with `file:`
-specifiers plus an `overrides` block (so the transitive `@nexgrid/core` also
+`package.json` resolves `@tablex/react` and `@tablex/core` with `file:`
+specifiers plus an `overrides` block (so the transitive `@tablex/core` also
 resolves locally). In your own app those are just `"0.1.0"`, and
 `next.config.mjs` needs nothing at all — the `outputFileTracingRoot` line only
 exists because of the local symlinks.
@@ -40,7 +40,7 @@ This is where most Next.js grid integrations go wrong, so it is worth being
 precise about which file needs the directive and why.
 
 ```text
-app/layout.tsx        server   imports @nexgrid/react/styles.css  (build-time, fine)
+app/layout.tsx        server   imports @tablex/react/styles.css  (build-time, fine)
 app/page.tsx          server   queries the data, renders <StudentsGrid initial={…} />
 app/students-grid.tsx CLIENT   holds QueryState, fetches, passes render functions
 app/columns.tsx       CLIENT   cell renderers — functions, so they cannot cross
@@ -49,7 +49,7 @@ lib/student-types.ts  shared   types and constants only, safe on both sides
 app/api/students/     server   route handler: parseQuery -> PagedResponse
 ```
 
-**`<NexGrid />` itself does not need a wrapper.** The published bundle starts
+**`<TableX />` itself does not need a wrapper.** The published bundle starts
 with a `"use client"` banner, so a Server Component can import it directly.
 
 **Your columns do.** A column's `cell` is a function, and functions cannot be
@@ -83,7 +83,7 @@ tripwire if you want that mistake to fail the build.)
 The entire server-side parse is one call:
 
 ```ts
-import { parseQuery } from "@nexgrid/core";
+import { parseQuery } from "@tablex/core";
 
 export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url);
@@ -112,7 +112,7 @@ on the query string, so it must not be statically rendered at build time.
 `lib/students.ts` only sorts and filters on fields it names in `SORTABLE`,
 `SEARCHABLE` and `FILTERABLE`. Column ids arrive from a public URL — anyone can
 ask to sort by `passwordHash`. Never reflect a query-string value into a
-property access or a SQL fragment. (`NexGrid.AspNetCore` makes the same rule
+property access or a SQL fragment. (`TableX.AspNetCore` makes the same rule
 structural with `.Sortable(...)` / `.Filterable(...)`; see
 `examples/aspnet-mvc`.)
 
@@ -127,13 +127,13 @@ and back-button-friendly is a swap of the state hook:
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { parseQuery, serializeQuery } from "@nexgrid/react";
+import { parseQuery, serializeQuery } from "@tablex/react";
 
 const searchParams = useSearchParams();
 const router = useRouter();
 const query = useMemo(() => parseQuery(searchParams.toString()), [searchParams]);
 
-<NexGrid
+<TableX
   query={query}
   onQueryChange={(next) => router.replace(`?${serializeQuery(next)}`)}
   {…rest}

@@ -1,4 +1,4 @@
-// The render model `<nex-grid>` builds once per input change, plus the pure
+// The render model `<table-x>` builds once per input change, plus the pure
 // helpers that build it.
 //
 // WHY A VIEW MODEL AT ALL: the component is `OnPush`, but Angular still
@@ -10,12 +10,12 @@
 // plain property reads, and gives every `@for` a stable `track` key.
 
 import type { TemplateRef } from "@angular/core";
-import { getCellText, getColumnId, type NexGridColumn } from "@nexgrid/core";
+import { getCellText, getColumnId, type TableXColumn } from "@tablex/core";
 
-import type { NexGridCellTemplateContext } from "./types";
+import type { TableXCellTemplateContext } from "./types";
 
 /** One rendered header cell. */
-export interface NexGridHeaderView {
+export interface TableXHeaderView {
   /** Stable, unique `@for` track key. */
   key: string;
   /** Column id, used for sort intent. */
@@ -43,22 +43,22 @@ export interface NexGridHeaderView {
 }
 
 /** One rendered data cell, in the table and in the mobile card list. */
-export interface NexGridCellView<TData> {
+export interface TableXCellView<TData> {
   /** Stable, unique `@for` track key (shared with the header cell). */
   key: string;
   /** Header text, used as the `<dt>` label in the card list. */
   header: string;
   align: "left" | "center" | "right";
   /** Custom template for this column, or `null` to render {@link text}. */
-  template: TemplateRef<NexGridCellTemplateContext<TData>> | null;
+  template: TemplateRef<TableXCellTemplateContext<TData>> | null;
   /** Context for {@link template}; `null` when there is no template. */
-  context: NexGridCellTemplateContext<TData> | null;
+  context: TableXCellTemplateContext<TData> | null;
   /** Plain-text rendering, used when there is no template. */
   text: string;
 }
 
 /** One rendered row. */
-export interface NexGridRowView<TData> {
+export interface TableXRowView<TData> {
   /** Stable, unique `@for` track key. */
   key: string;
   /** The row's identity, from `getRowId`. Drives selection. */
@@ -70,11 +70,11 @@ export interface NexGridRowView<TData> {
   selected: boolean;
   /** Accessible name for this row's selection checkbox. */
   selectLabel: string;
-  cells: NexGridCellView<TData>[];
+  cells: TableXCellView<TData>[];
 }
 
 /** One entry in the Columns menu. */
-export interface NexGridColumnToggle {
+export interface TableXColumnToggle {
   key: string;
   id: string;
   title: string;
@@ -82,14 +82,14 @@ export interface NexGridColumnToggle {
 }
 
 /** One entry in the Density menu. */
-export interface NexGridDensityOption {
+export interface TableXDensityOption {
   value: "compact" | "default" | "comfortable";
   label: string;
   selected: boolean;
 }
 
 /** One pager control: a page button or an ellipsis gap. */
-export interface NexGridPagerItem {
+export interface TableXPagerItem {
   key: string;
   /** True for the `…` separator, which renders as a span rather than a button. */
   gap: boolean;
@@ -105,14 +105,23 @@ export interface NexGridPagerItem {
  * placeholders and rendered as alternating text and `<strong>` nodes — which
  * keeps the sentence fully translatable without ever touching `innerHTML`.
  */
-export interface NexGridRangePart {
+export interface TableXRangePart {
   key: string;
   /** Render inside a `<strong>` rather than as bare text. */
   strong: boolean;
-  /** Adds `.nxg-range-total` — the total gets its own accent styling. */
+  /** Adds `.tbx-range-total` — the total gets its own accent styling. */
   total: boolean;
   value: string;
 }
+
+// Backwards-compatible aliases
+export type NexGridHeaderView = TableXHeaderView;
+export type NexGridCellView<TData> = TableXCellView<TData>;
+export type NexGridRowView<TData> = TableXRowView<TData>;
+export type NexGridPagerItem = TableXPagerItem;
+export type NexGridColumnToggle = TableXColumnToggle;
+export type NexGridDensityOption = TableXDensityOption;
+export type NexGridRangePart = TableXRangePart;
 
 /**
  * Build unique `@for` track keys for a column set.
@@ -139,7 +148,7 @@ export function uniqueKey(candidate: string, seen: Set<string>): string {
  * Resolve a column's displayed header text. A function header is invoked (the
  * Angular render type is `string`); everything else falls back to the id.
  */
-export function headerText<TData>(column: NexGridColumn<TData, string>): string {
+export function headerText<TData>(column: TableXColumn<TData, string>): string {
   const header = column.header;
   if (typeof header === "function") return header({});
   if (typeof header === "string" && header !== "") return header;
@@ -153,7 +162,7 @@ export function headerText<TData>(column: NexGridColumn<TData, string>): string 
  * same here as they do in an export.
  */
 export function cellText<TData>(
-  column: NexGridColumn<TData, string>,
+  column: TableXColumn<TData, string>,
   row: TData,
   value: unknown,
   labels: { yes: string; no: string },
@@ -172,8 +181,8 @@ export function cellText<TData>(
 export function buildRangeParts(
   template: string,
   values: Readonly<Record<string, string>>,
-): NexGridRangePart[] {
-  const parts: NexGridRangePart[] = [];
+): TableXRangePart[] {
+  const parts: TableXRangePart[] = [];
   const pattern = /\{(\w+)\}/g;
   let cursor = 0;
   let match: RegExpExecArray | null;

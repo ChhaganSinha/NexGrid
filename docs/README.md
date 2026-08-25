@@ -1,6 +1,6 @@
-# 📖 NexGrid Documentation
+# 📖 TableX Documentation
 
-Welcome to the official documentation for **NexGrid** — the server-driven data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
+Welcome to the official documentation for **TableX** — the server-driven data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
 
 ---
 
@@ -26,11 +26,11 @@ docs/
 │   ├── export.md               # Excel (.xls) & CSV full-dataset exports
 │   └── responsive.md           # Desktop table to mobile card layout
 └── api/                        # API & Prop References
-    ├── core.md                 # @nexgrid/core
-    ├── react.md                # @nexgrid/react
-    ├── angular.md              # @nexgrid/angular
-    ├── vanilla.md              # @nexgrid/vanilla
-    └── aspnet.md               # NexGrid.AspNetCore
+    ├── core.md                 # @tablex/core
+    ├── react.md                # @tablex/react
+    ├── angular.md              # @tablex/angular
+    ├── vanilla.md              # @tablex/vanilla
+    └── aspnet.md               # TableX.AspNetCore
 ```
 
 ---
@@ -40,10 +40,10 @@ docs/
 | Guide | Description |
 | :--- | :--- |
 | 🚀 [**Getting Started**](getting-started.md) | Installation and first working grid in React, Next.js, Angular, ASP.NET Core, and Vanilla HTML. |
-| 💡 [**Core Concepts**](concepts.md) | Why NexGrid never holds your dataset, the `QueryState` / `PagedResponse` contract, and data flow. |
+| 💡 [**Core Concepts**](concepts.md) | Why TableX never holds your dataset, the `QueryState` / `PagedResponse` contract, and data flow. |
 | 📐 [**Columns & Custom Cells**](columns.md) | Header names, accessor keys, custom cell templates (JSX, Angular templates, DOM nodes), alignment, and width. |
-| 🎨 [**Theming & Styling**](theming.md) | CSS custom properties (`--nxg-*`), Dark mode, high-contrast themes, and customization. |
-| 🌍 [**Localization**](localization.md) | Complete `NexGridLocale` interface, translating buttons, placeholders, and range text. |
+| 🎨 [**Theming & Styling**](theming.md) | CSS custom properties (`--tbx-*`), Dark mode, high-contrast themes, and customization. |
+| 🌍 [**Localization**](localization.md) | Complete `TableXLocale` interface, translating buttons, placeholders, and range text. |
 | 🖥️ [**Server Integration**](server-integration.md) | Wire format specifications with sample backends (ASP.NET Core EF Core, Node.js/Express, Next.js API Routes). |
 | 🔀 [**Migrating from TanStack Table**](migration-from-tanstack.md) | Step-by-step migration guide for projects using `@tanstack/react-table`. |
 | ❓ [**Frequently Asked Questions (FAQ)**](faq.md) | Answers to architectural, export, security, and performance questions. |
@@ -52,7 +52,7 @@ docs/
 
 ## ⚡ Feature Deep Dives
 
-Every feature in NexGrid behaves with 100% parity across all 4 platforms:
+Every feature in TableX behaves with 100% parity across all 4 platforms:
 
 | Feature | Topics Covered |
 | :--- | :--- |
@@ -70,17 +70,17 @@ Every feature in NexGrid behaves with 100% parity across all 4 platforms:
 
 | Package | Documentation |
 | :--- | :--- |
-| [`@nexgrid/core`](api/core.md) | Engine: types, query reducers, pagination math, URL query serializer, export engine. |
-| [`@nexgrid/react`](api/react.md) | `<NexGrid />` props, hooks, and types. |
-| [`@nexgrid/angular`](api/angular.md) | `<nex-grid>` inputs, outputs, `*nexGridCell`, and `*nexGridToolbar` directives. |
-| [`@nexgrid/vanilla`](api/vanilla.md) | `createNexGrid()` options, event handlers, and handle methods. |
-| [`NexGrid.AspNetCore`](api/aspnet.md) | `<nex-grid>` Tag Helpers, `NexGridQuery` model binder, and EF Core `IQueryable` extensions. |
+| [`@tablex/core`](api/core.md) | Engine: types, query reducers, pagination math, URL query serializer, export engine. |
+| [`@tablex/react`](api/react.md) | `<TableX />` props, hooks, and types. |
+| [`@tablex/angular`](api/angular.md) | `<table-x>` inputs, outputs, `*tableXCell`, and `*tableXToolbar` directives. |
+| [`@tablex/vanilla`](api/vanilla.md) | `createTableX()` options, event handlers, and handle methods. |
+| [`TableX.AspNetCore`](api/aspnet.md) | `<table-x>` Tag Helpers, `TableXQuery` model binder, and EF Core `IQueryable` extensions. |
 
 ---
 
 ## 🤝 Specification & Compliance
 
-Building a custom renderer or extending NexGrid? Review [`adapter-spec.md`](adapter-spec.md) for the normative DOM, accessibility, and behavioral specifications required of any NexGrid adapter.
+Building a custom renderer or extending TableX? Review [`adapter-spec.md`](adapter-spec.md) for the normative DOM, accessibility, and behavioral specifications required of any TableX adapter.
 
 ---
 

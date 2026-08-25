@@ -1,8 +1,8 @@
-# @nexgrid/react
+# @tablex/react
 
 A server-driven data grid for React and Next.js.
 
-NexGrid renders one page of rows at a time and never holds the dataset. Every
+TableX renders one page of rows at a time and never holds the dataset. Every
 piece of user intent — page, page size, sort, search, filters — is expressed as
 a single `QueryState` object that **you** own; the grid hands you the next one
 and re-renders when you hand back the matching page. That is the whole contract.
@@ -16,7 +16,7 @@ loading / empty / error states, and a card layout for phones — all styled by o
 stylesheet shared with the Angular and vanilla adapters, so the same grid looks
 identical on every platform.
 
-- Zero runtime dependencies beyond `@nexgrid/core`. React is a peer dependency.
+- Zero runtime dependencies beyond `@tablex/core`. React is a peer dependency.
 - Written for strict TypeScript, generic over your row type.
 - Ships ESM and CJS, with a `"use client"` banner so it drops straight into the
   Next.js App Router.
@@ -24,13 +24,13 @@ identical on every platform.
 ## Installation
 
 ```bash
-npm install @nexgrid/react @nexgrid/core
+npm install @tablex/react @tablex/core
 ```
 
 Import the stylesheet once, anywhere in your app:
 
 ```ts
-import "@nexgrid/react/styles.css";
+import "@tablex/react/styles.css";
 ```
 
 ## Quick start
@@ -43,14 +43,14 @@ changes, and pass the result straight through.
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   defaultQuery,
   serializeQuery,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: number;
@@ -60,7 +60,7 @@ interface Student {
   joinedAt: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
   { accessorKey: "email", header: "Email" },
   {
@@ -105,7 +105,7 @@ export function StudentsGrid() {
   }, [load, query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Students"
       columns={columns}
       data={page?.items ?? []}
@@ -132,7 +132,7 @@ Your endpoint must answer with a `PagedResponse<T>`:
 { "items": [], "page": 1, "pageSize": 10, "total": 0, "totalPages": 1 }
 ```
 
-If your API is ASP.NET Core, `NexGrid.AspNetCore` binds exactly the query string
+If your API is ASP.NET Core, `TableX.AspNetCore` binds exactly the query string
 `serializeQuery` produces and returns exactly this shape.
 
 ### Putting the query in the URL
@@ -145,7 +145,7 @@ const searchParams = useSearchParams();
 const router = useRouter();
 const query = useMemo(() => parseQuery(searchParams.toString()), [searchParams]);
 
-<NexGrid
+<TableX
   query={query}
   onQueryChange={(next) => router.replace(`?${serializeQuery(next)}`)}
   {...rest}
@@ -158,7 +158,7 @@ never put the grid into an impossible state.
 
 ## Next.js App Router
 
-The published bundle starts with `"use client"`, so `<NexGrid />` can be imported
+The published bundle starts with `"use client"`, so `<TableX />` can be imported
 directly from a Server Component without a wrapper:
 
 ```tsx
@@ -175,14 +175,14 @@ Two notes:
 - Anything you pass through props still crosses the server/client boundary, so
   `columns` (which contains `cell` functions) must be defined in a file marked
   `"use client"`, not in the server page.
-- Import `@nexgrid/react/styles.css` from your root layout, or from the client
+- Import `@tablex/react/styles.css` from your root layout, or from the client
   component itself if your setup supports component-level CSS imports.
 
 ## Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `columns` | `NexGridReactColumn<TData>[]` | required | Column definitions, in display order. |
+| `columns` | `TableXReactColumn<TData>[]` | required | Column definitions, in display order. |
 | `data` | `TData[]` | required | The **current page** of rows only. |
 | `total` | `number` | required | Total filtered row count from the server. Drives the pager. |
 | `query` | `QueryState` | required | The query the `data` above answers. |
@@ -206,9 +206,9 @@ Two notes:
 | `onExportAll` | `() => void \| Promise<void>` | — | Takes over exporting entirely; the built-in flow never runs. |
 | `fetchEndpoint` | `string` | — | List endpoint used to page in the rest of the dataset when exporting. |
 | `badgeRules` | `readonly ExcelBadgeRule[]` | core's `DEFAULT_BADGE_RULES` | Value-based cell styling for the Excel export. |
-| `locale` | `Partial<NexGridLocale>` | English defaults | Overrides for any user-facing string. |
-| `onNotify` | `(notice: NexGridNotice) => void` | no-op | Receives `{ type, message }` for export progress, failures, and successes. |
-| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Adds `.nxg-dark` / `.nxg-auto` to the root. |
+| `locale` | `Partial<TableXLocale>` | English defaults | Overrides for any user-facing string. |
+| `onNotify` | `(notice: TableXNotice) => void` | no-op | Receives `{ type, message }` for export progress, failures, and successes. |
+| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Adds `.tbx-dark` / `.tbx-auto` to the root. |
 
 ## Column definitions
 
@@ -222,7 +222,7 @@ A column is a plain object, structurally compatible with TanStack Table's
 | `header` | `string \| (ctx) => ReactNode` | Header content. A string is also used for menus and export headers. |
 | `cell` | `(ctx: { row: { original: TData }, getValue(): unknown }) => ReactNode` | Custom cell renderer. Without it the raw value is rendered as text. |
 | `enableSorting` | `boolean` | Sorting is on by default; set `false` to opt out. |
-| `meta` | `NexGridColumnMeta` | Layout and behavior hints — see below. |
+| `meta` | `TableXColumnMeta` | Layout and behavior hints — see below. |
 
 ### `meta`
 
@@ -245,7 +245,7 @@ hideable, and never exported.
 the mobile card list, so the two can never drift apart.
 
 ```tsx
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   // A status pill.
   {
     accessorKey: "status",
@@ -298,38 +298,38 @@ Every color and shape in the stylesheet reads a CSS custom property, so you
 re-skin the grid by overriding tokens — no class overrides, no `!important`.
 
 ```css
-.nxg-root {
-  --nxg-primary: #7c3aed;
-  --nxg-primary-fg: #ffffff;
-  --nxg-radius: 8px;
-  --nxg-font: "Inter", system-ui, sans-serif;
+.tbx-root {
+  --tbx-primary: #7c3aed;
+  --tbx-primary-fg: #ffffff;
+  --tbx-radius: 8px;
+  --tbx-font: "Inter", system-ui, sans-serif;
 }
 ```
 
 | Token | Purpose |
 |-------|---------|
-| `--nxg-font`, `--nxg-font-mono` | Body font, and the serial-number font. |
-| `--nxg-bg` | Input and pager background. |
-| `--nxg-card`, `--nxg-card-2` | Panel background, and the table header band. |
-| `--nxg-border` | Every border and divider. |
-| `--nxg-fg`, `--nxg-muted-fg` | Primary and secondary text. |
-| `--nxg-muted` | Hover fills and subtle chips. |
-| `--nxg-primary`, `--nxg-primary-fg` | Accent: sort icons, current page, selection. |
-| `--nxg-danger` | Destructive accents. |
-| `--nxg-radius`, `--nxg-radius-sm` | Panel and control corner radii. |
-| `--nxg-shadow`, `--nxg-focus-ring` | Elevation, and the focus ring. |
+| `--tbx-font`, `--tbx-font-mono` | Body font, and the serial-number font. |
+| `--tbx-bg` | Input and pager background. |
+| `--tbx-card`, `--tbx-card-2` | Panel background, and the table header band. |
+| `--tbx-border` | Every border and divider. |
+| `--tbx-fg`, `--tbx-muted-fg` | Primary and secondary text. |
+| `--tbx-muted` | Hover fills and subtle chips. |
+| `--tbx-primary`, `--tbx-primary-fg` | Accent: sort icons, current page, selection. |
+| `--tbx-danger` | Destructive accents. |
+| `--tbx-radius`, `--tbx-radius-sm` | Panel and control corner radii. |
+| `--tbx-shadow`, `--tbx-focus-ring` | Elevation, and the focus ring. |
 
 Dark mode is a class, not a media query, so it can follow whatever your app
 already uses:
 
 ```tsx
-<NexGrid theme="dark" {...props} />   {/* always dark          */}
-<NexGrid theme="auto" {...props} />   {/* follows the OS       */}
+<TableX theme="dark" {...props} />   {/* always dark          */}
+<TableX theme="auto" {...props} />   {/* follows the OS       */}
 ```
 
-`theme="dark"` puts `.nxg-dark` on the grid root. If your app already toggles a
-dark class higher up the tree, add `nxg-dark` alongside it and leave `theme`
-alone — the stylesheet matches `.nxg-dark .nxg-root` as well.
+`theme="dark"` puts `.tbx-dark` on the grid root. If your app already toggles a
+dark class higher up the tree, add `tbx-dark` alongside it and leave `theme`
+alone — the stylesheet matches `.tbx-dark .tbx-root` as well.
 
 Responsive behavior is driven entirely by the stylesheet: the grid renders both a
 table and a card list, and CSS shows the table at ≥ 768px and the cards below it.
@@ -348,7 +348,7 @@ If those requests fail it notifies you and falls back to the current page rather
 than producing nothing.
 
 ```tsx
-<NexGrid
+<TableX
   fetchEndpoint="/api/students"
   exportFileName="student_roster"
   badgeRules={[
@@ -375,7 +375,7 @@ is `"info" | "success" | "error"`, ready to forward to whatever you already use.
 Every user-facing string comes from a locale object. Override any subset:
 
 ```tsx
-<NexGrid
+<TableX
   locale={{
     searchPlaceholder: "Rechercher…",
     emptyText: "Aucun enregistrement ne correspond à votre recherche.",
@@ -405,10 +405,10 @@ Templates keep their `{placeholder}` tokens so word order stays yours. Import
   Enter. Keep genuinely interactive content in a cell rather than relying on the
   row handler alone.
 
-## Re-exported from `@nexgrid/core`
+## Re-exported from `@tablex/core`
 
 For convenience, the pieces a host needs to drive a controlled grid are
-re-exported from this package, so most apps never import `@nexgrid/core`
+re-exported from this package, so most apps never import `@tablex/core`
 directly:
 
 `defaultQuery`, `parseQuery`, `serializeQuery`, `buildQueryUrl`, `primarySort`,
@@ -428,5 +428,5 @@ one and that the sort cycle stays `asc → desc → cleared` across every adapte
 
 ## License
 
-[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+[MIT](https://github.com/ChhaganSinha/TableX/blob/main/LICENSE) © 2026 Chhagan Sinha
 

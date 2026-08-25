@@ -1,8 +1,8 @@
 {
-  "name": "nexgrid-monorepo",
+  "name": "tablex-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "NexGrid — a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.",
+  "description": "TableX — a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "repository": {
@@ -17,10 +17,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "build:core": "npm run build -w @nexgrid/core",
-    "build:vanilla": "npm run build -w @nexgrid/vanilla",
-    "build:react": "npm run build -w @nexgrid/react",
-    "build:angular": "npm run build -w @nexgrid/angular",
+    "build:core": "npm run build -w @tablex/core",
+    "build:vanilla": "npm run build -w @tablex/vanilla",
+    "build:react": "npm run build -w @tablex/react",
+    "build:angular": "npm run build -w @tablex/angular",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present"

@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] — NexGrid ASP.NET Core MVC example</title>
+    <title>@ViewData["Title"] — TableX ASP.NET Core MVC example</title>
 
     @*
-        Both files ship inside NexGrid.AspNetCore as static web assets, served
-        from _content/NexGrid.AspNetCore/ by UseStaticFiles(). There is nothing
+        Both files ship inside TableX.AspNetCore as static web assets, served
+        from _content/TableX.AspNetCore/ by UseStaticFiles(). There is nothing
         to copy, download or bundle.
 
         The literal paths are spelled out here for readability; the constants
-        NexGridAssets.StylesheetPath and NexGridAssets.ScriptPath hold exactly
+        TableXAssets.StylesheetPath and TableXAssets.ScriptPath hold exactly
         the same values if you would rather not hard-code them.
     *@
-    <link rel="stylesheet" href="~/_content/NexGrid.AspNetCore/nexgrid.css" />
+    <link rel="stylesheet" href="~/_content/TableX.AspNetCore/tablex.css" />
     <link rel="stylesheet" href="~/css/site.css" />
 </head>
 <body>
@@ -24,11 +24,11 @@
 
     @*
         Load the bundle ONCE per page, even with several grids on it — it
-        defines the `NexGrid` global that each grid's init script calls into.
+        defines the `TableX` global that each grid's init script calls into.
         It sits at the end of <body> so the browser can paint the page first;
         the init the Tag Helper emits waits for DOMContentLoaded when it has to.
     *@
-    <script src="~/_content/NexGrid.AspNetCore/nexgrid.global.js"></script>
+    <script src="~/_content/TableX.AspNetCore/tablex.global.js"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

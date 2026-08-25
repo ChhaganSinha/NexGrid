@@ -1,5 +1,5 @@
 /* Page chrome and the classes the custom cell renderers use. The grid itself
-   is styled by @nexgrid/react/styles.css, imported in app/layout.tsx. */
+   is styled by @tablex/react/styles.css, imported in app/layout.tsx. */
 
 :root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

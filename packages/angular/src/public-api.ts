@@ -1,20 +1,14 @@
-// @nexgrid/angular — the public surface of the Angular adapter.
-//
-// The engine lives in @nexgrid/core. The handful of core symbols re-exported
-// below are the ones a host touches on day one (building the initial query and
-// the fetch URL); everything else — reducers, export helpers, locale — is
-// imported from `@nexgrid/core` directly.
-
-// The three symbols are exported individually rather than bundled into a
-// convenience array: a `const` array crossing a library boundary reaches the
-// consumer as a bare `.d.ts` declaration with no initializer, and their
-// compiler cannot see through it (`NG1010: 'imports' must be an array of
-// components, directives, pipes, or NgModules`). Import what you use.
-export { NexGridComponent } from "./lib/nex-grid.component";
-export { NexGridCellDirective } from "./lib/nex-grid-cell.directive";
-export { NexGridToolbarDirective } from "./lib/nex-grid-toolbar.directive";
+// @tablex/angular — the public surface of the Angular adapter.
+export { TableXComponent, NexGridComponent } from "./lib/table-x.component";
+export { TableXCellDirective, NexGridCellDirective } from "./lib/table-x-cell.directive";
+export { TableXToolbarDirective, NexGridToolbarDirective } from "./lib/table-x-toolbar.directive";
 
 export type {
+  TableXAngularColumn,
+  TableXCellTemplateContext,
+  TableXNotice,
+  TableXSelectionChange,
+  TableXTheme,
   NexGridAngularColumn,
   NexGridCellTemplateContext,
   NexGridNotice,
@@ -23,13 +17,13 @@ export type {
 } from "./lib/types";
 
 export type {
-  NexGridCellView,
-  NexGridColumnToggle,
-  NexGridDensityOption,
-  NexGridHeaderView,
-  NexGridPagerItem,
-  NexGridRangePart,
-  NexGridRowView,
+  TableXCellView,
+  TableXColumnToggle,
+  TableXDensityOption,
+  TableXHeaderView,
+  TableXPagerItem,
+  TableXRangePart,
+  TableXRowView,
 } from "./lib/view-model";
 
 // Re-exported from the engine for convenience.
@@ -42,11 +36,14 @@ export {
   serializeQuery,
   withToggledSort,
   withToggledMultiSort,
-} from "@nexgrid/core";
+} from "@tablex/core";
 export type {
   ClientQueryOptions,
   Density,
   ExcelBadgeRule,
+  TableXColumn,
+  TableXColumnMeta,
+  TableXLocale,
   NexGridColumn,
   NexGridColumnMeta,
   NexGridLocale,
@@ -55,5 +52,4 @@ export type {
   QueryState,
   SortDir,
   SortSpec,
-} from "@nexgrid/core";
-
+} from "@tablex/core";

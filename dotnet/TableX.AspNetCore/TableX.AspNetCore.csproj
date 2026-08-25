@@ -1,0 +1,120 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    TableX.AspNetCore is a Razor Class Library rather than a plain class library
+    for one reason: it ships the browser bundle. The RCL static web asset pipeline
+    is what publishes wwwroot/ to consumers as _content/TableX.AspNetCore/, so an
+    app gets the renderer by adding the package and nothing else.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <RootNamespace>TableX.AspNetCore</RootNamespace>
+    <AssemblyName>TableX.AspNetCore</AssemblyName>
+    <!-- Tag Helper discovery in a consumer is by assembly name, so it must stay stable. -->
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>TableX.AspNetCore</PackageId>
+    <Version>0.1.0</Version>
+    <Title>TableX for ASP.NET Core</Title>
+    <Authors>Chhagan Sinha</Authors>
+    <Company>TableX</Company>
+    <Product>TableX</Product>
+    <Description>Server-driven data grid for ASP.NET Core: Tag Helpers that render the TableX browser bundle, a query-string binder for TableX's wire format, and allowlisted IQueryable extensions that turn a page/sort/search/filter request into an EF Core-translatable query and a PagedResponse.</Description>
+    <PackageTags>datagrid;data-grid;table;aspnetcore;taghelper;razor;pagination;sorting;filtering;export;iqueryable;efcore;server-side</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://github.com/ChhaganSinha/TableX</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ChhaganSinha/TableX.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) Chhagan Sinha</Copyright>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>TableX.AspNetCore.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" Visible="true" />
+  </ItemGroup>
+
+  <PropertyGroup Label="Browser assets">
+    <!--
+      The renderer is @tablex/vanilla's IIFE bundle. It is built by the JS
+      toolchain, so it is a build INPUT here, not a checked-in file.
+    -->
+    <TableXVanillaDist>$(MSBuildThisFileDirectory)..\..\packages\vanilla\dist\</TableXVanillaDist>
+    <TableXWwwRoot>$(MSBuildThisFileDirectory)wwwroot\</TableXWwwRoot>
+  </PropertyGroup>
+
+  <!--
+    Keep the two copied files out of the SDK's evaluation-time `wwwroot/**` glob.
+    That glob runs before any target, so on a clean tree it sees nothing and on an
+    incremental build it would register the asset a second time alongside the copy
+    target below. Removing here and re-adding there makes both cases identical.
+  -->
+  <ItemGroup>
+    <Content Remove="wwwroot\tablex.global.js" />
+    <Content Remove="wwwroot\tablex.css" />
+  </ItemGroup>
+
+  <!--
+    Copy the browser bundle in before static web asset discovery reads @(Content).
+    Every step is guarded by Exists(): a checkout where the JS has not been built
+    yet must still compile, it just produces a package with no wwwroot payload.
+  -->
+  <Target Name="CopyTableXBrowserAssets"
+          BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
+          Inputs="$(TableXVanillaDist)tablex.global.js;$(TableXVanillaDist)tablex.css"
+          Outputs="$(TableXWwwRoot)tablex.global.js;$(TableXWwwRoot)tablex.css">
+
+    <Copy SourceFiles="$(TableXVanillaDist)tablex.global.js"
+          DestinationFolder="$(TableXWwwRoot)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(TableXVanillaDist)tablex.global.js')" />
+
+    <Copy SourceFiles="$(TableXVanillaDist)tablex.css"
+          DestinationFolder="$(TableXWwwRoot)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(TableXVanillaDist)tablex.css')" />
+
+    <Warning Text="TableX: '$(TableXVanillaDist)tablex.global.js' was not found. Building without the browser bundle — run 'npm run build:vanilla' at the repository root to produce it."
+             Condition="!Exists('$(TableXVanillaDist)tablex.global.js')" />
+  </Target>
+
+  <!--
+    Registered in a separate, always-running target: CopyTableXBrowserAssets is
+    incremental and MSBuild skips a target whose outputs are up to date, taking
+    its ItemGroup with it.
+  -->
+  <Target Name="IncludeTableXBrowserAssets"
+          DependsOnTargets="CopyTableXBrowserAssets"
+          BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths">
+    <ItemGroup>
+      <Content Include="wwwroot\tablex.global.js" Condition="Exists('$(TableXWwwRoot)tablex.global.js')" />
+      <Content Include="wwwroot\tablex.css" Condition="Exists('$(TableXWwwRoot)tablex.css')" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CleanTableXBrowserAssets" AfterTargets="Clean">
+    <Delete Files="$(TableXWwwRoot)tablex.global.js;$(TableXWwwRoot)tablex.css" />
+  </Target>
+
+</Project>

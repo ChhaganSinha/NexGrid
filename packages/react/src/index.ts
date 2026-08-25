@@ -1,15 +1,20 @@
-// @nexgrid/react — public surface.
+// @tablex/react — public surface.
 //
-// The engine lives in `@nexgrid/core`. The handful of core exports re-exported
+// The engine lives in `@tablex/core`. The handful of core exports re-exported
 // below are the ones a HOST needs in order to drive a controlled grid — build a
 // starting query, read it out of a URL, move a page — so an app can integrate
-// NexGrid without a second install and without learning the package split. The
+// TableX without a second install and without learning the package split. The
 // rest of core (export writers, column helpers, locale internals) stays where
-// it is; import `@nexgrid/core` directly if you need it.
+// it is; import `@tablex/core` directly if you need it.
 
-export { NexGrid } from "./nex-grid.js";
+export { TableX, NexGrid } from "./table-x.js";
 
 export type {
+  TableXProps,
+  TableXReactColumn,
+  TableXNotice,
+  TableXNoticeType,
+  TableXTheme,
   NexGridProps,
   NexGridReactColumn,
   NexGridNotice,
@@ -17,8 +22,12 @@ export type {
   NexGridTheme,
 } from "./types.js";
 
-/** Column definitions render `React.ReactNode`; see {@link NexGridReactColumn}. */
+/** Column definitions render `React.ReactNode`; see {@link TableXReactColumn}. */
 export type {
+  TableXColumn,
+  TableXColumnMeta,
+  TableXCellContext,
+  TableXLocale,
   NexGridColumn,
   NexGridColumnMeta,
   NexGridCellContext,
@@ -30,10 +39,10 @@ export type {
   PagedResponse,
   Density,
   ExcelBadgeRule,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
-export { useClientNexGrid } from "./use-client-nex-grid.js";
-export type { UseClientNexGridOptions } from "./use-client-nex-grid.js";
+export { useClientTableX, useClientNexGrid } from "./use-client-table-x.js";
+export type { UseClientTableXOptions, UseClientNexGridOptions } from "./use-client-table-x.js";
 
 export {
   // In-memory client-side data querying
@@ -64,6 +73,5 @@ export {
   // Localization
   DEFAULT_LOCALE,
   resolveLocale,
-} from "@nexgrid/core";
-export type { ClientQueryOptions } from "@nexgrid/core";
-
+} from "@tablex/core";
+export type { ClientQueryOptions } from "@tablex/core";

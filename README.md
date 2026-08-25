@@ -1,14 +1,14 @@
 <div align="center">
 
-# ⚡ NexGrid
+# ⚡ TableX
 
 ### **A professional, server-driven data grid for React, Next.js, Angular, vanilla JavaScript, and ASP.NET Core.**
 
 One Engine · One Stylesheet · One Server Contract · Four Frameworks
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![npm version](https://img.shields.io/npm/v/@nexgrid/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@nexgrid/react)
-[![NuGet version](https://img.shields.io/nuget/v/NexGrid.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/NexGrid.AspNetCore)
+[![npm version](https://img.shields.io/npm/v/@tablex/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@tablex/react)
+[![NuGet version](https://img.shields.io/nuget/v/TableX.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/TableX.AspNetCore)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen?style=flat-square)](packages/core/test)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
@@ -19,24 +19,24 @@ One Engine · One Stylesheet · One Server Contract · Four Frameworks
 
 ---
 
-## 🚀 Why NexGrid?
+## 🚀 Why TableX?
 
 Traditional data grids assume the browser can hold your entire dataset in memory. That works fine for 100 rows, but breaks down when datasets scale:
 - Sorting silently re-orders **only the current page**, showing incorrect rankings.
 - Search filters only what is already downloaded in memory.
 - Exporting writes out only the visible DOM rows instead of the full filtered dataset.
 
-**NexGrid is designed server-driven from the core.**
+**TableX is designed server-driven from the core.**
 
 The grid **never holds your entire dataset**. Every user interaction — paging, multi-column sorting, global search, column filters — compiles into a standard [`QueryState`](docs/concepts.md#the-querystate-contract) object. Your server responds with exactly **one page of records plus the total matching count**.
 
-This single architectural rule ensures NexGrid behaves with identical lightning-fast performance at **50 rows or 5,000,000 rows**.
+This single architectural rule ensures TableX behaves with identical lightning-fast performance at **50 rows or 5,000,000 rows**.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant Grid as NexGrid (UI Component)
+    participant Grid as TableX (UI Component)
     participant Server as Backend API / ASP.NET / Node
     participant DB as Database (SQL / EF Core / Mongo)
 
@@ -54,11 +54,11 @@ sequenceDiagram
 
 | Package | Target Platform | Installation |
 | :--- | :--- | :--- |
-| [`@nexgrid/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @nexgrid/core` |
-| [`@nexgrid/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @nexgrid/react` |
-| [`@nexgrid/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @nexgrid/angular` |
-| [`@nexgrid/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @nexgrid/vanilla` |
-| [`NexGrid.AspNetCore`](dotnet/NexGrid.AspNetCore) | ASP.NET Core 8+ Razor Class Library & TagHelpers | `dotnet add package NexGrid.AspNetCore` |
+| [`@tablex/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @tablex/core` |
+| [`@tablex/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @tablex/react` |
+| [`@tablex/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @tablex/angular` |
+| [`@tablex/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @tablex/vanilla` |
+| [`TableX.AspNetCore`](dotnet/TableX.AspNetCore) | ASP.NET Core 8+ Razor Class Library & TagHelpers | `dotnet add package TableX.AspNetCore` |
 
 ---
 
@@ -80,8 +80,8 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
   - Full-dataset export support (fetches all filtered pages in the background, not just on-screen rows).
   - OWASP spreadsheet-injection neutralization (formula protection).
 - 📱 **Mobile Card Responsive Layout** — Renders as a structured table on desktop; automatically switches to high-density cards below 768px.
-- 🎨 **Modern Theming & Dark Mode** — Clean CSS custom properties (`--nxg-*`), with built-in Light, Dark, and OS-matched Auto themes.
-- 🌐 **100% Localizable** — Every string and label is overridable via [`NexGridLocale`](docs/localization.md).
+- 🎨 **Modern Theming & Dark Mode** — Clean CSS custom properties (`--tbx-*`), with built-in Light, Dark, and OS-matched Auto themes.
+- 🌐 **100% Localizable** — Every string and label is overridable via [`TableXLocale`](docs/localization.md).
 - ♿ **Accessible & Safe** — Semantic table markup, full ARIA attributes (`aria-sort`, `role="region"`), keyboard operable, and strict XSS protection.
 
 ---
@@ -91,22 +91,22 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 ### 1. React / Next.js (App Router Safe)
 
 ```bash
-npm install @nexgrid/react @nexgrid/core
+npm install @tablex/react @tablex/core
 ```
 
 ```tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { NexGrid } from "@nexgrid/react";
+import { TableX } from "@tablex/react";
 import {
   defaultQuery,
   buildQueryUrl,
   type QueryState,
   type PagedResponse,
-  type NexGridColumn,
-} from "@nexgrid/core";
-import "@nexgrid/react/styles.css";
+  type TableXColumn,
+} from "@tablex/core";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: string;
@@ -115,7 +115,7 @@ interface Student {
   status: string;
 }
 
-const columns: NexGridColumn<Student, React.ReactNode>[] = [
+const columns: TableXColumn<Student, React.ReactNode>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
   {
@@ -139,7 +139,7 @@ export function StudentsGrid() {
   }, [query]);
 
   return (
-    <NexGrid
+    <TableX
       caption="Students Directory"
       columns={columns}
       data={page?.items ?? []}
@@ -159,20 +159,20 @@ export function StudentsGrid() {
 ### 2. Angular (17+ Standalone)
 
 ```bash
-npm install @nexgrid/angular @nexgrid/core
+npm install @tablex/angular @tablex/core
 ```
 
 ```typescript
 import { Component, signal } from '@angular/core';
-import { NexGridComponent, type NexGridColumn } from '@nexgrid/angular';
-import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from '@nexgrid/core';
+import { TableXComponent, type TableXColumn } from '@tablex/angular';
+import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from '@tablex/core';
 
 @Component({
   selector: 'app-students-grid',
   standalone: true,
-  imports: [NexGridComponent],
+  imports: [TableXComponent],
   template: `
-    <nex-grid
+    <table-x
       caption="Students Directory"
       [columns]="columns"
       [data]="data()"
@@ -191,7 +191,7 @@ export class StudentsGridComponent {
   total = signal(0);
   loading = signal(false);
 
-  columns: NexGridColumn<Student>[] = [
+  columns: TableXColumn<Student>[] = [
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'email', header: 'Email' },
     { accessorKey: 'status', header: 'Status' },
@@ -216,13 +216,13 @@ export class StudentsGridComponent {
 ### 3. ASP.NET Core (Razor Tag Helpers + EF Core)
 
 ```bash
-dotnet add package NexGrid.AspNetCore
+dotnet add package TableX.AspNetCore
 ```
 
 **Controller / Minimal API Endpoint:**
 ```csharp
 [HttpGet("/api/students")]
-public async Task<PagedResponse<Student>> Get([FromQuery] NexGridQuery query, AppDbContext db)
+public async Task<PagedResponse<Student>> Get([FromQuery] TableXQuery query, AppDbContext db)
 {
     return await db.Students
         .AsNoTracking()
@@ -236,17 +236,17 @@ public async Task<PagedResponse<Student>> Get([FromQuery] NexGridQuery query, Ap
 
 **Razor View (`.cshtml`):**
 ```cshtml
-@using NexGrid.AspNetCore
-@addTagHelper *, NexGrid.AspNetCore
+@using TableX.AspNetCore
+@addTagHelper *, TableX.AspNetCore
 
-<link rel="stylesheet" href="@NexGridAssets.StylesheetPath" />
-<script src="@NexGridAssets.ScriptPath"></script>
+<link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
+<script src="@TableXAssets.ScriptPath"></script>
 
-<nex-grid caption="Students Directory" endpoint="/api/students" enable-selection="true">
-    <nex-grid-column field="name" header="Name" min-width="180" />
-    <nex-grid-column field="email" header="Email" />
-    <nex-grid-column field="status" header="Status" align="Center" />
-</nex-grid>
+<table-x caption="Students Directory" endpoint="/api/students" enable-selection="true">
+    <table-x-column field="name" header="Name" min-width="180" />
+    <table-x-column field="email" header="Email" />
+    <table-x-column field="status" header="Status" align="Center" />
+</table-x>
 ```
 
 ---
@@ -254,13 +254,13 @@ public async Task<PagedResponse<Student>> Get([FromQuery] NexGridQuery query, Ap
 ### 4. Vanilla JavaScript / Plain HTML
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/nexgrid.css" />
-<script src="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/nexgrid.global.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tablex/vanilla/dist/tablex.css" />
+<script src="https://cdn.jsdelivr.net/npm/@tablex/vanilla/dist/tablex.global.js"></script>
 
 <div id="grid"></div>
 
 <script>
-  const grid = NexGrid.createNexGrid(document.getElementById("grid"), {
+  const grid = TableX.createTableX(document.getElementById("grid"), {
     caption: "Students Directory",
     endpoint: "/api/students",
     enableSelection: true,
@@ -307,7 +307,7 @@ GET /api/students?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 | 📖 [**Getting Started**](docs/getting-started.md) | Setup and first working grid in React, Next.js, Angular, ASP.NET Core, and Vanilla JS. |
 | 💡 [**Core Concepts**](docs/concepts.md) | Deep dive into the server-driven model, `QueryState`, and state reducers. |
 | 📐 [**Column Configuration**](docs/columns.md) | Alignment, custom cell renderers, min/max widths, visibility, and sorting options. |
-| 🎨 [**Theming & Styling**](docs/theming.md) | CSS custom property tokens (`--nxg-*`), Dark mode, and custom presets. |
+| 🎨 [**Theming & Styling**](docs/theming.md) | CSS custom property tokens (`--tbx-*`), Dark mode, and custom presets. |
 | 🌍 [**Localization**](docs/localization.md) | Overriding strings, RTL considerations, and internationalized messages. |
 | 🖥️ [**Server Integration**](docs/server-integration.md) | Implementing endpoints in ASP.NET Core, Node.js/Express, Next.js Route Handlers. |
 | 🔀 [**Migrating from TanStack Table**](docs/migration-from-tanstack.md) | Direct comparison and drop-in migration from TanStack Table v8. |
@@ -332,8 +332,8 @@ Explore ready-to-run projects inside the [`examples/`](examples/README.md) direc
 
 ```bash
 # Clone the repository
-git clone https://github.com/ChhaganSinha/NexGrid.git
-cd NexGrid
+git clone https://github.com/ChhaganSinha/TableX.git
+cd TableX
 
 # Install dependencies and build all JS packages
 npm install
@@ -341,8 +341,8 @@ npm run build
 npm run test
 
 # Build and pack ASP.NET Core library
-dotnet build dotnet/NexGrid.sln -c Release
-dotnet pack dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release
+dotnet build dotnet/TableX.sln -c Release
+dotnet pack dotnet/TableX.AspNetCore/TableX.AspNetCore.csproj -c Release
 ```
 
 ---
@@ -365,5 +365,5 @@ For security reports, please refer to [SECURITY.md](SECURITY.md).
 
 ## 📄 License
 
-NexGrid is open source software created by **Chhagan Sinha** and licensed under the [MIT License](LICENSE). Free for personal and commercial use forever.
+TableX is open source software created by **Chhagan Sinha** and licensed under the [MIT License](LICENSE). Free for personal and commercial use forever.
 

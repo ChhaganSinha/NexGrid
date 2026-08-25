@@ -20,14 +20,14 @@ class MockNode {
     };
     this.classList = {
       _classes: new Set(),
-      add(...cls) {
-        cls.forEach((c) => this._classes.add(c));
+      add: (...cls) => {
+        cls.forEach((c) => this.classList._classes.add(c));
       },
-      remove(...cls) {
-        cls.forEach((c) => this._classes.delete(c));
+      remove: (...cls) => {
+        cls.forEach((c) => this.classList._classes.delete(c));
       },
-      contains(c) {
-        return this._classes.has(c);
+      contains: (c) => {
+        return this.classList._classes.has(c);
       },
     };
     this.dataset = {};
@@ -76,63 +76,83 @@ class MockNode {
     return child;
   }
 
+  removeChild(child) {
+    const idx = this.childNodes.indexOf(child);
+    if (idx !== -1) {
+      this.childNodes.splice(idx, 1);
+      child.parentNode = null;
+    }
+    return child;
+  }
+
   remove() {
     if (this.parentNode) {
-      const idx = this.parentNode.childNodes.indexOf(this);
-      if (idx !== -1) this.parentNode.childNodes.splice(idx, 1);
-      this.parentNode = null;
+      this.parentNode.removeChild(this);
     }
   }
 
-  setAttribute(name, val) {
-    this.attributes.set(name, String(val));
-    if (name === "class") {
-      this.classList._classes = new Set(String(val).split(/\s+/).filter(Boolean));
-    }
-  }
-
-  getAttribute(name) {
-    return this.attributes.get(name) ?? null;
+  replaceChildren(...newChildren) {
+    this.childNodes.forEach((c) => (c.parentNode = null));
+    this.childNodes = [];
+    newChildren.forEach((c) => {
+      if (typeof c === "string") {
+        const textNode = new MockNode("#text");
+        textNode.textContent = c;
+        this.appendChild(textNode);
+      } else if (c) {
+        this.appendChild(c);
+      }
+    });
   }
 
   addEventListener(type, handler) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
     this.listeners.get(type).push(handler);
   }
 
   removeEventListener(type, handler) {
     const list = this.listeners.get(type);
-    if (!list) return;
-    const idx = list.indexOf(handler);
-    if (idx !== -1) list.splice(idx, 1);
+    if (list) {
+      const idx = list.indexOf(handler);
+      if (idx !== -1) list.splice(idx, 1);
+    }
   }
 
   dispatchEvent(event) {
     event.target = this;
     event.currentTarget = this;
-    const list = this.listeners.get(event.type) || [];
-    for (const h of [...list]) {
-      h.call(this, event);
+    const list = this.listeners.get(event.type);
+    if (list) {
+      list.forEach((h) => h(event));
     }
     return true;
   }
 
-  contains(other) {
-    let curr = other;
-    while (curr) {
-      if (curr === this) return true;
-      curr = curr.parentNode;
+  setAttribute(k, v) {
+    this.attributes.set(k, String(v));
+    if (k === "class") {
+      this.classList._classes = new Set(String(v).split(/\s+/).filter(Boolean));
     }
-    return false;
   }
 
-  closest(selector) {
-    let curr = this;
-    while (curr) {
-      if (curr.nodeName && matchesSelector(curr, selector)) return curr;
-      curr = curr.parentNode;
+  getAttribute(k) {
+    if (k === "class" && this.classList._classes.size > 0) {
+      return Array.from(this.classList._classes).join(" ");
     }
-    return null;
+    return this.attributes.get(k) || null;
+  }
+
+  removeAttribute(k) {
+    this.attributes.delete(k);
+    if (k === "class") {
+      this.classList._classes.clear();
+    }
+  }
+
+  hasAttribute(k) {
+    return this.attributes.has(k);
   }
 
   querySelector(selector) {
@@ -141,42 +161,52 @@ class MockNode {
   }
 
   querySelectorAll(selector) {
-    const matches = [];
+    const results = [];
     const walk = (node) => {
-      if (node.nodeName && matchesSelector(node, selector)) {
-        matches.push(node);
+      if (matches(node, selector)) {
+        results.push(node);
       }
-      for (const child of node.childNodes) {
-        if (child instanceof MockNode) walk(child);
-      }
+      node.childNodes.forEach(walk);
     };
-    for (const child of this.childNodes) {
-      if (child instanceof MockNode) walk(child);
-    }
-    return matches;
+    this.childNodes.forEach(walk);
+    return results;
   }
 
-  focus() {}
-  blur() {}
+  closest(selector) {
+    let curr = this;
+    while (curr) {
+      if (matches(curr, selector)) return curr;
+      curr = curr.parentNode;
+    }
+    return null;
+  }
+
+  contains(node) {
+    let curr = node;
+    while (curr) {
+      if (curr === this) return true;
+      curr = curr.parentNode;
+    }
+    return false;
+  }
 }
 
-function matchesSelector(node, selector) {
+function matches(node, selector) {
+  if (!node) return false;
   if (selector.startsWith(".")) {
-    return node.classList.contains(selector.slice(1));
+    const cls = selector.slice(1);
+    return node.classList?.contains(cls) ?? false;
   }
   if (selector.startsWith("#")) {
-    return node.getAttribute("id") === selector.slice(1);
+    const id = selector.slice(1);
+    return node.getAttribute("id") === id;
   }
   if (selector.startsWith("[")) {
-    const attrMatch = selector.match(/\[([a-zA-Z0-9_-]+)([\^$*]?=)?["']?([^"']*)?["']?\]/);
+    const attrMatch = selector.match(/\[([a-zA-Z0-9_-]+)(?:="([^"]*)")?\]/);
     if (attrMatch) {
-      const [, attr, op, val] = attrMatch;
-      const attrVal = node.getAttribute(attr) || "";
-      if (!op) return node.attributes.has(attr);
-      if (op === "=") return attrVal === val;
-      if (op === "^=") return attrVal.startsWith(val);
-      if (op === "$=") return attrVal.endsWith(val);
-      if (op === "*=") return attrVal.includes(val);
+      const [, attr, val] = attrMatch;
+      if (val !== undefined) return node.getAttribute(attr) === val;
+      return node.hasAttribute(attr);
     }
   }
   return node.nodeName.toLowerCase() === selector.toLowerCase();
@@ -242,9 +272,9 @@ globalThis.EventTarget = MockNode;
 globalThis.document = new MockDocument();
 
 // Import vanilla package
-const { createNexGrid } = await import("../dist/index.js");
+const { createTableX, createNexGrid } = await import("../dist/index.js");
 
-test("createNexGrid mounts table, renders rows and updates correctly", () => {
+test("createTableX mounts table, renders rows and updates correctly", () => {
   const container = document.createElement("div");
   document.body.appendChild(container);
 
@@ -262,7 +292,7 @@ test("createNexGrid mounts table, renders rows and updates correctly", () => {
   let emittedQuery = null;
   let emittedSelection = null;
 
-  const handle = createNexGrid(container, {
+  const handle = createTableX(container, {
     caption: "Students Test",
     columns,
     data,
@@ -280,15 +310,15 @@ test("createNexGrid mounts table, renders rows and updates correctly", () => {
   assert.equal(handle.getQuery().page, 1);
   assert.deepEqual(handle.getSelection(), []);
 
-  const table = container.querySelector(".nxg-table");
+  const table = container.querySelector(".tbx-table");
   assert.ok(table, "Table element should be rendered");
 
   // Verify rows rendered
-  const rows = container.querySelectorAll(".nxg-row");
+  const rows = container.querySelectorAll(".tbx-row");
   assert.equal(rows.length, 2, "Should render 2 rows");
 
   // Test row selection
-  const checkboxes = container.querySelectorAll(".nxg-checkbox");
+  const checkboxes = container.querySelectorAll(".tbx-checkbox");
   assert.ok(checkboxes.length > 0, "Checkboxes should be rendered");
 
   // Toggle select row 1 (index 1 is first row checkbox, index 0 is select-all)
@@ -298,7 +328,7 @@ test("createNexGrid mounts table, renders rows and updates correctly", () => {
   assert.deepEqual(emittedSelection, { ids: ["1"], all: false });
 
   // Test sorting - click name column header
-  const headers = container.querySelectorAll(".nxg-th--sortable");
+  const headers = container.querySelectorAll(".tbx-th--sortable");
   assert.ok(headers.length >= 3, "Sortable headers rendered");
 
   // Single sort
@@ -323,7 +353,7 @@ test("createNexGrid mounts table, renders rows and updates correctly", () => {
   });
 
   assert.equal(handle.getQuery().sort[0].dir, "desc");
-  const updatedRows = container.querySelectorAll(".nxg-row");
+  const updatedRows = container.querySelectorAll(".tbx-row");
   assert.equal(updatedRows.length, 1);
 
   // Test teardown
@@ -331,7 +361,7 @@ test("createNexGrid mounts table, renders rows and updates correctly", () => {
   assert.equal(container.childNodes.length, 0, "Container should be emptied on destroy");
 });
 
-test("createNexGrid single selection mode selects only one row", () => {
+test("createTableX single selection mode selects only one row", () => {
   const container = document.createElement("div");
   document.body.appendChild(container);
 
@@ -346,7 +376,7 @@ test("createNexGrid single selection mode selects only one row", () => {
   ];
 
   let selectedIds = [];
-  const handle = createNexGrid(container, {
+  const handle = createTableX(container, {
     caption: "Single Select Test",
     columns,
     data,
@@ -358,7 +388,7 @@ test("createNexGrid single selection mode selects only one row", () => {
     },
   });
 
-  const checkboxes = container.querySelectorAll(".nxg-checkbox");
+  const checkboxes = container.querySelectorAll(".tbx-checkbox");
   // In single select mode, checkboxes are radio inputs for rows
   checkboxes[0].checked = true;
   checkboxes[0].dispatchEvent(new MockEvent("change"));
@@ -371,7 +401,7 @@ test("createNexGrid single selection mode selects only one row", () => {
   handle.destroy();
 });
 
-test("createNexGrid renders column filter trigger and applies filter", () => {
+test("createTableX renders column filter trigger and applies filter", () => {
   const container = document.createElement("div");
   document.body.appendChild(container);
 
@@ -390,7 +420,7 @@ test("createNexGrid renders column filter trigger and applies filter", () => {
   ];
 
   let emittedQuery = null;
-  const handle = createNexGrid(container, {
+  const handle = createTableX(container, {
     caption: "Filter Test",
     columns,
     data,
@@ -400,14 +430,14 @@ test("createNexGrid renders column filter trigger and applies filter", () => {
     },
   });
 
-  const filterBtn = container.querySelector(".nxg-col-filter-btn");
+  const filterBtn = container.querySelector(".tbx-col-filter-btn");
   assert.ok(filterBtn, "Filter button should be rendered on status column");
 
   filterBtn.dispatchEvent(new MockMouseEvent("click"));
-  const popover = container.querySelector(".nxg-filter-popover");
+  const popover = container.querySelector(".tbx-filter-popover");
   assert.ok(popover, "Filter popover should be open");
 
-  const options = popover.querySelectorAll(".nxg-filter-option");
+  const options = popover.querySelectorAll(".tbx-filter-option");
   assert.equal(options.length, 3); // All, Active, Pending
 
   options[1].dispatchEvent(new MockMouseEvent("click")); // Active
@@ -416,4 +446,3 @@ test("createNexGrid renders column filter trigger and applies filter", () => {
 
   handle.destroy();
 });
-

@@ -5,8 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = join(here, "..", "..", "core", "styles", "nexgrid.css");
-const dest = join(here, "..", "dist", "nexgrid.css");
+const src = join(here, "..", "..", "core", "styles", "tablex.css");
+const dest = join(here, "..", "dist", "tablex.css");
 
 mkdirSync(dirname(dest), { recursive: true });
 copyFileSync(src, dest);

@@ -10,15 +10,16 @@ import {
   getCellText,
   getCellValue,
   getColumnId,
+  type TableXColumn,
   type NexGridColumn,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 /** Default width, in px, for a column that declares neither `width` nor `minWidth`. */
 export const DEFAULT_MIN_WIDTH = 120;
 
 /** Render a column's header: a custom render function, its text, or its id. */
 export function renderColumnHeader<TData>(
-  col: NexGridColumn<TData, React.ReactNode>,
+  col: TableXColumn<TData, React.ReactNode>,
 ): React.ReactNode {
   const header = col.header;
   if (typeof header === "function") return header({});
@@ -32,7 +33,7 @@ export function renderColumnHeader<TData>(
  * Object]` into the grid.
  */
 export function renderCellContent<TData>(
-  col: NexGridColumn<TData, React.ReactNode>,
+  col: TableXColumn<TData, React.ReactNode>,
   row: TData,
   labels: { yes: string; no: string },
 ): React.ReactNode {
@@ -49,7 +50,7 @@ export function renderCellContent<TData>(
  * short values from collapsing into unreadable slivers.
  */
 export function headerCellStyle<TData>(
-  col: NexGridColumn<TData, React.ReactNode>,
+  col: TableXColumn<TData, React.ReactNode>,
 ): React.CSSProperties {
   const meta = col.meta;
   const style: React.CSSProperties =
@@ -62,7 +63,7 @@ export function headerCellStyle<TData>(
 
 /** Body cell geometry — alignment only; widths are set once, on the header. */
 export function bodyCellStyle<TData>(
-  col: NexGridColumn<TData, React.ReactNode>,
+  col: TableXColumn<TData, React.ReactNode>,
 ): React.CSSProperties | undefined {
   const align = col.meta?.align;
   return align === undefined ? undefined : { textAlign: align };
@@ -70,12 +71,12 @@ export function bodyCellStyle<TData>(
 
 /** Extra class for the header's inner flex wrapper, following `meta.align`. */
 export function headerInnerClass<TData>(
-  col: NexGridColumn<TData, React.ReactNode>,
+  col: TableXColumn<TData, React.ReactNode>,
 ): string {
   const align = col.meta?.align;
-  if (align === "center") return "nxg-th-inner nxg-th-inner--center";
-  if (align === "right") return "nxg-th-inner nxg-th-inner--right";
-  return "nxg-th-inner";
+  if (align === "center") return "tbx-th-inner tbx-th-inner--center";
+  if (align === "right") return "tbx-th-inner tbx-th-inner--right";
+  return "tbx-th-inner";
 }
 
 /**

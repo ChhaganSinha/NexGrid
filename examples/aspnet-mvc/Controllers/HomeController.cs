@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using NexGrid.AspNetCore;
-using NexGrid.Example.Mvc.Models;
+using TableX.AspNetCore;
+using TableX.Example.Mvc.Models;
 
-namespace NexGrid.Example.Mvc.Controllers;
+namespace TableX.Example.Mvc.Controllers;
 
 /// <summary>
 /// The page that hosts the grid, and the endpoint that feeds it.
@@ -13,7 +13,7 @@ public sealed class HomeController : Controller
 
     public HomeController(StudentStore store) => _store = store;
 
-    /// <summary>The Razor view containing the &lt;nex-grid&gt; Tag Helper.</summary>
+    /// <summary>The Razor view containing the &lt;table-x&gt; Tag Helper.</summary>
     public IActionResult Index()
     {
         ViewData["Statuses"] = StudentStore.Statuses;
@@ -21,16 +21,16 @@ public sealed class HomeController : Controller
     }
 
     /// <summary>
-    /// GET /api/students — one page of rows for a NexGrid request.
+    /// GET /api/students — one page of rows for a TableX request.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Two things are doing all the work:
     /// </para>
     /// <para>
-    /// <b><c>NexGridQuery query</c></b> binds itself off the query string. There
+    /// <b><c>TableXQuery query</c></b> binds itself off the query string. There
     /// is no <c>[FromQuery]</c>, no startup registration, and no validation to
-    /// write: parsing mirrors <c>@nexgrid/core</c>'s <c>parseQuery</c> exactly,
+    /// write: parsing mirrors <c>@tablex/core</c>'s <c>parseQuery</c> exactly,
     /// including how it degrades. <c>?page=0</c> becomes page 1,
     /// <c>?pageSize=99999</c> becomes 10, <c>?sort=:desc</c> is dropped. A
     /// hand-edited URL produces a usable grid rather than a 400 in the middle of
@@ -41,7 +41,7 @@ public sealed class HomeController : Controller
     /// in that order — matching decides which rows count, so it runs before the
     /// count the pager is drawn from — and returns
     /// <c>{ items, page, pageSize, total, totalPages }</c>, the shape every
-    /// NexGrid adapter expects.
+    /// TableX adapter expects.
     /// </para>
     /// <para>
     /// The <c>options</c> lambda is the SECURITY BOUNDARY, not a convenience.
@@ -61,7 +61,7 @@ public sealed class HomeController : Controller
     /// </remarks>
     [HttpGet("/api/students")]
     [Produces("application/json")]
-    public PagedResponse<Student> Students(NexGridQuery query) =>
+    public PagedResponse<Student> Students(TableXQuery query) =>
         _store.Query.ToPagedResponse(query, options => options
             .Sortable(
                 s => s.Name,

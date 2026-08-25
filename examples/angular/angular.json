@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "nexgrid-example-angular": {
+    "tablex-example-angular": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -13,14 +13,14 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/nexgrid-example-angular",
+            "outputPath": "dist/tablex-example-angular",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": [],
             "styles": [
-              "node_modules/@nexgrid/angular/styles.css",
+              "node_modules/@tablex/angular/styles.css",
               "src/styles.css"
             ],
             "scripts": [],
@@ -54,10 +54,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "nexgrid-example-angular:build:production"
+              "buildTarget": "tablex-example-angular:build:production"
             },
             "development": {
-              "buildTarget": "nexgrid-example-angular:build:development"
+              "buildTarget": "tablex-example-angular:build:development"
             }
           },
           "defaultConfiguration": "development"

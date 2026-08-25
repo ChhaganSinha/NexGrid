@@ -1,7 +1,7 @@
 {
-  "name": "@nexgrid/react",
+  "name": "@tablex/react",
   "version": "0.1.0",
-  "description": "NexGrid for React and Next.js — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
+  "description": "TableX for React and Next.js — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
@@ -16,6 +16,7 @@
   "keywords": [
     "react",
     "nextjs",
+    "tablex",
     "datagrid",
     "data-grid",
     "table",
@@ -49,7 +50,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@nexgrid/core": "0.1.0"
+    "@tablex/core": "0.1.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

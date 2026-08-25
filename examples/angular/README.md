@@ -1,6 +1,6 @@
-# NexGrid — Angular example
+# TableX — Angular example
 
-A standalone Angular 19 app (no NgModule) rendering `<nex-grid>` over 200
+A standalone Angular 19 app (no NgModule) rendering `<table-x>` over 200
 students from an in-memory service that honours the real `QueryState` contract:
 global search, sorting, a column filter, and paging — with simulated latency and
 a button that fails the next request so you can see the error card.
@@ -29,13 +29,13 @@ npm start              # http://localhost:4200
 "dependencies": {
   // ng-packagr's OUTPUT is the publishable package, so the link points at
   // dist/, not at packages/angular itself.
-  "@nexgrid/angular": "file:../../packages/angular/dist",
-  "@nexgrid/core": "file:../../packages/core"
+  "@tablex/angular": "file:../../packages/angular/dist",
+  "@tablex/core": "file:../../packages/core"
 },
-// @nexgrid/angular depends on "@nexgrid/core": "0.1.0"; this points that
+// @tablex/angular depends on "@tablex/core": "0.1.0"; this points that
 // transitive dependency at the local folder too.
 "overrides": {
-  "@nexgrid/core": "file:../../packages/core"
+  "@tablex/core": "file:../../packages/core"
 }
 ```
 
@@ -45,7 +45,7 @@ real path and can end up loading a second copy of `@angular/core` (`NG0203`).
 In your own app you install from a registry and none of this applies:
 
 ```bash
-npm install @nexgrid/angular
+npm install @tablex/angular
 ```
 
 ## Registering the stylesheet
@@ -57,14 +57,14 @@ your own styles:
 ```jsonc
 // angular.json → projects → … → architect → build → options
 "styles": [
-  "node_modules/@nexgrid/angular/styles.css",
+  "node_modules/@tablex/angular/styles.css",
   "src/styles.css"
 ]
 ```
 
 It must be **global**. Putting it in a component's `styles` does nothing —
 Angular's emulated encapsulation rewrites the selectors and they never match the
-grid's markup. (`@import "@nexgrid/core/styles.css";` from a global CSS file
+grid's markup. (`@import "@tablex/core/styles.css";` from a global CSS file
 works too; it is the same sheet.)
 
 ## What is where
@@ -72,7 +72,7 @@ works too; it is the same sheet.)
 | File | What it shows |
 | --- | --- |
 | `src/app/students.service.ts` | The server half of the contract: 200 deterministic rows and a `page(query)` returning `Observable<PagedResponse<Student>>` after applying search → filter → sort → count → page. Sorting and filtering are **allowlisted**. |
-| `src/app/app.component.ts` | The integration: signals for `data`/`total`/`query`, a `switchMap` request stream, custom `*nexGridCell` templates, a `nexGridToolbar` template, and a status filter built with `withFilter`. |
+| `src/app/app.component.ts` | The integration: signals for `data`/`total`/`query`, a `switchMap` request stream, custom `*tableXCell` templates, a `tableXToolbar` template, and a status filter built with `withFilter`. |
 | `angular.json` | Where the grid stylesheet is registered. |
 | `src/styles.css` | Page chrome and the classes the cell templates use. |
 
@@ -80,11 +80,11 @@ works too; it is the same sheet.)
 
 A column's `cell` function may only return a **string** in Angular — the
 framework cannot render an arbitrary value returned from a function. Anything
-richer is a template declared as a content child of `<nex-grid>` and keyed by
+richer is a template declared as a content child of `<table-x>` and keyed by
 column id:
 
 ```html
-<ng-container *nexGridCell="'status'; of: rows(); let row">
+<ng-container *tableXCell="'status'; of: rows(); let row">
   <span class="badge badge--{{ row.status.toLowerCase() }}">{{ row.status }}</span>
 </ng-container>
 ```
@@ -95,14 +95,14 @@ column id:
   `let column = column`.
 - The same template renders the table cell **and** the mobile card row.
 - The equivalent plain-attribute form is
-  `<ng-template nexGridCell="status" let-row>`. Do **not** combine the two —
-  `<ng-template *nexGridCell="…">` asks Angular for a template that contains a
+  `<ng-template tableXCell="status" let-row>`. Do **not** combine the two —
+  `<ng-template *tableXCell="…">` asks Angular for a template that contains a
   template, and the cell comes out empty.
 
 ## Everything goes through `queryChange`
 
 ```html
-<nex-grid
+<table-x
   [columns]="columns"
   [data]="rows()"      <!-- the CURRENT page only -->
   [total]="total()"    <!-- the full filtered count — this draws the pager -->
@@ -119,7 +119,7 @@ the outer stream survives a failure and the retry button still works.
 
 Column filters are the host's job: the grid renders no filter UI, it only
 carries `filter[status]=…` inside the query. Build that with `withFilter` from
-`@nexgrid/core` rather than spreading the object by hand — the reducers are what
+`@tablex/core` rather than spreading the object by hand — the reducers are what
 guarantee a filter change resets to page 1 and that the sort cycle stays
 `asc → desc → cleared` on every platform.
 
@@ -129,7 +129,7 @@ guarantee a filter change resets to page 1 and that the sort cycle stays
 
 ```ts
 import { HttpClient } from "@angular/common/http";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
 
 private readonly http = inject(HttpClient);
 
@@ -142,7 +142,7 @@ page(query: QueryState) {
 
 `buildQueryUrl` writes
 `?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active` — exactly what
-`NexGrid.AspNetCore` binds and what `examples/nextjs`'s route handler parses.
+`TableX.AspNetCore` binds and what `examples/nextjs`'s route handler parses.
 
 Once you have a real endpoint, add `fetchEndpoint="/api/students"` to the grid
 and the export menu will page in the whole filtered dataset instead of only the

@@ -1,7 +1,7 @@
 {
-  "name": "@nexgrid/angular",
+  "name": "@tablex/angular",
   "version": "0.1.0",
-  "description": "NexGrid for Angular — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
+  "description": "TableX for Angular — a professional, server-driven data grid with search, sorting, selection, density, exports, and responsive card layout.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
@@ -15,6 +15,7 @@
   },
   "keywords": [
     "angular",
+    "tablex",
     "datagrid",
     "data-grid",
     "table",
@@ -29,7 +30,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@nexgrid/core": "0.1.0",
+    "@tablex/core": "0.1.0",
     "tslib": "^2.6.0"
   },
   "peerDependencies": {

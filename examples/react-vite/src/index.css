@@ -1,5 +1,5 @@
 /* Page chrome and the handful of classes the custom cell renderers use.
-   Nothing here styles the grid itself — that is nexgrid.css, imported in
+   Nothing here styles the grid itself — that is tablex.css, imported in
    main.tsx. The grid is re-skinned by overriding its CSS custom properties,
    never by fighting its classes. */
 

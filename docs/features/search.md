@@ -64,19 +64,19 @@ Nothing is searchable unless it is registered — see
 
 ```tsx
 // React
-<NexGrid enableSearch={false} {...props} />
-<NexGrid searchPlaceholder="Find a student by name or email…" {...props} />
+<TableX enableSearch={false} {...props} />
+<TableX searchPlaceholder="Find a student by name or email…" {...props} />
 ```
 
 ```html
 <!-- Angular -->
-<nex-grid [enableSearch]="false" …/>
-<nex-grid searchPlaceholder="Find a student by name or email…" …/>
+<table-x [enableSearch]="false" …/>
+<table-x searchPlaceholder="Find a student by name or email…" …/>
 ```
 
 ```js
 // Vanilla
-createNexGrid(container, {
+createTableX(container, {
   caption: "Students",
   endpoint: "/api/students",
   columns,
@@ -86,9 +86,9 @@ createNexGrid(container, {
 
 ```cshtml
 <!-- ASP.NET Core -->
-<nex-grid caption="Students" endpoint="/api/students" enable-search="false">…</nex-grid>
-<nex-grid caption="Students" endpoint="/api/students"
-          search-placeholder="Find a student…">…</nex-grid>
+<table-x caption="Students" endpoint="/api/students" enable-search="false">…</table-x>
+<table-x caption="Students" endpoint="/api/students"
+          search-placeholder="Find a student…">…</table-x>
 ```
 
 `searchPlaceholder` overrides `locale.searchPlaceholder` for one grid. To change
@@ -105,15 +105,15 @@ drive the search: a URL, a saved view, a dashboard drill-through.
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  NexGrid,
+  TableX,
   buildQueryUrl,
   defaultQuery,
   withSearch,
-  type NexGridReactColumn,
+  type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+} from "@tablex/react";
+import "@tablex/react/styles.css";
 
 interface Student {
   id: number;
@@ -122,7 +122,7 @@ interface Student {
   status: string;
 }
 
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name" },
   { accessorKey: "email", header: "Email" },
   { accessorKey: "status", header: "Status", meta: { align: "center" } },
@@ -157,7 +157,7 @@ export function StudentsGrid({ initialSearch }: { initialSearch?: string }) {
       <button type="button" onClick={() => setQuery((q) => withSearch(q, ""))}>
         Clear
       </button>
-      <NexGrid
+      <TableX
         caption="Students"
         columns={columns}
         data={page?.items ?? []}
@@ -183,7 +183,7 @@ the reducer is what resets `page` to 1 and what turns `""` into `undefined`.
 the query:
 
 ```ts
-import { withFilter, type QueryState } from "@nexgrid/core";
+import { withFilter, type QueryState } from "@tablex/core";
 
 let query: QueryState = defaultQuery();
 query = withFilter(query, "status", "Active");    // filter[status]=Active

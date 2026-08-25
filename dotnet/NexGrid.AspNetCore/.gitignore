@@ -1,4 +1,0 @@
-# Copied in from packages/vanilla/dist by the CopyNexGridBrowserAssets target.
-# They are build outputs of the JS toolchain, not sources of this project.
-wwwroot/nexgrid.global.js
-wwwroot/nexgrid.css

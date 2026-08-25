@@ -8,12 +8,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import "@nexgrid/react/styles.css";
+import "@tablex/react/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NexGrid — Next.js App Router example",
-  description: "A server page, a client grid, and a route handler that speaks NexGrid's wire format.",
+  title: "TableX — Next.js App Router example",
+  description: "A server page, a client grid, and a route handler that speaks TableX's wire format.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

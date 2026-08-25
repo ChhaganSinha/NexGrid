@@ -1,4 +1,4 @@
-// @nexgrid/core — the framework-agnostic engine behind every NexGrid adapter.
+// @tablex/core — the framework-agnostic engine behind every TableX adapter.
 
 // Server contract
 export {
@@ -33,6 +33,9 @@ export {
   visibleColumns,
 } from "./column.js";
 export type {
+  TableXColumn,
+  TableXColumnMeta,
+  TableXCellContext,
   NexGridColumn,
   NexGridColumnMeta,
   NexGridCellContext,
@@ -54,7 +57,6 @@ export {
 export { queryClientData } from "./client-query.js";
 export type { ClientQueryOptions } from "./client-query.js";
 
-
 // Pagination presentation
 export { getPageNumbers, getRecordRange, serialNumber } from "./pagination.js";
 export type { PageItem, RecordRange } from "./pagination.js";
@@ -63,7 +65,6 @@ export type { PageItem, RecordRange } from "./pagination.js";
 export { toSearchParams, serializeQuery, parseQuery, buildQueryUrl } from "./serialize.js";
 export { toODataParams, buildODataUrl, fromODataResponse } from "./odata.js";
 export type { ODataQueryOptions, ODataResponse } from "./odata.js";
-
 
 // Full-dataset collection
 export { fetchAllPages, MAX_PAGE_SIZE, DEFAULT_ROW_CAP } from "./fetch-all-pages.js";
@@ -88,4 +89,4 @@ export {
 
 // Locale
 export { DEFAULT_LOCALE, resolveLocale, formatMessage } from "./i18n.js";
-export type { NexGridLocale } from "./i18n.js";
+export type { TableXLocale, NexGridLocale } from "./i18n.js";

@@ -1,4 +1,4 @@
-// The NexGrid icon set, built as real SVG nodes.
+// The TableX icon set, built as real SVG nodes.
 //
 // Every adapter draws the SAME twelve icons (adapter spec §7) so a grid looks
 // identical whichever framework rendered it. They are inlined rather than
@@ -18,7 +18,7 @@ type IconPart = readonly [keyof SVGElementTagNameMap, Readonly<Record<string, st
 
 /**
  * Shared presentation attributes. Sizing is intentionally absent — it comes
- * from the CSS classes (`.nxg-icon`, `.nxg-sort-icon`, ...) so a host can
+ * from the CSS classes (`.tbx-icon`, `.tbx-sort-icon`, ...) so a host can
  * re-scale icons through the stylesheet alone.
  */
 const ICON_ATTRS: Readonly<Record<string, string>> = {
@@ -38,7 +38,7 @@ function icon(parts: readonly IconPart[], className?: string): SVGSVGElement {
 }
 
 /** Magnifier for the search field. */
-export function searchIcon(className = "nxg-search-icon"): SVGSVGElement {
+export function searchIcon(className = "tbx-search-icon"): SVGSVGElement {
   return icon(
     [
       ["circle", { cx: "11", cy: "11", r: "8" }],
@@ -49,7 +49,7 @@ export function searchIcon(className = "nxg-search-icon"): SVGSVGElement {
 }
 
 /** Cross used by the "clear search" button. */
-export function xIcon(className = "nxg-icon"): SVGSVGElement {
+export function xIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "M18 6 6 18" }],
@@ -60,7 +60,7 @@ export function xIcon(className = "nxg-icon"): SVGSVGElement {
 }
 
 /** Horizontal sliders — the Columns menu trigger. */
-export function slidersIcon(className = "nxg-icon"): SVGSVGElement {
+export function slidersIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
     [
       ["line", { x1: "21", x2: "14", y1: "4", y2: "4" }],
@@ -78,7 +78,7 @@ export function slidersIcon(className = "nxg-icon"): SVGSVGElement {
 }
 
 /** Funnel — the Density menu trigger. */
-export function filterIcon(className = "nxg-icon"): SVGSVGElement {
+export function filterIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
     [["polygon", { points: "22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" }]],
     className,
@@ -86,7 +86,7 @@ export function filterIcon(className = "nxg-icon"): SVGSVGElement {
 }
 
 /** Download tray — the Export menu trigger. */
-export function downloadIcon(className = "nxg-icon"): SVGSVGElement {
+export function downloadIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }],
@@ -98,7 +98,7 @@ export function downloadIcon(className = "nxg-icon"): SVGSVGElement {
 }
 
 /** Spreadsheet document — the Excel export option. */
-export function fileSpreadsheetIcon(className = "nxg-icon--excel"): SVGSVGElement {
+export function fileSpreadsheetIcon(className = "tbx-icon--excel"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
@@ -113,7 +113,7 @@ export function fileSpreadsheetIcon(className = "nxg-icon--excel"): SVGSVGElemen
 }
 
 /** Text document — the CSV export option. */
-export function fileTextIcon(className = "nxg-icon--csv"): SVGSVGElement {
+export function fileTextIcon(className = "tbx-icon--csv"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
@@ -127,17 +127,17 @@ export function fileTextIcon(className = "nxg-icon--csv"): SVGSVGElement {
 }
 
 /** Left chevron — previous page. */
-export function chevronLeftIcon(className = "nxg-icon"): SVGSVGElement {
+export function chevronLeftIcon(className = "tbx-icon"): SVGSVGElement {
   return icon([["path", { d: "m15 18-6-6 6-6" }]], className);
 }
 
 /** Right chevron — next page. */
-export function chevronRightIcon(className = "nxg-icon"): SVGSVGElement {
+export function chevronRightIcon(className = "tbx-icon"): SVGSVGElement {
   return icon([["path", { d: "m9 18 6-6-6-6" }]], className);
 }
 
 /** Up arrow — ascending sort. */
-export function arrowUpIcon(className = "nxg-sort-icon"): SVGSVGElement {
+export function arrowUpIcon(className = "tbx-sort-icon"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "m5 12 7-7 7 7" }],
@@ -148,7 +148,7 @@ export function arrowUpIcon(className = "nxg-sort-icon"): SVGSVGElement {
 }
 
 /** Down arrow — descending sort. */
-export function arrowDownIcon(className = "nxg-sort-icon"): SVGSVGElement {
+export function arrowDownIcon(className = "tbx-sort-icon"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "M12 5v14" }],
@@ -159,7 +159,7 @@ export function arrowDownIcon(className = "nxg-sort-icon"): SVGSVGElement {
 }
 
 /** Opposed arrows — sortable but not currently sorted. */
-export function arrowUpDownIcon(className = "nxg-sort-icon nxg-sort-icon--idle"): SVGSVGElement {
+export function arrowUpDownIcon(className = "tbx-sort-icon tbx-sort-icon--idle"): SVGSVGElement {
   return icon(
     [
       ["path", { d: "m21 16-4 4-4-4" }],
@@ -172,6 +172,6 @@ export function arrowUpDownIcon(className = "nxg-sort-icon nxg-sort-icon--idle")
 }
 
 /** Tick — the checked marker in menu checkbox items. */
-export function checkIcon(className = "nxg-check"): SVGSVGElement {
+export function checkIcon(className = "tbx-check"): SVGSVGElement {
   return icon([["path", { d: "M20 6 9 17l-5-5" }]], className);
 }

@@ -1,4 +1,4 @@
-# `@nexgrid/react` API reference
+# `@tablex/react` API reference
 
 > The canonical prop table, with prose for every prop, lives in the package
 > README: **[`packages/react/README.md`](../../packages/react/README.md)**.
@@ -6,18 +6,18 @@
 > only matter once you are wiring it up.
 
 ```bash
-npm install @nexgrid/react
+npm install @tablex/react
 ```
 
 ```ts
-import { NexGrid } from "@nexgrid/react";
-import "@nexgrid/react/styles.css";
+import { TableX } from "@tablex/react";
+import "@tablex/react/styles.css";
 ```
 
 - [Exports](#exports)
-- [`NexGridProps<TData>`](#nexgridpropstdata)
+- [`TableXProps<TData>`](#tablexpropstdata)
 - [Types](#types)
-- [Re-exported from `@nexgrid/core`](#re-exported-from-nexgridcore)
+- [Re-exported from `@tablex/core`](#re-exported-from-tablexcore)
 - [Next.js notes](#nextjs-notes)
 - [Packaging](#packaging)
 
@@ -25,29 +25,29 @@ import "@nexgrid/react/styles.css";
 
 | Export | Kind | Notes |
 | --- | --- | --- |
-| `NexGrid` | component | `function NexGrid<TData>(props: NexGridProps<TData>): JSX.Element` |
-| `NexGridProps<TData>` | type | The full prop surface. |
-| `NexGridReactColumn<TData>` | type | `NexGridColumn<TData, ReactNode>`. |
-| `NexGridNotice` | type | `{ type: NexGridNoticeType; message: string }`. |
-| `NexGridNoticeType` | type | `"info" \| "success" \| "error"`. |
-| `NexGridTheme` | type | `"light" \| "dark" \| "auto"`. |
+| `TableX` | component | `function TableX<TData>(props: TableXProps<TData>): JSX.Element` |
+| `TableXProps<TData>` | type | The full prop surface. |
+| `TableXReactColumn<TData>` | type | `TableXColumn<TData, ReactNode>`. |
+| `TableXNotice` | type | `{ type: TableXNoticeType; message: string }`. |
+| `TableXNoticeType` | type | `"info" \| "success" \| "error"`. |
+| `TableXTheme` | type | `"light" \| "dark" \| "auto"`. |
 
 Plus the core types and helpers listed under
-[Re-exported from `@nexgrid/core`](#re-exported-from-nexgridcore).
+[Re-exported from `@tablex/core`](#re-exported-from-tablexcore).
 
-`NexGridProps` lives in its own module inside the package, so importing the prop
+`TableXProps` lives in its own module inside the package, so importing the prop
 type does **not** pull the component (and its `"use client"` boundary) into a
 server file.
 
-## `NexGridProps<TData>`
+## `TableXProps<TData>`
 
 Full descriptions and defaults:
 [README › Props](../../packages/react/README.md#props).
 
 ```ts
-export interface NexGridProps<TData> {
+export interface TableXProps<TData> {
   // Required — the controlled contract
-  columns: NexGridReactColumn<TData>[];
+  columns: TableXReactColumn<TData>[];
   data: TData[];                       // the CURRENT page only
   total: number;                       // full filtered count
   query: QueryState;
@@ -81,9 +81,9 @@ export interface NexGridProps<TData> {
   badgeRules?: readonly ExcelBadgeRule[];
 
   // Messaging and theme
-  locale?: Partial<NexGridLocale>;
-  onNotify?: (notice: NexGridNotice) => void;   // default: no-op
-  theme?: NexGridTheme;                          // default "light"
+  locale?: Partial<TableXLocale>;
+  onNotify?: (notice: TableXNotice) => void;   // default: no-op
+  theme?: TableXTheme;                          // default "light"
 }
 ```
 
@@ -93,34 +93,34 @@ Details the table does not spell out:
 | --- | --- |
 | `data` / `total` | `data` is one page; `total` is the server's full filtered count. Passing `data.length` as `total` collapses the pager and breaks whole-dataset export. |
 | `density` | Read on first render; the Density menu owns it afterwards. Later prop changes are ignored. |
-| `error` | Replaces the entire grid with `.nxg-state-card` — toolbar and footer included. `isLoading` only replaces the rows. |
+| `error` | Replaces the entire grid with `.tbx-state-card` — toolbar and footer included. `isLoading` only replaces the rows. |
 | `onRetry` | Its presence is what renders the retry button. |
 | `getRowId` | Used for the selection set **and** as the React key. Rows sharing an id are one identity. |
 | `onExportAll` | When set, no fetch-all, no file writing, no notifications. Both menu items call it; the format is not passed. |
 | `fetchEndpoint` | React has no endpoint mode — this endpoint is used **only** by the export's fetch-all pass, at `pageSize=100` up to 2,000 rows. Requests go out as `fetch(url, { cache: "no-store" })`; there is no `fetchOptions` prop. |
 | `badgeRules` | **Replaces** `DEFAULT_BADGE_RULES`. Spread them in to extend. |
-| `theme` | Adds `.nxg-dark` / `.nxg-auto` to the root. The stylesheet also matches those classes on any ancestor. |
+| `theme` | Adds `.tbx-dark` / `.tbx-auto` to the root. The stylesheet also matches those classes on any ancestor. |
 
 ## Types
 
 ```ts
-export type NexGridReactColumn<TData> = NexGridColumn<TData, ReactNode>;
+export type TableXReactColumn<TData> = TableXColumn<TData, ReactNode>;
 
-export type NexGridNoticeType = "info" | "success" | "error";
+export type TableXNoticeType = "info" | "success" | "error";
 
-export interface NexGridNotice {
-  type: NexGridNoticeType;
+export interface TableXNotice {
+  type: TableXNoticeType;
   message: string;
 }
 
-export type NexGridTheme = "light" | "dark" | "auto";
+export type TableXTheme = "light" | "dark" | "auto";
 ```
 
-A cell renderer receives core's `NexGridCellContext<TData>` and returns any
+A cell renderer receives core's `TableXCellContext<TData>` and returns any
 `ReactNode`:
 
 ```tsx
-import type { NexGridReactColumn } from "@nexgrid/react";
+import type { TableXReactColumn } from "@tablex/react";
 
 interface Student {
   id: number;
@@ -128,7 +128,7 @@ interface Student {
   status: "Active" | "Pending" | "Disabled";
 }
 
-export const columns: NexGridReactColumn<Student>[] = [
+export const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
   {
     accessorKey: "status",
@@ -146,7 +146,7 @@ export const columns: NexGridReactColumn<Student>[] = [
 The same renderer runs for the table row and for the mobile card, so it must be
 side-effect free. See [Columns](../columns.md#custom-cells-per-framework).
 
-## Re-exported from `@nexgrid/core`
+## Re-exported from `@tablex/core`
 
 So most apps never need a second import.
 
@@ -158,37 +158,37 @@ import {
   withToggledSort, withSort, withSearch, withPage, withPageSize, withFilter,
   totalPagesFor, isPageSize, PAGE_SIZES, DEFAULT_PAGE_SIZE,
   DEFAULT_LOCALE, resolveLocale,
-} from "@nexgrid/react";
+} from "@tablex/react";
 ```
 
 **Types**
 
 ```ts
 import type {
-  NexGridColumn, NexGridColumnMeta, NexGridCellContext, NexGridLocale,
+  TableXColumn, TableXColumnMeta, TableXCellContext, TableXLocale,
   QueryState, SortSpec, SortDir, PageSize, PagedResponse, Density, ExcelBadgeRule,
-} from "@nexgrid/react";
+} from "@tablex/react";
 ```
 
 Anything else — `fetchAllPages`, `toExportColumns`, `downloadCsv`,
 `downloadExcel`, `getCellText`, `getPageNumbers`, `DENSITY_ROW_HEIGHT`,
-`DEFAULT_BADGE_RULES` — comes from `@nexgrid/core` directly. It is already
+`DEFAULT_BADGE_RULES` — comes from `@tablex/core` directly. It is already
 installed as a dependency of this package.
 
 Always mutate a `QueryState` through the reducers rather than spreading it by
 hand: they are what guarantee that a search or page-size change resets to page
 one and that the sort cycle stays `asc → desc → cleared`. See
-[`@nexgrid/core` API](core.md#query-reducers).
+[`@tablex/core` API](core.md#query-reducers).
 
 ## Next.js notes
 
-The published bundle carries a `"use client"` banner, so `<NexGrid />` imports
+The published bundle carries a `"use client"` banner, so `<TableX />` imports
 directly into a client component with no wrapper, and a Server Component can
 render that component.
 
 - `columns` contains `cell` functions, and functions do not cross the
   server/client boundary. Define the column array in a `"use client"` file.
-- Import `@nexgrid/react/styles.css` from the root layout, or from the client
+- Import `@tablex/react/styles.css` from the root layout, or from the client
   component if your setup supports component-level CSS imports.
 - The list endpoint must be a route handler (a `GET`), not a Server Action, and
   should opt out of static caching — see
@@ -201,7 +201,7 @@ Worked example: [Getting started › Next.js](../getting-started.md#nextjs-app-r
 | | |
 | --- | --- |
 | Entry points | `.` (ESM + CJS + types), `./styles.css`, `./package.json` |
-| Runtime dependencies | `@nexgrid/core` only |
+| Runtime dependencies | `@tablex/core` only |
 | Peer dependency | `react >= 18` |
 | Node | `>= 18` |
 | Side effects | none declared |
@@ -210,5 +210,5 @@ Worked example: [Getting started › Next.js](../getting-started.md#nextjs-app-r
 ## Related
 
 - [Package README](../../packages/react/README.md) — the canonical prop table
-- [`@nexgrid/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
+- [`@tablex/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
 - [Features](../README.md#features)

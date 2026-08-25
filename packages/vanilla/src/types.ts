@@ -1,19 +1,21 @@
-// The public surface of @nexgrid/vanilla.
+// The public surface of @tablex/vanilla.
 //
 // These options mirror the React adapter's props one-for-one (adapter spec
 // §4.3) with callbacks in place of props, so a team moving a grid between the
 // two adapters is renaming things, not rethinking them. The one addition is
 // `endpoint`: with no framework around it, a plain-DOM grid that cannot fetch
 // its own data would need a hand-written data layer before it renders a single
-// row, which is exactly the boilerplate `NexGrid.AspNetCore` exists to remove.
+// row, which is exactly the boilerplate `TableX.AspNetCore` exists to remove.
 
 import type {
   Density,
   ExcelBadgeRule,
+  TableXColumn,
+  TableXLocale,
+  QueryState,
   NexGridColumn,
   NexGridLocale,
-  QueryState,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 /**
  * What a vanilla `header` / `cell` renderer may return.
@@ -22,27 +24,32 @@ import type {
  * markup. Returning a `Node` is the ONLY way to put elements into a cell, and
  * it is deliberate: the consumer built that node, so they own its contents.
  */
-export type NexGridNode = string | Node;
+export type TableXNode = string | Node;
+export type NexGridNode = TableXNode;
 
 /** A column definition bound to the vanilla render type. */
-export type NexGridVanillaColumn<TData> = NexGridColumn<TData, NexGridNode>;
+export type TableXVanillaColumn<TData> = TableXColumn<TData, TableXNode>;
+export type NexGridVanillaColumn<TData> = TableXVanillaColumn<TData>;
 
 /** Severity of a grid notification. */
-export type NexGridNoticeType = "info" | "success" | "error";
+export type TableXNoticeType = "info" | "success" | "error";
+export type NexGridNoticeType = TableXNoticeType;
 
 /** A message the grid wants surfaced. The grid never renders toasts itself. */
-export interface NexGridNotice {
-  type: NexGridNoticeType;
+export interface TableXNotice {
+  type: TableXNoticeType;
   message: string;
 }
+export type NexGridNotice = TableXNotice;
 
 /** Colour scheme applied to the grid root. */
-export type NexGridTheme = "light" | "dark" | "auto";
+export type TableXTheme = "light" | "dark" | "auto";
+export type NexGridTheme = TableXTheme;
 
-/** Configuration for {@link createNexGrid}. */
-export interface NexGridOptions<TData> {
+/** Configuration for {@link createTableX}. */
+export interface TableXOptions<TData> {
   /** Column definitions, in display order. */
-  columns: NexGridVanillaColumn<TData>[];
+  columns: TableXVanillaColumn<TData>[];
   /** Accessible name for the table; also the default export file prefix. */
   caption: string;
 
@@ -89,10 +96,10 @@ export interface NexGridOptions<TData> {
   error?: boolean;
   /** Retry handler; rendering a retry button on the error card. */
   onRetry?: () => void;
-  /** Extra class names appended to `.nxg-root`. */
+  /** Extra class names appended to `.tbx-root`. */
   className?: string;
   /** Colour scheme. Default `"light"`. */
-  theme?: NexGridTheme;
+  theme?: TableXTheme;
 
   // ---- Features ------------------------------------------------------------
 
@@ -131,7 +138,7 @@ export interface NexGridOptions<TData> {
   onExportAll?: () => void | Promise<void>;
   /**
    * Endpoint used to collect the FULL filtered dataset for export when the
-   * current page is only part of it. Defaults to {@link NexGridOptions.endpoint}.
+   * current page is only part of it. Defaults to {@link TableXOptions.endpoint}.
    */
   fetchEndpoint?: string;
   /** Value-based Excel badge styling. Defaults to `DEFAULT_BADGE_RULES`. */
@@ -140,13 +147,14 @@ export interface NexGridOptions<TData> {
   // ---- Localisation & messaging -------------------------------------------
 
   /** Overrides for any user-facing string. */
-  locale?: Partial<NexGridLocale>;
+  locale?: Partial<TableXLocale>;
   /** Receives notices (export progress, failures). Default: no-op. */
-  onNotify?: (notice: NexGridNotice) => void;
+  onNotify?: (notice: TableXNotice) => void;
 }
+export type NexGridOptions<TData> = TableXOptions<TData>;
 
-/** The state {@link NexGridHandle.update} can patch. */
-export interface NexGridUpdate<TData> {
+/** The state {@link TableXHandle.update} can patch. */
+export interface TableXUpdate<TData> {
   /** The current page of rows. */
   data: TData[];
   /** Total filtered row count. */
@@ -158,11 +166,12 @@ export interface NexGridUpdate<TData> {
   /** Error flag; replaces the grid with the error card. */
   error: boolean;
 }
+export type NexGridUpdate<TData> = TableXUpdate<TData>;
 
-/** The controller returned by {@link createNexGrid}. */
-export interface NexGridHandle<TData> {
+/** The controller returned by {@link createTableX}. */
+export interface TableXHandle<TData> {
   /** Patch grid state. Omitted keys are left untouched. */
-  update(patch: Partial<NexGridUpdate<TData>>): void;
+  update(patch: Partial<TableXUpdate<TData>>): void;
   /** Endpoint mode: refetch the current query. Otherwise: re-render. */
   refresh(): void;
   /** The query currently displayed. */
@@ -172,3 +181,4 @@ export interface NexGridHandle<TData> {
   /** Tear down: detach the grid and remove every listener it registered. */
   destroy(): void;
 }
+export type NexGridHandle<TData> = TableXHandle<TData>;

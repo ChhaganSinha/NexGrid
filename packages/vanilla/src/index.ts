@@ -1,16 +1,24 @@
-// @nexgrid/vanilla — the zero-dependency DOM renderer for NexGrid.
+// @tablex/vanilla — the zero-dependency DOM renderer for TableX.
 //
 // This barrel is also the surface of the IIFE browser bundle (global
-// `NexGrid`), where a consumer has no module system and therefore no other way
-// to reach the engine. That is why a curated slice of `@nexgrid/core` is
+// `TableX`), where a consumer has no module system and therefore no other way
+// to reach the engine. That is why a curated slice of `@tablex/core` is
 // re-exported here rather than left to a second import: a `<script>`-tag or
 // ASP.NET page needs `defaultQuery()`, `parseQuery()` and `PAGE_SIZES` just to
 // wire the grid to its address bar, and asking it to load core separately would
 // defeat the point of a single-file bundle.
 
-export { createNexGrid } from "./grid.js";
+export { createTableX, createNexGrid } from "./grid.js";
 
 export type {
+  TableXHandle,
+  TableXNode,
+  TableXNotice,
+  TableXNoticeType,
+  TableXOptions,
+  TableXTheme,
+  TableXUpdate,
+  TableXVanillaColumn,
   NexGridHandle,
   NexGridNode,
   NexGridNotice,
@@ -82,12 +90,16 @@ export {
   withSort,
   withToggledSort,
   withToggledMultiSort,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 export type {
   ClientQueryOptions,
   Density,
   ExcelBadgeRule,
+  TableXCellContext,
+  TableXColumn,
+  TableXColumnMeta,
+  TableXLocale,
   NexGridCellContext,
   NexGridColumn,
   NexGridColumnMeta,
@@ -99,5 +111,4 @@ export type {
   RecordRange,
   SortDir,
   SortSpec,
-} from "@nexgrid/core";
-
+} from "@tablex/core";

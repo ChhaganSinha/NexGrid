@@ -1,7 +1,7 @@
-# @nexgrid/angular
+# @tablex/angular
 
 A professional, **server-driven** data grid for Angular 17+ — standalone, zero
-runtime dependencies beyond [`@nexgrid/core`](../core), and no NgModule.
+runtime dependencies beyond [`@tablex/core`](../core), and no NgModule.
 
 The grid never holds your dataset. It holds one page, turns every user action
 into a `QueryState`, and hands that back to you; you fetch and feed the next
@@ -25,7 +25,7 @@ page in. Search, sorting, paging and filtering happen where the data lives.
 ## Install
 
 ```bash
-npm install @nexgrid/angular
+npm install @tablex/angular
 ```
 
 `@angular/core`, `@angular/common` (>= 17) and `rxjs` (>= 7) are peer
@@ -44,7 +44,7 @@ build target in `angular.json`:
         "build": {
           "options": {
             "styles": [
-              "node_modules/@nexgrid/angular/styles.css",
+              "node_modules/@tablex/angular/styles.css",
               "src/styles.css"
             ]
           }
@@ -59,7 +59,7 @@ Prefer to import it from CSS instead? The identical sheet is published by the
 engine package with a proper export map:
 
 ```css
-@import "@nexgrid/core/styles.css";
+@import "@tablex/core/styles.css";
 ```
 
 Either way it must be **global**. Component styles are scoped by Angular's
@@ -72,13 +72,13 @@ emulated encapsulation and will not reach the grid's markup.
 ### 1. A service that fetches one page
 
 `buildQueryUrl` serializes a `QueryState` into the exact wire format the rest
-of NexGrid speaks (`?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active`),
-which is also what `NexGrid.AspNetCore` binds on the server.
+of TableX speaks (`?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active`),
+which is also what `TableX.AspNetCore` binds on the server.
 
 ```ts
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
 
 export interface Student {
   id: number;
@@ -106,24 +106,24 @@ where `total` is the **full filtered count** — that is what drives the pager.
 ```ts
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import {
-  NexGridCellDirective,
-  NexGridComponent,
-  NexGridToolbarDirective,
+  TableXCellDirective,
+  TableXComponent,
+  TableXToolbarDirective,
   defaultQuery,
-  type NexGridAngularColumn,
-  type NexGridNotice,
+  type TableXAngularColumn,
+  type TableXNotice,
   type QueryState,
-} from "@nexgrid/angular";
+} from "@tablex/angular";
 
 import { StudentsService, type Student } from "./students.service";
 
 @Component({
   selector: "app-students",
   standalone: true,
-  imports: [NexGridComponent, NexGridCellDirective, NexGridToolbarDirective],
+  imports: [TableXComponent, TableXCellDirective, TableXToolbarDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <nex-grid
+    <table-x
       caption="Students"
       fetchEndpoint="/api/students"
       enableSelection
@@ -144,15 +144,15 @@ import { StudentsService, type Student } from "./students.service";
       </ng-container>
 
       <ng-template nexGridToolbar>
-        <button type="button" class="nxg-btn" (click)="create()">Add student</button>
+        <button type="button" class="tbx-btn" (click)="create()">Add student</button>
       </ng-template>
-    </nex-grid>
+    </table-x>
   `,
 })
 export class StudentsComponent {
   private readonly service = inject(StudentsService);
 
-  readonly columns: NexGridAngularColumn<Student>[] = [
+  readonly columns: TableXAngularColumn<Student>[] = [
     { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
     { accessorKey: "email", header: "Email" },
     { accessorKey: "status", header: "Status", meta: { align: "center", width: 120 } },
@@ -195,7 +195,7 @@ export class StudentsComponent {
     /* open the create dialog */
   }
 
-  toast(notice: NexGridNotice): void {
+  toast(notice: TableXNotice): void {
     /* hand to your snackbar — the grid never renders one itself */
   }
 }
@@ -211,7 +211,7 @@ and (debounced) keystroke arrives as one `queryChange` with a ready-to-send
 
 | Input | Type | Default | Description |
 |---|---|---|---|
-| `columns` **(required)** | `NexGridAngularColumn<TData>[]` | — | Column definitions. See [Columns](#columns). |
+| `columns` **(required)** | `TableXAngularColumn<TData>[]` | — | Column definitions. See [Columns](#columns). |
 | `data` **(required)** | `TData[]` | `[]` | The **current page** of rows only. |
 | `total` **(required)** | `number` | `0` | Full filtered row count from the server. Drives the pager. |
 | `query` **(required)** | `QueryState` | `defaultQuery()` | The active query. The grid is fully controlled — it never mutates this. |
@@ -227,9 +227,9 @@ and (debounced) keystroke arrives as one `queryChange` with a ready-to-send
 | `exportFileName` | `string` | slug of `caption` | Export file name, without extension. |
 | `fetchEndpoint` | `string` | — | List endpoint used to collect the whole filtered dataset for an export. Without it, exports contain the current page. |
 | `badgeRules` | `readonly ExcelBadgeRule[]` | `DEFAULT_BADGE_RULES` | Value-based cell styling for the Excel export. |
-| `locale` | `Partial<NexGridLocale>` | — | Overrides merged over the default strings. |
+| `locale` | `Partial<TableXLocale>` | — | Overrides merged over the default strings. |
 | `getRowId` | `(row: TData) => string` | `r => String(r.id ?? r)` | Row identity. Drives selection and DOM reuse. |
-| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | `dark` / `auto` add `.nxg-dark` / `.nxg-auto` to the root. |
+| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | `dark` / `auto` add `.tbx-dark` / `.tbx-auto` to the root. |
 | `rowClickable` | `boolean` | `false` | Forces the row-click affordance on. Not normally needed — see `rowClick`. |
 
 Flag inputs coerce like HTML boolean attributes, so `enableSelection` and
@@ -254,7 +254,7 @@ Column definitions are structurally compatible with TanStack Table's
 `ColumnDef`, so an existing column set usually drops straight in.
 
 ```ts
-const columns: NexGridAngularColumn<Student>[] = [
+const columns: TableXAngularColumn<Student>[] = [
   {
     accessorKey: "name",         // or `id`
     header: "Name",              // string, or (ctx) => string
@@ -280,7 +280,7 @@ value returned from a function). Anything richer is a template.
 
 ## Custom cell templates
 
-Declare a `nexGridCell` template as a content child of `<nex-grid>`, keyed by
+Declare a `nexGridCell` template as a content child of `<table-x>`, keyed by
 column id. It is used for that column in **both** the table and the mobile card
 list, so the two can never drift apart.
 
@@ -288,7 +288,7 @@ Use it as a structural directive — on `<ng-container>` when you want no wrappe
 element:
 
 ```html
-<nex-grid caption="Students" [columns]="columns" [data]="rows()" …>
+<table-x caption="Students" [columns]="columns" [data]="rows()" …>
   <!-- `let row` is the row itself -->
   <ng-container *nexGridCell="'name'; let row">
     <a [routerLink]="['/students', row.id]">{{ row.name }}</a>
@@ -301,11 +301,11 @@ element:
 
   <!-- a column with no accessor, for row actions -->
   <ng-container *nexGridCell="'actions'; let row">
-    <button type="button" class="nxg-btn" (click)="edit(row); $event.stopPropagation()">
+    <button type="button" class="tbx-btn" (click)="edit(row); $event.stopPropagation()">
       Edit
     </button>
   </ng-container>
-</nex-grid>
+</table-x>
 ```
 
 The plain-attribute form on an `<ng-template>` is equivalent:
@@ -326,7 +326,7 @@ Template context:
 |---|---|---|---|---|
 | row | `let row` | `let-row` | `TData` | The row object (`$implicit`). |
 | value | `let value = value` | `let-value="value"` | `unknown` | The raw value the column reads for this row. |
-| column | `let col = column` | `let-col="column"` | `NexGridAngularColumn<TData>` | The column being rendered. |
+| column | `let col = column` | `let-col="column"` | `TableXAngularColumn<TData>` | The column being rendered. |
 | rowIndex | `let i = rowIndex` | `let-i="rowIndex"` | `number` | Index **within the current page**. |
 
 ### Strongly typed rows
@@ -354,11 +354,11 @@ Either a template — rendered at the end of the toolbar, after the export menu 
 or plain content projection:
 
 ```html
-<nex-grid …>
+<table-x …>
   <ng-template nexGridToolbar>
-    <button type="button" class="nxg-btn" (click)="create()">Add student</button>
+    <button type="button" class="tbx-btn" (click)="create()">Add student</button>
   </ng-template>
-</nex-grid>
+</table-x>
 ```
 
 ---
@@ -369,7 +369,7 @@ The export menu offers **Formatted Excel (.xls)** — a styled workbook with
 colored status badges — and **Raw CSV (.csv)**, which is RFC 4180 quoted and
 guards against spreadsheet formula injection.
 
-The flow, identical in every NexGrid adapter:
+The flow, identical in every TableX adapter:
 
 1. If anything is listening to `exportAll`, it is emitted and the grid stops —
    the host owns the export.
@@ -383,10 +383,10 @@ The flow, identical in every NexGrid adapter:
 
 ```html
 <!-- built-in export over the whole filtered dataset -->
-<nex-grid fetchEndpoint="/api/students" exportFileName="students" …/>
+<table-x fetchEndpoint="/api/students" exportFileName="students" …/>
 
 <!-- or take it over entirely -->
-<nex-grid (exportAll)="exportOnTheServer()" …/>
+<table-x (exportAll)="exportOnTheServer()" …/>
 ```
 
 Custom Excel badge colors:
@@ -405,7 +405,7 @@ readonly badgeRules: ExcelBadgeRule[] = [
 Every string is overridable; anything you leave out falls back to English.
 
 ```html
-<nex-grid
+<table-x
   [locale]="{
     searchPlaceholder: 'Suchen…',
     columnsButton: 'Spalten',
@@ -416,8 +416,8 @@ Every string is overridable; anything you leave out falls back to English.
 />
 ```
 
-Placeholders in braces are substituted by the grid. See `NexGridLocale` in
-`@nexgrid/core` for the full list.
+Placeholders in braces are substituted by the grid. See `TableXLocale` in
+`@tablex/core` for the full list.
 
 ---
 
@@ -427,33 +427,33 @@ The stylesheet is built entirely on CSS custom properties, so a host app
 re-skins the grid by overriding tokens — never by fighting class selectors.
 
 ```css
-.nxg-root {
-  --nxg-primary: #7c3aed;
-  --nxg-radius: 8px;
-  --nxg-border: #e4e4e7;
-  --nxg-font: "Inter", system-ui, sans-serif;
+.tbx-root {
+  --tbx-primary: #7c3aed;
+  --tbx-radius: 8px;
+  --tbx-border: #e4e4e7;
+  --tbx-font: "Inter", system-ui, sans-serif;
 }
 ```
 
 | Token | Purpose |
 |---|---|
-| `--nxg-font`, `--nxg-font-mono` | Type families |
-| `--nxg-bg`, `--nxg-card`, `--nxg-card-2` | Surfaces |
-| `--nxg-border` | All borders and dividers |
-| `--nxg-fg`, `--nxg-muted`, `--nxg-muted-fg` | Text and muted fills |
-| `--nxg-primary`, `--nxg-primary-fg` | Accent (sort icons, current page, selection) |
-| `--nxg-danger` | Destructive accents |
-| `--nxg-radius`, `--nxg-radius-sm`, `--nxg-shadow`, `--nxg-focus-ring` | Shape and depth |
+| `--tbx-font`, `--tbx-font-mono` | Type families |
+| `--tbx-bg`, `--tbx-card`, `--tbx-card-2` | Surfaces |
+| `--tbx-border` | All borders and dividers |
+| `--tbx-fg`, `--tbx-muted`, `--tbx-muted-fg` | Text and muted fills |
+| `--tbx-primary`, `--tbx-primary-fg` | Accent (sort icons, current page, selection) |
+| `--tbx-danger` | Destructive accents |
+| `--tbx-radius`, `--tbx-radius-sm`, `--tbx-shadow`, `--tbx-focus-ring` | Shape and depth |
 
 Dark mode is a token swap: `[theme]="'dark'"` pins it, `[theme]="'auto'"`
-follows `prefers-color-scheme`. You can also put `.nxg-dark` on any ancestor —
+follows `prefers-color-scheme`. You can also put `.tbx-dark` on any ancestor —
 useful when your app already has a theme switch.
 
-The **host element itself** carries `.nxg-root`, so a `class` on `<nex-grid>`
+The **host element itself** carries `.tbx-root`, so a `class` on `<table-x>`
 lands on the grid root:
 
 ```html
-<nex-grid class="my-grid" caption="Students" …/>
+<table-x class="my-grid" caption="Students" …/>
 ```
 
 ---
@@ -476,13 +476,13 @@ lands on the grid root:
 ## Server side
 
 The query format is stable and documented, and
-[`NexGrid.AspNetCore`](../../README.md) binds it with no glue code:
+[`TableX.AspNetCore`](../../README.md) binds it with no glue code:
 
 ```
 ?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 ```
 
-Use `parseQuery` / `serializeQuery` from `@nexgrid/core` (re-exported here) to
+Use `parseQuery` / `serializeQuery` from `@tablex/core` (re-exported here) to
 round-trip it through the URL and make grid state shareable.
 
 ## Author & Maintainer
@@ -495,5 +495,5 @@ round-trip it through the URL and make grid state shareable.
 
 ## License
 
-[MIT](https://github.com/ChhaganSinha/NexGrid/blob/main/LICENSE) © 2026 Chhagan Sinha
+[MIT](https://github.com/ChhaganSinha/TableX/blob/main/LICENSE) © 2026 Chhagan Sinha
 

@@ -11,7 +11,7 @@
 // ./columns.tsx) — defining columns here and passing them down fails at
 // runtime with "Functions cannot be passed directly to Client Components".
 
-import { defaultQuery } from "@nexgrid/core";
+import { defaultQuery } from "@tablex/core";
 
 import { queryStudents } from "@/lib/students";
 
@@ -27,7 +27,7 @@ export default async function Page() {
 
   return (
     <main className="page">
-      <h1>NexGrid — Next.js App Router</h1>
+      <h1>TableX — Next.js App Router</h1>
       <p>
         This page is a Server Component. It renders the first page of 200 students on the server
         and passes it to a Client Component, which takes over every interaction and fetches
@@ -39,7 +39,7 @@ export default async function Page() {
         is a server file: it may query the database, but it may not pass functions down.{" "}
         <code>app/students-grid.tsx</code> and <code>app/columns.tsx</code> start with{" "}
         <code>&quot;use client&quot;</code> because they hold state and render functions.{" "}
-        <code>&lt;NexGrid /&gt;</code> itself is published with a <code>&quot;use client&quot;</code>{" "}
+        <code>&lt;TableX /&gt;</code> itself is published with a <code>&quot;use client&quot;</code>{" "}
         banner, so importing it needs no wrapper — but the <em>columns you give it</em> do.
       </p>
 

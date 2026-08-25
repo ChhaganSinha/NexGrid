@@ -1,7 +1,7 @@
 {
-  "name": "@nexgrid/core",
+  "name": "@tablex/core",
   "version": "0.1.0",
-  "description": "Framework-agnostic engine for NexGrid: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
+  "description": "Framework-agnostic engine for TableX: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
@@ -14,6 +14,7 @@
     "url": "https://github.com/ChhaganSinha/NexGrid/issues"
   },
   "keywords": [
+    "tablex",
     "datagrid",
     "data-grid",
     "table",
@@ -37,7 +38,7 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./styles.css": "./styles/nexgrid.css",
+    "./styles.css": "./styles/tablex.css",
     "./package.json": "./package.json"
   },
   "files": [
@@ -49,8 +50,6 @@
     "build": "tsup",
     "test": "npm run build && node scripts/run-tests.mjs",
     "typecheck": "tsc --noEmit",
-
-
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {

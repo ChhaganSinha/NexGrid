@@ -13,7 +13,7 @@
 // is no diffing to get subtly wrong. What is NOT rebuilt is anything the user
 // can be typing into: the search input, the rows-per-page select and the
 // page-jump form are created once and live for the lifetime of the grid, and
-// controls that ARE rebuilt carry a `data-nxg-focus` key so focus survives the
+// controls that ARE rebuilt carry a `data-tbx-focus` key so focus survives the
 // swap. Without that, a keyboard user toggling "select all" would be dumped
 // back to the top of the document on every toggle.
 
@@ -52,10 +52,10 @@ import {
   withToggledMultiSort,
   copyToClipboard,
   type Density,
-  type NexGridLocale,
+  type TableXLocale,
   type PagedResponse,
   type QueryState,
-} from "@nexgrid/core";
+} from "@tablex/core";
 
 import { append, el, replaceChildren, type ElementChild } from "./dom.js";
 import {
@@ -74,12 +74,12 @@ import {
   xIcon,
 } from "./icons.js";
 import type {
-  NexGridHandle,
-  NexGridNode,
-  NexGridNoticeType,
-  NexGridOptions,
-  NexGridUpdate,
-  NexGridVanillaColumn,
+  TableXHandle,
+  TableXNode,
+  TableXNoticeType,
+  TableXOptions,
+  TableXUpdate,
+  TableXVanillaColumn,
 } from "./types.js";
 
 /** Debounce applied to the search field before a query is emitted. */
@@ -124,15 +124,15 @@ function queryEquals(a: QueryState, b: QueryState): boolean {
   return aKeys.every((key) => aFilter[key] === bFilter[key]);
 }
 
-class NexGridController<TData> implements NexGridHandle<TData> {
-  private readonly options: NexGridOptions<TData>;
-  private readonly locale: NexGridLocale;
+class NexGridController<TData> implements TableXHandle<TData> {
+  private readonly options: TableXOptions<TData>;
+  private readonly locale: TableXLocale;
   private readonly caption: string;
   private readonly rowId: (row: TData) => string;
   private readonly uid: string;
 
   // ---- State ---------------------------------------------------------------
-  private readonly columns: NexGridVanillaColumn<TData>[];
+  private readonly columns: TableXVanillaColumn<TData>[];
   private data: TData[];
   private total: number;
   private query: QueryState;
@@ -174,12 +174,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private readonly rowsSelect: HTMLSelectElement;
   private readonly jumpInput: HTMLInputElement;
 
-  constructor(container: HTMLElement, options: NexGridOptions<TData>) {
+  constructor(container: HTMLElement, options: TableXOptions<TData>) {
     this.options = options;
     this.locale = resolveLocale(options.locale);
     this.caption = options.caption;
     this.rowId = options.getRowId ?? defaultGetRowId;
-    this.uid = `nxg-${++instanceCounter}`;
+    this.uid = `tbx-${++instanceCounter}`;
 
     this.columns = options.columns;
     this.data = options.data ?? [];
@@ -191,20 +191,20 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     this.isError = options.error ?? false;
 
     // ---- Root -------------------------------------------------------------
-    const rootClasses = ["nxg-root"];
-    if (options.theme === "dark") rootClasses.push("nxg-dark");
-    else if (options.theme === "auto") rootClasses.push("nxg-auto");
+    const rootClasses = ["tbx-root"];
+    if (options.theme === "dark") rootClasses.push("tbx-dark");
+    else if (options.theme === "auto") rootClasses.push("tbx-auto");
     if (options.className) rootClasses.push(options.className);
     this.root = el("div", { class: rootClasses.join(" ") });
 
     // ---- Toolbar ----------------------------------------------------------
-    const startGroup = el("div", { class: "nxg-toolbar-group" });
-    const endGroup = el("div", { class: "nxg-toolbar-group nxg-toolbar-group--end" });
-    this.toolbar = el("div", { class: "nxg-toolbar" }, [startGroup, endGroup]);
+    const startGroup = el("div", { class: "tbx-toolbar-group" });
+    const endGroup = el("div", { class: "tbx-toolbar-group tbx-toolbar-group--end" });
+    this.toolbar = el("div", { class: "tbx-toolbar" }, [startGroup, endGroup]);
 
     if (options.enableSearch !== false) {
       const input = el("input", {
-        class: "nxg-search-input",
+        class: "tbx-search-input",
         attrs: {
           type: "search",
           placeholder: options.searchPlaceholder ?? this.locale.searchPlaceholder,
@@ -218,20 +218,20 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         this.scheduleSearch(input.value);
       });
       this.searchInput = input;
-      this.searchWrap = el("div", { class: "nxg-search" }, [searchIcon(), input]);
+      this.searchWrap = el("div", { class: "tbx-search" }, [searchIcon(), input]);
       startGroup.appendChild(this.searchWrap);
     }
 
     const columnsButton = this.createMenuButton("columns", slidersIcon(), this.locale.columnsButton);
     startGroup.appendChild(this.wrapMenu("columns", columnsButton));
 
-    this.densityLabel = el("span", { class: "nxg-capitalize" });
+    this.densityLabel = el("span", { class: "tbx-capitalize" });
     const densityButton = this.createMenuButton("density", filterIcon(), this.densityLabel);
     startGroup.appendChild(this.wrapMenu("density", densityButton));
 
     this.exportLabel = el("span");
     const exportButton = this.createMenuButton("export", downloadIcon(), this.exportLabel);
-    exportButton.classList.add("nxg-btn--export");
+    exportButton.classList.add("tbx-btn--export");
     if (options.enableExport !== false) {
       endGroup.appendChild(this.wrapMenu("export", exportButton));
     }
@@ -243,23 +243,23 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     // ---- Table ------------------------------------------------------------
     this.thead = el("thead");
     this.tbody = el("tbody");
-    const table = el("table", { class: "nxg-table", attrs: { "aria-label": this.caption } }, [
+    const table = el("table", { class: "tbx-table", attrs: { "aria-label": this.caption } }, [
       this.thead,
       this.tbody,
     ]);
-    this.tableWrap = el("div", { class: "nxg-table-wrap" }, [table]);
+    this.tableWrap = el("div", { class: "tbx-table-wrap" }, [table]);
 
     // ---- Cards ------------------------------------------------------------
-    this.cards = el("div", { class: "nxg-cards" });
+    this.cards = el("div", { class: "tbx-cards" });
 
     // ---- Footer -----------------------------------------------------------
-    this.range = el("div", { class: "nxg-range" });
-    this.pager = el("div", { class: "nxg-pager" });
+    this.range = el("div", { class: "tbx-range" });
+    this.pager = el("div", { class: "tbx-pager" });
 
     const rowsLabelId = `${this.uid}-rows-label`;
     const rowsLabel = el("span", { attrs: { id: rowsLabelId }, text: this.locale.rowsPerPage });
     this.rowsSelect = el("select", {
-      class: "nxg-rows-select",
+      class: "tbx-rows-select",
       attrs: { "aria-labelledby": rowsLabelId },
     });
     for (const size of PAGE_SIZES) {
@@ -268,11 +268,11 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     this.rowsSelect.addEventListener("change", () => {
       this.applyQuery(withPageSize(this.query, Number.parseInt(this.rowsSelect.value, 10)));
     });
-    const rowsPerPage = el("div", { class: "nxg-rows-per-page" }, [rowsLabel, this.rowsSelect]);
+    const rowsPerPage = el("div", { class: "tbx-rows-per-page" }, [rowsLabel, this.rowsSelect]);
 
     const jumpId = `${this.uid}-jump`;
     this.jumpInput = el("input", {
-      class: "nxg-jump-input",
+      class: "tbx-jump-input",
       attrs: {
         id: jumpId,
         type: "number",
@@ -280,9 +280,9 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         "aria-label": this.locale.goToPageOf,
       },
     });
-    const jumpForm = el("form", { class: "nxg-jump" }, [
+    const jumpForm = el("form", { class: "tbx-jump" }, [
       el("label", {
-        class: "nxg-jump-label",
+        class: "tbx-jump-label",
         attrs: { for: jumpId },
         text: this.locale.goToPage,
       }),
@@ -294,8 +294,8 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     });
     this.jumpInput.addEventListener("blur", () => this.submitJump());
 
-    const pagination = el("div", { class: "nxg-pagination" }, [rowsPerPage, this.pager, jumpForm]);
-    this.footer = el("div", { class: "nxg-footer" }, [this.range, pagination]);
+    const pagination = el("div", { class: "tbx-pagination" }, [rowsPerPage, this.pager, jumpForm]);
+    this.footer = el("div", { class: "tbx-footer" }, [this.range, pagination]);
 
     // ---- Global listeners --------------------------------------------------
     this.addGlobalListener(document, "pointerdown", this.handleDocumentPointerDown);
@@ -311,7 +311,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   // Public handle
   // =========================================================================
 
-  update(patch: Partial<NexGridUpdate<TData>>): void {
+  update(patch: Partial<TableXUpdate<TData>>): void {
     if (this.destroyed) return;
 
     let queryChanged = false;
@@ -374,7 +374,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     this.globalListeners.push({ target, type, handler });
   }
 
-  private notify(type: NexGridNoticeType, message: string): void {
+  private notify(type: TableXNoticeType, message: string): void {
     this.options.onNotify?.({ type, message });
   }
 
@@ -386,7 +386,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const button = el(
       "button",
       {
-        class: "nxg-btn",
+        class: "tbx-btn",
         attrs: {
           type: "button",
           id: `${this.uid}-${name}-btn`,
@@ -402,7 +402,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   }
 
   private wrapMenu(name: MenuName, button: HTMLButtonElement): HTMLDivElement {
-    const wrap = el("div", { class: "nxg-menu-wrap" }, [button]);
+    const wrap = el("div", { class: "tbx-menu-wrap" }, [button]);
     this.menuWraps.set(name, wrap);
     return wrap;
   }
@@ -444,7 +444,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       }
     }
     if (this.openFilterColumn !== null) {
-      if (!(target instanceof Node && this.root.querySelector(".nxg-col-filter-wrap")?.contains(target))) {
+      if (!(target instanceof Node && this.root.querySelector(".tbx-col-filter-wrap")?.contains(target))) {
         this.openFilterColumn = null;
         this.render();
       }
@@ -652,7 +652,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   // Derived state
   // =========================================================================
 
-  private visibleCols(): NexGridVanillaColumn<TData>[] {
+  private visibleCols(): TableXVanillaColumn<TData>[] {
     return visibleColumns(this.columns, this.hidden);
   }
 
@@ -764,15 +764,15 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
   private buildErrorCard(): HTMLElement {
     const children: ElementChild[] = [
-      el("p", { class: "nxg-state-text", text: this.locale.errorText }),
+      el("p", { class: "tbx-state-text", text: this.locale.errorText }),
     ];
     // In endpoint mode the grid owns fetching, so it can always offer a retry
     // even when the host did not supply one.
     const onRetry = this.options.onRetry;
     if (onRetry || this.options.endpoint !== undefined) {
       const button = el("button", {
-        class: "nxg-btn",
-        attrs: { type: "button", "data-nxg-focus": "retry" },
+        class: "tbx-btn",
+        attrs: { type: "button", "data-tbx-focus": "retry" },
         text: this.locale.retryButton,
       });
       button.addEventListener("click", () => {
@@ -781,7 +781,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       });
       children.push(button);
     }
-    return el("div", { class: "nxg-state-card" }, children);
+    return el("div", { class: "tbx-state-card" }, children);
   }
 
   // ---- Focus preservation --------------------------------------------------
@@ -794,7 +794,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
   private restoreFocus(key: string | null): void {
     if (key === null) return;
-    const candidates = this.root.querySelectorAll<HTMLElement>("[data-nxg-focus]");
+    const candidates = this.root.querySelectorAll<HTMLElement>("[data-tbx-focus]");
     for (const candidate of Array.from(candidates)) {
       if (candidate.dataset["nxgFocus"] === key) {
         candidate.focus();
@@ -841,7 +841,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const wrap = this.searchWrap;
     if (!input || !wrap) return;
 
-    const existing = wrap.querySelector(".nxg-search-clear");
+    const existing = wrap.querySelector(".tbx-search-clear");
     if (input.value === "") {
       existing?.remove();
       return;
@@ -851,10 +851,10 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const button = el(
       "button",
       {
-        class: "nxg-search-clear",
+        class: "tbx-search-clear",
         attrs: { type: "button", "aria-label": this.locale.clearSearch },
       },
-      [xIcon("nxg-icon"), el("span", { class: "nxg-sr-only", text: this.locale.clearSearch })],
+      [xIcon("tbx-icon"), el("span", { class: "tbx-sr-only", text: this.locale.clearSearch })],
     );
     button.addEventListener("click", () => {
       input.value = "";
@@ -872,7 +872,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
     const isOpen = this.openMenu === name;
     button.setAttribute("aria-expanded", String(isOpen));
-    wrap.querySelector(".nxg-menu")?.remove();
+    wrap.querySelector(".tbx-menu")?.remove();
     if (isOpen) wrap.appendChild(build());
   }
 
@@ -880,7 +880,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const menu = el(
       "div",
       {
-        class: modifier ? `nxg-menu ${modifier}` : "nxg-menu",
+        class: modifier ? `tbx-menu ${modifier}` : "tbx-menu",
         attrs: { role: "menu", "aria-labelledby": `${this.uid}-${name}-btn` },
       },
       children,
@@ -920,11 +920,11 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const button = el(
       "button",
       {
-        class: "nxg-menu-item",
+        class: "tbx-menu-item",
         attrs: {
           type: "button",
           role,
-          "data-nxg-focus": focusKey,
+          "data-tbx-focus": focusKey,
           ...(checked === undefined ? {} : { "aria-checked": String(checked) }),
         },
       },
@@ -936,8 +936,8 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
   private buildColumnsMenu(): HTMLElement {
     const items: ElementChild[] = [
-      el("div", { class: "nxg-menu-label", text: this.locale.toggleColumnsLabel }),
-      el("div", { class: "nxg-menu-separator" }),
+      el("div", { class: "tbx-menu-label", text: this.locale.toggleColumnsLabel }),
+      el("div", { class: "tbx-menu-separator" }),
     ];
 
     for (const column of this.columns) {
@@ -998,7 +998,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         `menu:export:${key}`,
         [
           glyph,
-          el("div", { class: "nxg-menu-item-title" }, [
+          el("div", { class: "tbx-menu-item-title" }, [
             el("strong", { text: title }),
             el("small", { text: subtitle }),
           ]),
@@ -1006,7 +1006,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         () => void this.runExport(key),
       );
 
-    return this.buildMenu("export", "nxg-menu--end", [
+    return this.buildMenu("export", "tbx-menu--end", [
       option(
         "excel",
         fileSpreadsheetIcon(),
@@ -1029,28 +1029,28 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     const cells: ElementChild[] = [];
 
     if (this.showSerial()) {
-      cells.push(el("th", { class: "nxg-th nxg-th--serial", text: this.locale.serialHeader }));
+      cells.push(el("th", { class: "tbx-th tbx-th--serial", text: this.locale.serialHeader }));
     }
 
     if (this.selectionEnabled()) {
       if (this.isSingleSelection()) {
-        cells.push(el("th", { class: "nxg-th nxg-th--select" }));
+        cells.push(el("th", { class: "tbx-th tbx-th--select" }));
       } else {
         const ids = this.pageRowIds();
         const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
         const someSelected = ids.some((id) => this.selected.has(id));
         const checkbox = el("input", {
-          class: "nxg-checkbox",
+          class: "tbx-checkbox",
           attrs: {
             type: "checkbox",
             "aria-label": this.locale.selectAllLabel,
-            "data-nxg-focus": "select-all",
+            "data-tbx-focus": "select-all",
           },
         });
         checkbox.checked = allSelected;
         checkbox.indeterminate = !allSelected && someSelected;
         checkbox.addEventListener("change", () => this.toggleSelectAll());
-        cells.push(el("th", { class: "nxg-th nxg-th--select" }, [checkbox]));
+        cells.push(el("th", { class: "tbx-th tbx-th--select" }, [checkbox]));
       }
     }
 
@@ -1068,20 +1068,20 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       const inner = el("div", {
         class:
           align === "center"
-            ? "nxg-th-inner nxg-th-inner--center"
+            ? "tbx-th-inner tbx-th-inner--center"
             : align === "right"
-              ? "nxg-th-inner nxg-th-inner--right"
-              : "nxg-th-inner",
+              ? "tbx-th-inner tbx-th-inner--right"
+              : "tbx-th-inner",
       });
       inner.appendChild(this.buildHeaderLabel(column));
 
       if (sortable) {
         const glyph =
           sorted === "asc" ? arrowUpIcon() : sorted === "desc" ? arrowDownIcon() : arrowUpDownIcon();
-        const iconWrap = el("span", { class: "nxg-sort-icon-wrap" }, [glyph]);
+        const iconWrap = el("span", { class: "tbx-sort-icon-wrap" }, [glyph]);
         if (sorts.length > 1 && sortIndex >= 0) {
           iconWrap.appendChild(
-            el("span", { class: "nxg-sort-order", text: String(sortIndex + 1) }),
+            el("span", { class: "tbx-sort-order", text: String(sortIndex + 1) }),
           );
         }
         inner.appendChild(iconWrap);
@@ -1090,19 +1090,19 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       if (meta.serverFilterable) {
         const activeFilter = this.query.filter?.[id];
         const isFilterActive = activeFilter !== undefined && activeFilter !== "";
-        const filterWrap = el("div", { class: "nxg-col-filter-wrap" });
+        const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
         const filterBtn = el(
           "button",
           {
             class: isFilterActive
-              ? "nxg-col-filter-btn nxg-col-filter-btn--active"
-              : "nxg-col-filter-btn",
+              ? "tbx-col-filter-btn tbx-col-filter-btn--active"
+              : "tbx-col-filter-btn",
             attrs: {
               type: "button",
               "aria-label": `Filter ${getColumnTitle(column) || id}`,
             },
           },
-          [filterIcon("nxg-icon")],
+          [filterIcon("tbx-icon")],
         );
         filterBtn.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -1131,12 +1131,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       const th = el(
         "th",
         {
-          class: sortable ? "nxg-th nxg-th--sortable" : "nxg-th",
+          class: sortable ? "tbx-th tbx-th--sortable" : "tbx-th",
           attrs: {
             scope: "col",
             "aria-sort": sortable ? ariaSort : undefined,
             tabindex: sortable ? "0" : undefined,
-            "data-nxg-focus": sortable ? `sort:${id}` : undefined,
+            "data-tbx-focus": sortable ? `sort:${id}` : undefined,
           },
           style: {
             width: effectiveWidth,
@@ -1150,7 +1150,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       if (sortable) {
         th.addEventListener("click", (event: MouseEvent) => {
           const target = event.target as HTMLElement | null;
-          if (target?.closest(".nxg-col-filter-wrap") || target?.closest(".nxg-resize-handle")) {
+          if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
             return;
           }
           const next = event.shiftKey
@@ -1161,7 +1161,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         th.addEventListener("keydown", (event: KeyboardEvent) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           const target = event.target as HTMLElement | null;
-          if (target?.closest(".nxg-col-filter-wrap")) return;
+          if (target?.closest(".tbx-col-filter-wrap")) return;
           event.preventDefault();
           const next = event.shiftKey
             ? withToggledMultiSort(this.query, id)
@@ -1171,7 +1171,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       }
 
       if (this.options.enableColumnResize !== false) {
-        const handle = el("div", { class: "nxg-resize-handle" });
+        const handle = el("div", { class: "tbx-resize-handle" });
         handle.addEventListener("pointerdown", (event: PointerEvent) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1185,10 +1185,10 @@ class NexGridController<TData> implements NexGridHandle<TData> {
           const onUp = () => {
             document.removeEventListener("pointermove", onMove);
             document.removeEventListener("pointerup", onUp);
-            document.body?.classList.remove("nxg-resizing");
+            document.body?.classList.remove("tbx-resizing");
             this.render();
           };
-          document.body?.classList.add("nxg-resizing");
+          document.body?.classList.add("tbx-resizing");
           document.addEventListener("pointermove", onMove);
           document.addEventListener("pointerup", onUp);
         });
@@ -1201,7 +1201,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     replaceChildren(this.thead, [el("tr", {}, cells)]);
   }
 
-  private buildHeaderLabel(column: NexGridVanillaColumn<TData>): HTMLSpanElement {
+  private buildHeaderLabel(column: TableXVanillaColumn<TData>): HTMLSpanElement {
     const span = el("span");
     const header = column.header;
     if (typeof header === "function") {
@@ -1224,8 +1224,8 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     if (this.isLoading) {
       replaceChildren(this.tbody, [
         el("tr", {}, [
-          el("td", { class: "nxg-state", attrs: { colspan: String(colSpan) } }, [
-            el("span", { class: "nxg-spinner" }),
+          el("td", { class: "tbx-state", attrs: { colspan: String(colSpan) } }, [
+            el("span", { class: "tbx-spinner" }),
             el("div", { text: this.locale.loadingText }),
           ]),
         ]),
@@ -1237,7 +1237,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       replaceChildren(this.tbody, [
         el("tr", {}, [
           el("td", {
-            class: "nxg-state",
+            class: "tbx-state",
             attrs: { colspan: String(colSpan) },
             text: this.locale.emptyText,
           }),
@@ -1253,22 +1253,22 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private buildRow(
     row: TData,
     index: number,
-    cols: readonly NexGridVanillaColumn<TData>[],
+    cols: readonly TableXVanillaColumn<TData>[],
   ): HTMLTableRowElement {
     const id = this.rowId(row);
     const selected = this.selected.has(id);
     const clickable = this.options.onRowClick !== undefined;
 
-    const classes = ["nxg-row"];
-    if (selected) classes.push("nxg-row--selected");
-    if (clickable) classes.push("nxg-row--clickable");
+    const classes = ["tbx-row"];
+    if (selected) classes.push("tbx-row--selected");
+    if (clickable) classes.push("tbx-row--clickable");
 
     const cells: ElementChild[] = [];
 
     if (this.showSerial()) {
       cells.push(
         el("td", {
-          class: "nxg-td nxg-td--serial",
+          class: "tbx-td tbx-td--serial",
           text: String(serialNumber(this.currentPage(), this.query.pageSize, index)),
         }),
       );
@@ -1276,7 +1276,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
     if (this.selectionEnabled()) {
       cells.push(
-        el("td", { class: "nxg-td nxg-td--select" }, [
+        el("td", { class: "tbx-td tbx-td--select" }, [
           this.buildRowCheckbox(id, selected, `row-select:${id}`),
         ]),
       );
@@ -1284,7 +1284,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
     for (const column of cols) {
       const meta = column.meta ?? {};
-      const td = el("td", { class: "nxg-td", style: { textAlign: meta.align ?? "left" } });
+      const td = el("td", { class: "tbx-td", style: { textAlign: meta.align ?? "left" } });
       this.renderCellInto(td, column, row);
       cells.push(td);
     }
@@ -1303,17 +1303,17 @@ class NexGridController<TData> implements NexGridHandle<TData> {
    */
   private buildColumnFilterPopover(
     id: string,
-    column: NexGridVanillaColumn<TData>,
-    meta: NonNullable<NexGridVanillaColumn<TData>["meta"]>,
+    column: TableXVanillaColumn<TData>,
+    meta: NonNullable<TableXVanillaColumn<TData>["meta"]>,
     currentValue?: string,
   ): HTMLElement {
-    const popover = el("div", { class: "nxg-filter-popover" });
+    const popover = el("div", { class: "tbx-filter-popover" });
     popover.addEventListener("click", (e) => e.stopPropagation());
 
     if (meta.filterOptions && meta.filterOptions.length > 0) {
-      const optionsWrap = el("div", { class: "nxg-filter-popover-options" });
+      const optionsWrap = el("div", { class: "tbx-filter-popover-options" });
       const allOption = el("div", {
-        class: !currentValue ? "nxg-filter-option nxg-filter-option--selected" : "nxg-filter-option",
+        class: !currentValue ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
         text: this.locale.filterAll,
       });
       allOption.addEventListener("click", () => {
@@ -1325,7 +1325,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       for (const opt of meta.filterOptions) {
         const isSelected = currentValue === opt;
         const optEl = el("div", {
-          class: isSelected ? "nxg-filter-option nxg-filter-option--selected" : "nxg-filter-option",
+          class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
           text: opt,
         });
         optEl.addEventListener("click", () => {
@@ -1338,7 +1338,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     } else {
       const title = getColumnTitle(column) || id;
       const input = el("input", {
-        class: "nxg-filter-popover-input",
+        class: "tbx-filter-popover-input",
         attrs: {
           type: "text",
           placeholder: formatMessage(this.locale.filterColumnPlaceholder, { column: title }),
@@ -1359,10 +1359,10 @@ class NexGridController<TData> implements NexGridHandle<TData> {
         }
       });
 
-      const actions = el("div", { class: "nxg-filter-popover-actions" });
+      const actions = el("div", { class: "tbx-filter-popover-actions" });
       if (currentValue) {
         const clearBtn = el("button", {
-          class: "nxg-filter-popover-btn",
+          class: "tbx-filter-popover-btn",
           attrs: { type: "button" },
           text: this.locale.clearFilter,
         });
@@ -1374,7 +1374,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       }
 
       const applyBtn = el("button", {
-        class: "nxg-filter-popover-btn nxg-filter-popover-btn--primary",
+        class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
         attrs: { type: "button" },
         text: this.locale.applyFilter,
       });
@@ -1391,12 +1391,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private buildRowCheckbox(id: string, selected: boolean, focusKey: string): HTMLInputElement {
     const isSingle = this.isSingleSelection();
     const checkbox = el("input", {
-      class: "nxg-checkbox",
+      class: "tbx-checkbox",
       attrs: {
         type: isSingle ? "radio" : "checkbox",
         name: isSingle ? `${this.uid}-row-select` : undefined,
         "aria-label": formatMessage(this.locale.selectRowLabel, { id }),
-        "data-nxg-focus": focusKey,
+        "data-tbx-focus": focusKey,
       },
     });
     checkbox.checked = selected;
@@ -1413,12 +1413,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
    * the whole XSS story for this package — there is no HTML-parsing path for
    * row data to travel down.
    */
-  private renderCellInto(host: HTMLElement, column: NexGridVanillaColumn<TData>, row: TData): void {
+  private renderCellInto(host: HTMLElement, column: TableXVanillaColumn<TData>, row: TData): void {
     const value = getCellValue(column, row);
     const custom = column.cell;
 
     if (custom) {
-      const rendered: NexGridNode | null | undefined = custom({
+      const rendered: TableXNode | null | undefined = custom({
         row: { original: row },
         getValue: () => value,
       });
@@ -1439,9 +1439,9 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private renderCards(): void {
     if (this.isLoading) {
       replaceChildren(this.cards, [
-        el("div", { class: "nxg-card" }, [
-          el("div", { class: "nxg-state" }, [
-            el("span", { class: "nxg-spinner" }),
+        el("div", { class: "tbx-card" }, [
+          el("div", { class: "tbx-state" }, [
+            el("span", { class: "tbx-spinner" }),
             el("div", { text: this.locale.loadingText }),
           ]),
         ]),
@@ -1451,8 +1451,8 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
     if (this.data.length === 0) {
       replaceChildren(this.cards, [
-        el("div", { class: "nxg-card" }, [
-          el("div", { class: "nxg-state", text: this.locale.emptyText }),
+        el("div", { class: "tbx-card" }, [
+          el("div", { class: "tbx-state", text: this.locale.emptyText }),
         ]),
       ]);
       return;
@@ -1468,31 +1468,31 @@ class NexGridController<TData> implements NexGridHandle<TData> {
   private buildCard(
     row: TData,
     index: number,
-    cols: readonly NexGridVanillaColumn<TData>[],
+    cols: readonly TableXVanillaColumn<TData>[],
   ): HTMLDivElement {
     const id = this.rowId(row);
     const selected = this.selected.has(id);
     const clickable = this.options.onRowClick !== undefined;
 
-    const classes = ["nxg-card"];
-    if (selected) classes.push("nxg-card--selected");
-    if (clickable) classes.push("nxg-card--clickable");
+    const classes = ["tbx-card"];
+    if (selected) classes.push("tbx-card--selected");
+    if (clickable) classes.push("tbx-card--clickable");
 
     const children: ElementChild[] = [];
 
     if (this.showSerial() || this.selectionEnabled()) {
-      const head = el("div", { class: "nxg-card-head" });
+      const head = el("div", { class: "tbx-card-head" });
       if (this.showSerial()) {
         head.appendChild(
           el("span", {
-            class: "nxg-card-serial",
+            class: "tbx-card-serial",
             text: `#${serialNumber(this.currentPage(), this.query.pageSize, index)}`,
           }),
         );
       }
       if (this.selectionEnabled()) {
         head.appendChild(
-          el("span", { class: "nxg-card-select" }, [
+          el("span", { class: "tbx-card-select" }, [
             this.buildRowCheckbox(id, selected, `card-select:${id}`),
           ]),
         );
@@ -1500,12 +1500,12 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       children.push(head);
     }
 
-    const list = el("dl", { class: "nxg-card-rows" });
+    const list = el("dl", { class: "tbx-card-rows" });
     for (const column of cols) {
       const dd = el("dd");
       this.renderCellInto(dd, column, row);
       list.appendChild(
-        el("div", { class: "nxg-card-row" }, [
+        el("div", { class: "tbx-card-row" }, [
           el("dt", { text: getColumnTitle(column) || getColumnId(column) }),
           dd,
         ]),
@@ -1535,7 +1535,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       else if (part === "{end}") sentence.appendChild(el("strong", { text: String(record.end) }));
       else if (part === "{total}")
         sentence.appendChild(
-          el("strong", { class: "nxg-range-total", text: record.total.toLocaleString() }),
+          el("strong", { class: "tbx-range-total", text: record.total.toLocaleString() }),
         );
       else sentence.appendChild(document.createTextNode(part));
     }
@@ -1544,7 +1544,7 @@ class NexGridController<TData> implements NexGridHandle<TData> {
     if (this.selected.size > 0) {
       rangeChildren.push(
         el("span", {
-          class: "nxg-selected-badge",
+          class: "tbx-selected-badge",
           text: formatMessage(this.locale.selectedBadge, { count: this.selected.size }),
         }),
       );
@@ -1571,15 +1571,15 @@ class NexGridController<TData> implements NexGridHandle<TData> {
       const button = el(
         "button",
         {
-          class: "nxg-page-nav",
+          class: "tbx-page-nav",
           attrs: {
             type: "button",
             "aria-label": label,
-            "data-nxg-focus": `page-${direction}`,
+            "data-tbx-focus": `page-${direction}`,
             disabled,
           },
         },
-        [glyph, el("span", { class: "nxg-sr-only", text: label })],
+        [glyph, el("span", { class: "tbx-sr-only", text: label })],
       );
       button.addEventListener("click", () =>
         this.applyQuery(withPage(this.query, target, totalPages)),
@@ -1593,17 +1593,17 @@ class NexGridController<TData> implements NexGridHandle<TData> {
 
     for (const item of getPageNumbers(page, totalPages)) {
       if (item === "...") {
-        buttons.push(el("span", { class: "nxg-page-ellipsis", text: "…" }));
+        buttons.push(el("span", { class: "tbx-page-ellipsis", text: "…" }));
         continue;
       }
       const isCurrent = item === page;
       const button = el("button", {
-        class: isCurrent ? "nxg-page-btn nxg-page-btn--current" : "nxg-page-btn",
+        class: isCurrent ? "tbx-page-btn tbx-page-btn--current" : "tbx-page-btn",
         attrs: {
           type: "button",
           "aria-label": formatMessage(this.locale.pageLabel, { page: item }),
           "aria-current": isCurrent ? "page" : undefined,
-          "data-nxg-focus": `page:${item}`,
+          "data-tbx-focus": `page:${item}`,
         },
         text: String(item),
       });
@@ -1643,9 +1643,11 @@ class NexGridController<TData> implements NexGridHandle<TData> {
  * });
  * ```
  */
-export function createNexGrid<TData>(
+export function createTableX<TData>(
   container: HTMLElement,
-  options: NexGridOptions<TData>,
-): NexGridHandle<TData> {
+  options: TableXOptions<TData>,
+): TableXHandle<TData> {
   return new NexGridController<TData>(container, options);
 }
+
+export const createNexGrid = createTableX;

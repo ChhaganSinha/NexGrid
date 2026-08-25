@@ -17,26 +17,26 @@ Every adapter renders **both** structures on every render, and the shared
 stylesheet decides which one is visible:
 
 ```css
-.nxg-table-wrap {
+.tbx-table-wrap {
   display: none;
   overflow-x: auto;
   /* … */
 }
 
 @media (min-width: 768px) {
-  .nxg-table-wrap {
+  .tbx-table-wrap {
     display: block;
   }
 }
 
-.nxg-cards {
+.tbx-cards {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 @media (min-width: 768px) {
-  .nxg-cards {
+  .tbx-cards {
     display: none;
   }
 }
@@ -48,7 +48,7 @@ runtime, server-rendered markup cannot be wrong about the viewport it has not
 seen yet, and print stylesheets or CSS-only overrides can pick a layout without
 fighting component state.
 
-The table also scrolls horizontally inside `.nxg-table-wrap`
+The table also scrolls horizontally inside `.tbx-table-wrap`
 (`overflow-x: auto`, `touch-action: pan-x`), so a wide table on a tablet pans
 rather than pushing the page sideways.
 
@@ -59,13 +59,13 @@ menus above and the same pager below. The toolbar itself stacks vertically below
 ## The card structure
 
 ```text
-div.nxg-cards
-└─ div.nxg-card [--selected] [--clickable]
-   ├─ div.nxg-card-head
-   │  ├─ span.nxg-card-serial            (when showSerialNumber)
-   │  └─ span.nxg-card-select > input.nxg-checkbox   (when enableSelection)
-   └─ dl.nxg-card-rows
-      └─ div.nxg-card-row > dt + dd      (one per visible column)
+div.tbx-cards
+└─ div.tbx-card [--selected] [--clickable]
+   ├─ div.tbx-card-head
+   │  ├─ span.tbx-card-serial            (when showSerialNumber)
+   │  └─ span.tbx-card-select > input.tbx-checkbox   (when enableSelection)
+   └─ dl.tbx-card-rows
+      └─ div.tbx-card-row > dt + dd      (one per visible column)
 ```
 
 - `dt` is the column's header text; `dd` is the rendered cell.
@@ -83,11 +83,11 @@ which is the correct semantics once the tabular relationship is gone.
 | Custom cell renderers | yes | **the same ones** |
 | Column visibility | yes | yes — hiding a column removes its card row |
 | Selection | header + row checkboxes | per-card checkbox in the head |
-| Row click | `.nxg-row--clickable` | `.nxg-card--clickable` |
+| Row click | `.tbx-row--clickable` | `.tbx-card--clickable` |
 | Serial number | first column | card head |
 | Sorting affordance | header click | — use the toolbar; there is no header |
 | `meta.width`, `meta.minWidth`, `meta.align` | applied | **ignored** |
-| Density | padding on `.nxg-td` | unchanged (style `.nxg-card` yourself) |
+| Density | padding on `.tbx-td` | unchanged (style `.tbx-card` yourself) |
 
 Because the cell renderer is shared, the two layouts cannot drift apart — there
 is no second code path to forget. In React that means the renderer runs twice
@@ -99,9 +99,9 @@ Sorting has no card-layout affordance. A phone user sorts by whatever your app
 offers in `toolbarActions`, or by a query the page owns:
 
 ```tsx
-<NexGrid
+<TableX
   toolbarActions={
-    <button type="button" className="nxg-btn" onClick={() => setQuery((q) => withSort(q, "createdAt", "desc"))}>
+    <button type="button" className="tbx-btn" onClick={() => setQuery((q) => withSort(q, "createdAt", "desc"))}>
       Newest first
     </button>
   }
@@ -122,7 +122,7 @@ offers in `toolbarActions`, or by a query the page owns:
   column reads as a plain value in a card.
 
 ```ts
-const columns: NexGridReactColumn<Student>[] = [
+const columns: TableXReactColumn<Student>[] = [
   { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
   { accessorKey: "email", header: "Email" },
   { accessorKey: "status", header: "Status", meta: { align: "center", width: 130 } },
@@ -140,13 +140,13 @@ selectors match:
 ```css
 /* Switch to cards below 1024px instead of 768px. */
 @media (max-width: 1023.98px) {
-  .nxg-table-wrap { display: none; }
-  .nxg-cards { display: flex; }
+  .tbx-table-wrap { display: none; }
+  .tbx-cards { display: flex; }
 }
 
 @media (min-width: 1024px) {
-  .nxg-table-wrap { display: block; }
-  .nxg-cards { display: none; }
+  .tbx-table-wrap { display: block; }
+  .tbx-cards { display: none; }
 }
 ```
 
@@ -154,9 +154,9 @@ To pin one layout everywhere — a print sheet, or a kiosk that is always wide:
 
 ```css
 @media print {
-  .nxg-table-wrap { display: block; }
-  .nxg-cards { display: none; }
-  .nxg-toolbar { display: none; }
+  .tbx-table-wrap { display: block; }
+  .tbx-cards { display: none; }
+  .tbx-toolbar { display: none; }
 }
 ```
 
@@ -168,11 +168,11 @@ without re-rendering anything.
 Cards use the same [theme tokens](../theming.md) as the rest of the grid:
 
 ```css
-.nxg-root {
-  --nxg-card: #ffffff;      /* card background      */
-  --nxg-border: #e2e8f0;    /* card border          */
-  --nxg-radius: 12px;       /* card corner radius   */
-  --nxg-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+.tbx-root {
+  --tbx-card: #ffffff;      /* card background      */
+  --tbx-border: #e2e8f0;    /* card border          */
+  --tbx-radius: 12px;       /* card corner radius   */
+  --tbx-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 ```
 
@@ -180,25 +180,25 @@ Useful hooks:
 
 | Class | Element |
 | --- | --- |
-| `.nxg-card` | one record |
-| `.nxg-card--selected` | selected record (tinted with `--nxg-primary`) |
-| `.nxg-card--clickable` | pointer cursor, active-state fill |
-| `.nxg-card-head` | serial + checkbox strip |
-| `.nxg-card-serial` | serial number (monospace, `--nxg-font-mono`) |
-| `.nxg-card-rows` | the `<dl>` |
-| `.nxg-card-row` | one `dt`/`dd` pair |
+| `.tbx-card` | one record |
+| `.tbx-card--selected` | selected record (tinted with `--tbx-primary`) |
+| `.tbx-card--clickable` | pointer cursor, active-state fill |
+| `.tbx-card-head` | serial + checkbox strip |
+| `.tbx-card-serial` | serial number (monospace, `--tbx-font-mono`) |
+| `.tbx-card-rows` | the `<dl>` |
+| `.tbx-card-row` | one `dt`/`dd` pair |
 
 Stacking a card row on very narrow screens:
 
 ```css
 @media (max-width: 380px) {
-  .nxg-card-row {
+  .tbx-card-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
   }
 
-  .nxg-card-row dd {
+  .tbx-card-row dd {
     text-align: start;
   }
 }
@@ -212,8 +212,8 @@ table row *and* the card even when only one is painted. In tests, scope the
 query:
 
 ```ts
-const tableRows = container.querySelectorAll(".nxg-table-wrap .nxg-row");
-const cards = container.querySelectorAll(".nxg-cards .nxg-card");
+const tableRows = container.querySelectorAll(".tbx-table-wrap .tbx-row");
+const cards = container.querySelectorAll(".tbx-cards .tbx-card");
 ```
 
 Screen readers see both too. That is intentional — each is complete and
@@ -224,5 +224,5 @@ a globally unique DOM `id`.
 
 - [Columns](../columns.md) — headers, widths, alignment, visibility
 - [Density](density.md) — row heights in the table layout
-- [Theming](../theming.md) — every `--nxg-*` token
+- [Theming](../theming.md) — every `--tbx-*` token
 - [`adapter-spec.md` §6](../adapter-spec.md) — the full DOM contract

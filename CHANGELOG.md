@@ -9,24 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **@nexgrid/core** — framework-agnostic engine: `QueryState`/`PagedResponse`
+- **@tablex/core** — framework-agnostic engine: `QueryState`/`PagedResponse`
   server contract, grid state controller, pagination math, density model,
   RFC 4180 CSV export with spreadsheet-injection defense, formatted Excel
   (.xls) export with value-based badge styling, `fetchAllPages` full-dataset
   collector, locale text, and the shared CSS theme (light/dark, CSS custom
   properties).
-- **@nexgrid/react** — React 18+/Next.js (App Router–safe) `<NexGrid />`
+- **@tablex/react** — React 18+/Next.js (App Router–safe) `<TableX />`
   component with TanStack-compatible column definitions: debounced global
   search, column visibility, density switching, server-driven sorting
   (asc → desc → clear), row selection, automatic serial numbers, Excel/CSV
   export, numbered pagination with ellipsis and page jump, loading/error/empty
   states, responsive card layout on small screens, toolbar actions slot.
-- **@nexgrid/angular** — Angular 17+ standalone `<nex-grid>` component with the
-  same feature set; custom cells via `*nexGridCell` templates.
-- **@nexgrid/vanilla** — zero-dependency DOM renderer (`createNexGrid`) with
+- **@tablex/angular** — Angular 17+ standalone `<table-x>` component with the
+  same feature set; custom cells via `*tableXCell` templates.
+- **@tablex/vanilla** — zero-dependency DOM renderer (`createTableX`) with
   controlled and self-fetching (`endpoint`) modes; ESM + IIFE bundles.
-- **NexGrid.AspNetCore** — ASP.NET Core Razor Class Library: `<nex-grid>` Tag
-  Helper (bundles the vanilla renderer as static web assets), `NexGridQuery`
+- **TableX.AspNetCore** — ASP.NET Core Razor Class Library: `<table-x>` Tag
+  Helper (bundles the vanilla renderer as static web assets), `TableXQuery`
   model binding, and allowlisted `IQueryable` extensions producing
   `PagedResponse<T>`.
 - Documentation (`docs/`) and runnable examples for React (Vite), Next.js,
