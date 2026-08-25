@@ -88,17 +88,27 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 - 🔍 **Debounced Global Search** — 350 ms debounced search with automatic clear button.
 - 🔄 **Three-State Sorting** — Familiar cycle: `Ascending → Descending → Cleared`. Multi-column sorting supported.
 - 📄 **Numbered Pagination & Jump** — Smart ellipsis, page size selector (`10, 25, 50, 100`), jump-to-page input, and live range summary (`Showing 21 to 40 of 1,284 entries`).
+- 🔍 **3-Dot Column Filters & Range Inputs** — Column popovers (⋮) supporting text search, dropdown lists, `From..To` date pickers, and `Min..Max` numeric range filtering.
+- 📌 **Sticky / Pinned Columns** — Freeze columns left or right with automatic pixel offset calculation and scroll elevation divider shadows.
+- ⚡ **Bulk Actions Floating Bar** — Contextual bottom-docked pill bar with selection count badge, fast Excel/CSV export, and customizable batch actions.
+- 📂 **Row Expansion (Master-Detail)** — Accordion expandable rows with animated rotating chevrons `[ ❯ ]` for rich nested sub-views.
+- 🧮 **Summary / Aggregation Footer** — Compute `sum`, `avg`, `count`, `min`, `max`, or custom aggregations in `<tfoot>`.
+- ✏️ **Inline Cell Editing** — Double-click editing for text, numbers, and dropdowns with <kbd>Enter</kbd>/Save and <kbd>Esc</kbd>/Cancel.
+- 🔀 **Column Drag-and-Drop Reordering** — Drag header tabs horizontally to reorder columns on the fly.
+- 🎛️ **Full Feature Customization** — Toggle any button or UI region on/off (`showToolbar`, `showFooter`, `enableSearch`, `enableColumns`, `enableDensity`, `enableExport`, `enablePagination`, `enableRowsPerPage`, `enableJumpToPage`, `enableColumnFilters`, `enableSorting`, `showSerialNumber`).
 - ☑️ **Row Selection** — Single and multi-row selection with "Select All on Page" checkbox and active selection badge.
 - 👁️ **Column Visibility & Alignment** — Dropdown menu to toggle column visibility on the fly; custom left/center/right alignment.
 - 📏 **Density Switching** — Compact (36px), Standard (44px), and Comfortable (52px) row height modes.
 - 🔢 **Automatic Serial Numbers** — Built-in `S.No.` column that seamlessly counts across pages.
 - 📊 **Multi-Format Exports** —
-  - **Formatted Excel (.xls)** with automatic status badge styling and colored cell tags.
+  - **Formatted Excel (.xlsx / .xls)** with automatic status badge styling and colored cell tags.
   - **RFC 4180 CSV** with UTF-8 BOM.
+  - **Copy to Clipboard** with formatted TSV.
   - Full-dataset export support (fetches all filtered pages in the background, not just on-screen rows).
   - OWASP spreadsheet-injection neutralization (formula protection).
-- 📱 **Mobile Card Responsive Layout** — Renders as a structured table on desktop; automatically switches to high-density cards below 768px.
+- 📱 **Mobile Card Responsive Layout** — Renders as a structured table on desktop; automatically switches to high-density cards with zebra striping below 768px.
 - 🎨 **Modern Theming & Dark Mode** — Clean CSS custom properties (`--tbx-*`), with built-in Light, Dark, and OS-matched Auto themes.
+- 🖨️ **Print-Optimized Layout** — Dedicated `@media print` styles for clean paper and PDF reports.
 - 🌐 **100% Localizable** — Every string and label is overridable via [`TableXLocale`](docs/localization.md).
 - ♿ **Accessible & Safe** — Semantic table markup, full ARIA attributes (`aria-sort`, `role="region"`), keyboard operable, and strict XSS protection.
 

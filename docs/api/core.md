@@ -123,6 +123,10 @@ export const STRUCTURAL_COLUMN_IDS: readonly string[];   // ["select", "actions"
 | `isSortable` | `(col) => boolean` | `enableSorting !== false`, id non-empty, not structural. |
 | `isHideable` | `(col) => boolean` | `meta.hideable !== false`, id non-empty, not structural. |
 | `isExportable` | `(col) => boolean` | `meta.exportable !== false`, id non-empty, not structural. |
+| `isPinned` | `(col) => "left" \| "right" \| false` | Check if column has `meta.pinned`. |
+| `isEditable` | `(col) => boolean` | Check if column has `meta.editable === true`. |
+| `computeAggregation` | `(col, rows) => string \| number \| null` | Compute aggregation total / average / count / min / max / custom across rows. |
+| `isFilterable` | `(col, globalFilterable?) => boolean` | Check if column is filterable. |
 | `initialHiddenColumns` | `(columns) => Record<string, boolean>` | Map of ids with `meta.hidden === true`. |
 | `visibleColumns` | `(columns, hidden) => TableXColumn[]` | Filters out ids marked `true` in `hidden`. Columns with no id are kept. |
 

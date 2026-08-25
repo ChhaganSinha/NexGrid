@@ -74,18 +74,38 @@ export interface TableXOptions<TData> {
   className?: string;
   theme?: TableXTheme;                          // default "light"
 
-  // Features
+  // Features & Visibility Toggles
+  showToolbar?: boolean;                         // default true
+  showFooter?: boolean;                          // default true
   showSerialNumber?: boolean;                    // default true
   enableSearch?: boolean;                        // default true
   searchPlaceholder?: string;
+  enableColumns?: boolean;                       // default true
+  enableDensity?: boolean;                       // default true
+  enableExport?: boolean;                        // default true
+  enableSorting?: boolean;                       // default true
+  enablePagination?: boolean;                    // default true
+  enableRowsPerPage?: boolean;                   // default true
+  enableJumpToPage?: boolean;                    // default true
+  enableColumnFilters?: boolean;                 // default true
+  enableColumnResize?: boolean;                  // default true
   enableSelection?: boolean;                     // default false
+  selectionMode?: "multi" | "single";            // default "multi"
   onSelectionChange?: (selectedIds: string[], allAcrossSelected: boolean) => void;
   onRowClick?: (row: TData) => void;
   getRowId?: (row: TData) => string;             // default: row.id, else String(row)
   toolbarActions?: Node | string;
 
+  // Enterprise Extensions
+  renderExpandedRow?: (row: TData) => TableXNode; // Accordion master-detail rows
+  enableBulkActions?: boolean;                   // default true (floating pill bar)
+  bulkActions?: (selectedIds: string[], deselectAll: () => void) => TableXNode;
+  enableSummaryRow?: boolean;                    // default auto (true if column defines aggregation)
+  enableColumnReorder?: boolean;                 // default false (drag & drop reordering)
+  onColumnOrderChange?: (newOrder: string[]) => void;
+  onCellEdit?: (edit: { row: TData; columnId: string; oldValue: unknown; newValue: unknown }) => void;
+
   // Export
-  enableExport?: boolean;                        // default true
   exportFileName?: string;                       // default filePrefixFromCaption(caption)
   onExportAll?: () => void | Promise<void>;      // replaces the built-in export
   fetchEndpoint?: string;                        // defaults to `endpoint`

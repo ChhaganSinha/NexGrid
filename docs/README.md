@@ -26,6 +26,12 @@ docs/
 │   ├── sorting.md              # 3-state sorting & multi-sort
 │   ├── pagination.md           # Numbered pager, range calculation, jump box
 │   ├── selection.md            # Checkboxes, select-all, action badges
+│   ├── column-filters.md       # 3-dot column filter popovers & range inputs
+│   ├── pinned-columns.md       # Freeze/pin columns left & right with shadow
+│   ├── bulk-actions.md         # Floating bottom pill bar for batch operations
+│   ├── row-expansion.md        # Accordion master-detail expandable sub-rows
+│   ├── summary-row.md          # Total, average, count, min/max footer row
+│   ├── inline-editing.md       # Double-click cell editing with keyboard controls
 │   ├── density.md              # Compact, default, comfortable presets
 │   ├── export.md               # Excel (.xls) & CSV full-dataset exports
 │   └── responsive.md           # Desktop table to mobile card layout
@@ -56,16 +62,22 @@ docs/
 
 ## ⚡ Feature Deep Dives
 
-Every feature in TableX behaves with 100% parity across all 4 platforms:
+Every feature in TableX behaves with 100% parity across all platforms:
 
 | Feature | Topics Covered |
 | :--- | :--- |
 | 🔍 [**Global Search**](features/search.md) | 350ms debouncing, clear button, custom search fields, and server translation. |
 | 🔄 [**Sorting**](features/sorting.md) | Three-state sort cycle (`asc → desc → clear`), multi-column sort tokens, and server allowlists. |
 | 📄 [**Pagination**](features/pagination.md) | Page size allowlists, smart ellipsis calculations, "Go to page" jump input, live record count. |
-| ☑️ [**Row Selection**](features/selection.md) | Row identity keys, select-all-on-page header checkbox, selection badge, and bulk actions. |
+| ☑️ [**Row Selection**](features/selection.md) | Row identity keys, select-all-on-page header checkbox, selection badge, and selection modes. |
+| 🔍 [**Column Filters**](features/column-filters.md) | 3-dot column filter popover (⋮), select lists, and numeric & date `min..max` range inputs. |
+| 📌 [**Pinned Columns**](features/pinned-columns.md) | Freeze columns left/right with scroll elevation divider shadows. |
+| ⚡ [**Bulk Actions Bar**](features/bulk-actions.md) | Floating bottom pill bar with item count, Excel/CSV export, and custom batch actions. |
+| 📂 [**Row Expansion**](features/row-expansion.md) | Accordion master-detail sub-rows with animated rotating chevrons `[ ❯ ]`. |
+| 🧮 [**Summary Row**](features/summary-row.md) | Bottom `<tfoot>` row calculating `sum`, `avg`, `count`, `min`, `max`, or custom aggregations. |
+| ✏️ [**Inline Cell Editing**](features/inline-editing.md) | Double-click cell editing with text/number inputs or dropdowns, <kbd>Enter</kbd> to save, <kbd>Esc</kbd> to cancel. |
 | 📏 [**Row Density**](features/density.md) | `compact` (36px), `default` (44px), and `comfortable` (52px) row height modes. |
-| 📊 [**Excel & CSV Exports**](features/export.md) | Formatted Excel (.xls) with badges, RFC 4180 CSV with UTF-8 BOM, full-dataset collector, and OWASP formula defense. |
+| 📊 [**Excel & CSV Exports**](features/export.md) | Formatted Excel (.xlsx/.xls) with badges, RFC 4180 CSV with UTF-8 BOM, and full-dataset collector. |
 | 📱 [**Responsive Card View**](features/responsive.md) | Seamless transformation from table (desktop) to cards (screens < 768px). |
 
 ---

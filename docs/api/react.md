@@ -60,21 +60,43 @@ export interface TableXProps<TData> {
   error?: boolean;                     // replaces the WHOLE grid
   onRetry?: () => void;                // adds a retry button to the error card
 
-  // Selection
-  enableSelection?: boolean;                                            // default false
+  // Selection & Bulk Actions
+  enableSelection?: boolean;           // default false
+  selectionMode?: "multi" | "single";  // default "multi"
   onSelectionChange?: (selectedIds: string[], allAcrossSelected: boolean) => void;
+  enableBulkActions?: boolean;         // default true (floating bar when rows checked)
+  bulkActions?: (selectedIds: string[], deselectAll: () => void) => ReactNode;
 
-  // Toolbar and rows
+  // Features & Visibility Toggles
+  showToolbar?: boolean;               // default true
+  showFooter?: boolean;                // default true
   enableSearch?: boolean;              // default true
   searchPlaceholder?: string;          // overrides locale.searchPlaceholder
+  enableColumns?: boolean;             // default true
+  enableDensity?: boolean;             // default true
+  enableExport?: boolean;              // default true
+  enableSorting?: boolean;             // default true
+  enablePagination?: boolean;          // default true
+  enableRowsPerPage?: boolean;         // default true
+  enableJumpToPage?: boolean;          // default true
+  enableColumnFilters?: boolean;       // default true
+  enableColumnResize?: boolean;        // default true
+  showSerialNumber?: boolean;          // default true
+
+  // Enterprise Extensions
+  renderExpandedRow?: (row: TData) => ReactNode; // Accordion master-detail rows
+  enableSummaryRow?: boolean;          // default auto (true if column defines aggregation)
+  enableColumnReorder?: boolean;       // default false (drag & drop reorder)
+  onColumnOrderChange?: (newOrder: string[]) => void;
+  onCellEdit?: (edit: { row: TData; columnId: string; oldValue: unknown; newValue: unknown }) => void;
+
+  // Toolbar and rows
   toolbarActions?: ReactNode;
   onRowClick?: (row: TData) => void;
   getRowId?: (row: TData) => string;   // default: String(row.id ?? row)
   className?: string;
-  showSerialNumber?: boolean;          // default true
 
   // Export
-  enableExport?: boolean;              // default true
   exportFileName?: string;             // default filePrefixFromCaption(caption)
   onExportAll?: () => void | Promise<void>;   // replaces the built-in export
   fetchEndpoint?: string;              // enables whole-dataset export

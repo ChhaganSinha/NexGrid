@@ -70,7 +70,17 @@ export interface TableXColumnMeta {
   exportable?: boolean;
   serverFilterable?: boolean;
   serverFilterField?: string;
+  filterable?: boolean;
+  enableFiltering?: boolean;
+  filterType?: "text" | "number" | "date" | "number-range" | "date-range" | "select";
+  filterPlaceholder?: string;
   filterOptions?: readonly string[];
+  pinned?: "left" | "right";
+  aggregation?: "sum" | "avg" | "count" | "min" | "max" | ((values: unknown[], rows: unknown[]) => string | number);
+  aggregationLabel?: string;
+  editable?: boolean;
+  editType?: "text" | "number" | "select";
+  editOptions?: readonly string[];
 }
 ```
 
@@ -83,9 +93,17 @@ export interface TableXColumnMeta {
 | `hidden` | `boolean` | `false` | Start hidden. Still listed (unchecked) in the Columns menu. |
 | `hideable` | `boolean` | `true` | `false` pins the column visible and keeps it out of the Columns menu. |
 | `exportable` | `boolean` | `true` | `false` keeps the column out of CSV and Excel exports. |
-| `serverFilterable` | `boolean` | `false` | Marks the column as filterable on the server (`filter[<field>]=<value>`). |
-| `serverFilterField` | `string` | column id | The key the API expects in `filter[...]` when it differs from the id. |
-| `filterOptions` | `readonly string[]` | — | Allowed values for a server-filterable column — a picker rather than free text. |
+| `pinned` | `"left" \| "right"` | — | Freeze/pin column to the left or right edge of the table with scroll elevation shadow. |
+| `filterable` | `boolean` | `true` | Enable column 3-dot (⋮) filter menu on header. |
+| `filterType` | `"text" \| "number" \| "date" \| "number-range" \| "date-range" \| "select"` | `"text"` | Type of filter input (text, date pickers `From..To`, numeric `Min..Max`, or dropdown). |
+| `filterPlaceholder` | `string` | — | Custom placeholder for column filter search input. |
+| `filterOptions` | `readonly string[]` | — | Allowed values for a column — renders a selectable list rather than free text. |
+| `aggregation` | `"sum" \| "avg" \| "count" \| "min" \| "max" \| Function` | — | Calculate column aggregation value in the `<tfoot>` summary row. |
+| `aggregationLabel` | `string` | — | Custom label for aggregation result (e.g. `"Total:"`, `"Avg Score:"`). |
+| `editable` | `boolean` | `false` | Enable double-click inline cell editing for this column. |
+| `editType` | `"text" \| "number" \| "select"` | `"text"` | Input type for inline editor. |
+| `editOptions` | `readonly string[]` | — | Options list when `editType: "select"`. |
+
 
 ## Structural columns: `select` and `actions`
 
