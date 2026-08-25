@@ -174,8 +174,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private readonly searchWrap: HTMLDivElement | null = null;
   private readonly menuButtons = new Map<MenuName, HTMLButtonElement>();
   private readonly menuWraps = new Map<MenuName, HTMLDivElement>();
-  private readonly densityLabel: HTMLSpanElement;
-  private readonly exportLabel: HTMLSpanElement;
+  private readonly densityLabel: HTMLSpanElement | null = null;
+  private readonly exportLabel: HTMLSpanElement | null = null;
   private readonly tableWrap: HTMLDivElement;
   private readonly thead: HTMLTableSectionElement;
   private readonly tbody: HTMLTableSectionElement;
@@ -183,8 +183,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private readonly footer: HTMLDivElement;
   private readonly range: HTMLDivElement;
   private readonly pager: HTMLDivElement;
-  private readonly rowsSelect: HTMLSelectElement;
-  private readonly jumpInput: HTMLInputElement;
+  private readonly rowsSelect: HTMLSelectElement | null = null;
+  private readonly jumpInput: HTMLInputElement | null = null;
 
   constructor(container: HTMLElement, options: TableXOptions<TData>) {
     this.options = options;
@@ -234,22 +234,29 @@ class NexGridController<TData> implements TableXHandle<TData> {
       startGroup.appendChild(this.searchWrap);
     }
 
-    const columnsButton = this.createMenuButton("columns", columnsIcon(), this.locale.columnsButton);
-    endGroup.appendChild(this.wrapMenu("columns", columnsButton));
+    const showColumns = options.enableColumns !== false && options.showColumnsButton !== false;
+    if (showColumns) {
+      const columnsButton = this.createMenuButton("columns", columnsIcon(), this.locale.columnsButton);
+      endGroup.appendChild(this.wrapMenu("columns", columnsButton));
+    }
 
-    this.densityLabel = el("span", { class: "tbx-capitalize" });
-    const densityButton = this.createMenuButton("density", densityIcon(), this.densityLabel);
-    endGroup.appendChild(this.wrapMenu("density", densityButton));
+    const showDensity = options.enableDensity !== false && options.showDensityButton !== false;
+    if (showDensity) {
+      this.densityLabel = el("span", { class: "tbx-capitalize" });
+      const densityButton = this.createMenuButton("density", densityIcon(), this.densityLabel);
+      endGroup.appendChild(this.wrapMenu("density", densityButton));
+    }
 
-    this.exportLabel = el("span", { text: this.locale.exportButton });
-    const exportButton = this.createMenuButton(
-      "export",
-      downloadTrayIcon(),
-      this.exportLabel,
-      chevronDownIcon("tbx-icon tbx-chevron"),
-    );
-    exportButton.classList.add("tbx-btn--export");
-    if (options.enableExport !== false) {
+    const showExport = options.enableExport !== false && options.showExportButton !== false;
+    if (showExport) {
+      this.exportLabel = el("span", { text: this.locale.exportButton });
+      const exportButton = this.createMenuButton(
+        "export",
+        downloadTrayIcon(),
+        this.exportLabel,
+        chevronDownIcon("tbx-icon tbx-chevron"),
+      );
+      exportButton.classList.add("tbx-btn--export");
       endGroup.appendChild(this.wrapMenu("export", exportButton));
     }
 
@@ -273,45 +280,62 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.range = el("div", { class: "tbx-range" });
     this.pager = el("div", { class: "tbx-pager" });
 
-    const rowsLabelId = `${this.uid}-rows-label`;
-    const rowsLabel = el("span", { attrs: { id: rowsLabelId }, text: this.locale.rowsPerPage });
-    this.rowsSelect = el("select", {
-      class: "tbx-rows-select",
-      attrs: { "aria-labelledby": rowsLabelId },
-    });
-    for (const size of PAGE_SIZES) {
-      this.rowsSelect.appendChild(el("option", { attrs: { value: String(size) }, text: `${size} rows` }));
+    const showRowsPerPage = options.enableRowsPerPage !== false && options.showRowsPerPage !== false;
+    let rowsPerPage: HTMLElement | null = null;
+    if (showRowsPerPage) {
+      const rowsLabelId = `${this.uid}-rows-label`;
+      const rowsLabel = el("span", { attrs: { id: rowsLabelId }, text: this.locale.rowsPerPage });
+      this.rowsSelect = el("select", {
+        class: "tbx-rows-select",
+        attrs: { "aria-labelledby": rowsLabelId },
+      });
+      for (const size of PAGE_SIZES) {
+        this.rowsSelect.appendChild(el("option", { attrs: { value: String(size) }, text: `${size} rows` }));
+      }
+      this.rowsSelect.addEventListener("change", () => {
+        if (this.rowsSelect) {
+          this.applyQuery(withPageSize(this.query, Number.parseInt(this.rowsSelect.value, 10)));
+        }
+      });
+      rowsPerPage = el("div", { class: "tbx-rows-per-page" }, [rowsLabel, this.rowsSelect]);
     }
-    this.rowsSelect.addEventListener("change", () => {
-      this.applyQuery(withPageSize(this.query, Number.parseInt(this.rowsSelect.value, 10)));
-    });
-    const rowsPerPage = el("div", { class: "tbx-rows-per-page" }, [rowsLabel, this.rowsSelect]);
 
-    const jumpId = `${this.uid}-jump`;
-    this.jumpInput = el("input", {
-      class: "tbx-jump-input",
-      attrs: {
-        id: jumpId,
-        type: "number",
-        min: "1",
-        "aria-label": this.locale.goToPageOf,
-      },
-    });
-    const jumpForm = el("form", { class: "tbx-jump" }, [
-      el("label", {
-        class: "tbx-jump-label",
-        attrs: { for: jumpId },
-        text: this.locale.goToPage,
-      }),
-      this.jumpInput,
-    ]);
-    jumpForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      this.submitJump();
-    });
-    this.jumpInput.addEventListener("blur", () => this.submitJump());
+    const showJump = options.enableJumpToPage !== false && options.showJumpToPage !== false;
+    let jumpForm: HTMLElement | null = null;
+    if (showJump) {
+      const jumpId = `${this.uid}-jump`;
+      this.jumpInput = el("input", {
+        class: "tbx-jump-input",
+        attrs: {
+          id: jumpId,
+          type: "number",
+          min: "1",
+          "aria-label": this.locale.goToPageOf,
+        },
+      });
+      jumpForm = el("form", { class: "tbx-jump" }, [
+        el("label", {
+          class: "tbx-jump-label",
+          attrs: { for: jumpId },
+          text: this.locale.goToPage,
+        }),
+        this.jumpInput,
+      ]);
+      jumpForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        this.submitJump();
+      });
+      this.jumpInput.addEventListener("blur", () => this.submitJump());
+    }
 
-    const pagination = el("div", { class: "tbx-pagination" }, [rowsPerPage, this.pager, jumpForm]);
+    const showPagination = options.enablePagination !== false && options.showPagination !== false;
+
+    const paginationChildren: HTMLElement[] = [];
+    if (rowsPerPage) paginationChildren.push(rowsPerPage);
+    if (showPagination) paginationChildren.push(this.pager);
+    if (jumpForm) paginationChildren.push(jumpForm);
+
+    const pagination = el("div", { class: "tbx-pagination" }, paginationChildren);
     this.footer = el("div", { class: "tbx-footer" }, [this.range, pagination]);
 
     // ---- Global listeners --------------------------------------------------
@@ -515,6 +539,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   }
 
   private submitJump(): void {
+    if (!this.jumpInput) return;
     const totalPages = this.totalPages();
     const parsed = Number.parseInt(this.jumpInput.value, 10);
     if (!Number.isFinite(parsed)) {
@@ -781,7 +806,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (mode === "error") {
       replaceChildren(this.root, [this.buildErrorCard()]);
     } else {
-      replaceChildren(this.root, [this.toolbar, this.tableWrap, this.cards, this.footer]);
+      const children: HTMLElement[] = [];
+      if (this.options.showToolbar !== false) children.push(this.toolbar);
+      children.push(this.tableWrap, this.cards);
+      if (this.options.showFooter !== false) children.push(this.footer);
+      replaceChildren(this.root, children);
     }
   }
 
@@ -835,12 +864,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.syncSearchInput();
     this.syncSearchClear();
 
-    this.densityLabel.textContent = formatMessage(this.locale.densityButton, {
-      density: this.density,
-    });
-    this.exportLabel.textContent = this.isExporting
-      ? this.locale.exportingButton
-      : this.locale.exportButton;
+    if (this.densityLabel) {
+      this.densityLabel.textContent = formatMessage(this.locale.densityButton, {
+        density: this.density,
+      });
+    }
+    if (this.exportLabel) {
+      this.exportLabel.textContent = this.isExporting
+        ? this.locale.exportingButton
+        : this.locale.exportButton;
+    }
 
     const exportButton = this.menuButtons.get("export");
     if (exportButton) exportButton.disabled = this.isExporting;
@@ -1084,8 +1117,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     for (const column of this.visibleCols()) {
       const id = getColumnId(column);
-      const sortable = isSortable(column);
-      const filterable = isFilterable(column, this.options.enableColumnFilters === true);
+      const sortable = isSortable(column) && this.options.enableSorting !== false;
+      const filterable = isFilterable(column, this.options.enableColumnFilters !== false);
       const sortIndex = sorts.findIndex((s) => s.field === id);
       const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
       const sorted = sortable && sortItem ? sortItem.dir : null;
@@ -1625,9 +1658,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     replaceChildren(this.range, rangeChildren);
 
-    this.rowsSelect.value = String(this.query.pageSize);
-    this.jumpInput.max = String(totalPages);
-    if (document.activeElement !== this.jumpInput) this.jumpInput.value = String(page);
+    if (this.rowsSelect) {
+      this.rowsSelect.value = String(this.query.pageSize);
+    }
+    if (this.jumpInput) {
+      this.jumpInput.max = String(totalPages);
+      if (document.activeElement !== this.jumpInput) this.jumpInput.value = String(page);
+    }
 
     replaceChildren(this.pager, this.buildPagerButtons(page, totalPages));
   }

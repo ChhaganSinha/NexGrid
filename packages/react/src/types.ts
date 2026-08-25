@@ -90,6 +90,36 @@ export interface TableXProps<TData> {
   enableSearch?: boolean;
   /** Overrides `locale.searchPlaceholder`. */
   searchPlaceholder?: string;
+  /** Show the columns toggle dropdown menu button. Default `true`. */
+  enableColumns?: boolean;
+  /** Alias for enableColumns. */
+  showColumnsButton?: boolean;
+  /** Show the density dropdown menu button. Default `true`. */
+  enableDensity?: boolean;
+  /** Alias for enableDensity. */
+  showDensityButton?: boolean;
+  /** Show the export menu. Default `true`. */
+  enableExport?: boolean;
+  /** Alias for enableExport. */
+  showExportButton?: boolean;
+  /** Enable sorting across all columns. Default `true`. */
+  enableSorting?: boolean;
+  /** Show the footer pagination controls. Default `true`. */
+  enablePagination?: boolean;
+  /** Alias for enablePagination. */
+  showPagination?: boolean;
+  /** Show the rows-per-page dropdown in the footer. Default `true`. */
+  enableRowsPerPage?: boolean;
+  /** Alias for enableRowsPerPage. */
+  showRowsPerPage?: boolean;
+  /** Show the jump to page input in the footer. Default `true`. */
+  enableJumpToPage?: boolean;
+  /** Alias for enableJumpToPage. */
+  showJumpToPage?: boolean;
+  /** Show the entire toolbar area. Default `true`. */
+  showToolbar?: boolean;
+  /** Show the entire footer area. Default `true`. */
+  showFooter?: boolean;
   /** Rendered at the end of the toolbar, after the export menu. */
   toolbarActions?: ReactNode;
   /** Clicking a row (or a card) invokes this. Adds a pointer cursor. */
@@ -100,9 +130,6 @@ export interface TableXProps<TData> {
   className?: string;
   /** Show the automatic `S.No.` column. Default `true`. */
   showSerialNumber?: boolean;
-
-  /** Show the export menu. Default `true`. */
-  enableExport?: boolean;
   /** File name prefix, without extension. Default: the caption, lower-cased and underscored. */
   exportFileName?: string;
   /** Take over exporting entirely; when set, the grid's own export flow never runs. */

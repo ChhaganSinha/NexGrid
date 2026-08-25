@@ -109,14 +109,44 @@ export interface TableXOptions<TData> {
   enableSearch?: boolean;
   /** Overrides `locale.searchPlaceholder`. */
   searchPlaceholder?: string;
+  /** Show the columns toggle dropdown menu button. Default `true`. */
+  enableColumns?: boolean;
+  /** Alias for enableColumns. */
+  showColumnsButton?: boolean;
+  /** Show the density dropdown menu button. Default `true`. */
+  enableDensity?: boolean;
+  /** Alias for enableDensity. */
+  showDensityButton?: boolean;
+  /** Show the export dropdown menu button. Default `true`. */
+  enableExport?: boolean;
+  /** Alias for enableExport. */
+  showExportButton?: boolean;
   /** Show row selection checkboxes. Default `false`. */
   enableSelection?: boolean;
   /** Selection mode: `"multi"` (default) or `"single"`. */
   selectionMode?: "multi" | "single";
-  /** Enable column-level filter menus on column headers. Default `false` (or per-column). */
+  /** Enable column-level filter menus on column headers. Default `true`. */
   enableColumnFilters?: boolean;
   /** Enable dragging column borders to resize columns. Default `true`. */
   enableColumnResize?: boolean;
+  /** Enable sorting across all columns. Default `true`. */
+  enableSorting?: boolean;
+  /** Show the footer pagination controls. Default `true`. */
+  enablePagination?: boolean;
+  /** Alias for enablePagination. */
+  showPagination?: boolean;
+  /** Show the rows-per-page dropdown in the footer. Default `true`. */
+  enableRowsPerPage?: boolean;
+  /** Alias for enableRowsPerPage. */
+  showRowsPerPage?: boolean;
+  /** Show the jump to page input in the footer. Default `true`. */
+  enableJumpToPage?: boolean;
+  /** Alias for enableJumpToPage. */
+  showJumpToPage?: boolean;
+  /** Show the entire toolbar area. Default `true`. */
+  showToolbar?: boolean;
+  /** Show the entire footer area. Default `true`. */
+  showFooter?: boolean;
   /**
    * Called with the running selection whenever it changes.
    * `allAcrossSelected` is always `false` today — the argument is reserved for
@@ -132,8 +162,6 @@ export interface TableXOptions<TData> {
 
   // ---- Export --------------------------------------------------------------
 
-  /** Show the export menu. Default `true`. */
-  enableExport?: boolean;
   /** File prefix; defaults to `filePrefixFromCaption(caption)`. */
   exportFileName?: string;
   /** Replaces the built-in export entirely when set. */

@@ -430,7 +430,8 @@ test("createTableX renders column filter trigger and applies filter", () => {
     },
   });
 
-  const filterBtn = container.querySelector(".tbx-col-filter-btn");
+  const filterBtns = container.querySelectorAll(".tbx-col-filter-btn");
+  const filterBtn = filterBtns[1] || filterBtns[0];
   assert.ok(filterBtn, "Filter button should be rendered on status column");
 
   filterBtn.dispatchEvent(new MockMouseEvent("click"));
@@ -445,7 +446,8 @@ test("createTableX renders column filter trigger and applies filter", () => {
   assert.equal(emittedQuery.filter?.status, "Active");
 
   // Open popover again and click Clear button
-  const filterBtnActive = container.querySelector(".tbx-col-filter-btn");
+  const filterBtnsActive = container.querySelectorAll(".tbx-col-filter-btn");
+  const filterBtnActive = filterBtnsActive[1] || filterBtnsActive[0];
   filterBtnActive.dispatchEvent(new MockMouseEvent("click"));
   const popover2 = container.querySelector(".tbx-filter-popover");
   assert.ok(popover2, "Filter popover should be open again");
@@ -456,6 +458,42 @@ test("createTableX renders column filter trigger and applies filter", () => {
 
   assert.equal(emittedQuery.filter?.status, undefined, "Filter should be cleared");
   assert.equal(handle.getQuery().filter?.status, undefined, "Internal query filter should be cleared");
+
+  handle.destroy();
+});
+
+test("createTableX respects feature customization options to hide buttons/features", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "id", header: "ID" },
+    { accessorKey: "name", header: "Name" },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Customization Test",
+    columns,
+    data: [{ id: "1", name: "Alice" }],
+    total: 1,
+    enableSearch: false,
+    enableColumns: false,
+    enableDensity: false,
+    enableExport: false,
+    enableRowsPerPage: false,
+    enableJumpToPage: false,
+    enableColumnFilters: false,
+    showSerialNumber: false,
+  });
+
+  assert.equal(container.querySelector(".tbx-search"), null, "Search should be hidden");
+  assert.equal(container.querySelector("#tbx-columns-btn"), null, "Columns button should be hidden");
+  assert.equal(container.querySelector("#tbx-density-btn"), null, "Density button should be hidden");
+  assert.equal(container.querySelector(".tbx-btn--export"), null, "Export button should be hidden");
+  assert.equal(container.querySelector(".tbx-rows-per-page"), null, "Rows per page should be hidden");
+  assert.equal(container.querySelector(".tbx-jump"), null, "Jump to page should be hidden");
+  assert.equal(container.querySelector(".tbx-col-filter-btn"), null, "Column filters should be hidden");
+  assert.equal(container.querySelector(".tbx-th--serial"), null, "Serial number column should be hidden");
 
   handle.destroy();
 });

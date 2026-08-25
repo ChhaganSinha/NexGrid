@@ -155,9 +155,10 @@ const SEARCH_DEBOUNCE_MS = 350;
         }
       </div>
     } @else {
-      <div class="tbx-toolbar">
-        <div class="tbx-toolbar-group">
-          @if (enableSearch) {
+      @if (showToolbar) {
+        <div class="tbx-toolbar">
+          <div class="tbx-toolbar-group">
+            @if (enableSearch) {
             <div class="tbx-search">
               <svg
                 class="tbx-search-icon"
@@ -208,14 +209,15 @@ const SEARCH_DEBOUNCE_MS = 350;
         </div>
 
         <div class="tbx-toolbar-group tbx-toolbar-group--end">
-          <div class="tbx-menu-wrap">
-            <button
-              type="button"
-              class="tbx-btn"
-              aria-haspopup="menu"
-              [attr.aria-expanded]="openMenu === 'columns'"
-              (click)="toggleMenu('columns', $event)"
-            >
+          @if (isColumnsVisible) {
+            <div class="tbx-menu-wrap">
+              <button
+                type="button"
+                class="tbx-btn"
+                aria-haspopup="menu"
+                [attr.aria-expanded]="openMenu === 'columns'"
+                (click)="toggleMenu('columns', $event)"
+              >
               <svg
                 class="tbx-icon"
                 viewBox="0 0 24 24"
@@ -262,7 +264,9 @@ const SEARCH_DEBOUNCE_MS = 350;
               </div>
             }
           </div>
+        }
 
+        @if (isDensityVisible) {
           <div class="tbx-menu-wrap">
             <button
               type="button"
@@ -314,17 +318,18 @@ const SEARCH_DEBOUNCE_MS = 350;
               </div>
             }
           </div>
+        }
 
-          @if (enableExport) {
-            <div class="tbx-menu-wrap">
-              <button
-                type="button"
-                class="tbx-btn tbx-btn--export"
-                aria-haspopup="menu"
-                [disabled]="isExporting"
-                [attr.aria-expanded]="openMenu === 'export'"
-                (click)="toggleMenu('export', $event)"
-              >
+        @if (isExportVisible) {
+          <div class="tbx-menu-wrap">
+            <button
+              type="button"
+              class="tbx-btn tbx-btn--export"
+              aria-haspopup="menu"
+              [disabled]="isExporting"
+              [attr.aria-expanded]="openMenu === 'export'"
+              (click)="toggleMenu('export', $event)"
+            >
                 <svg
                   class="tbx-icon"
                   viewBox="0 0 24 24"
@@ -448,9 +453,10 @@ const SEARCH_DEBOUNCE_MS = 350;
           @if (toolbarSlot) {
             <ng-container [ngTemplateOutlet]="toolbarSlot.template" />
           }
-          <ng-content />
+          <ng-content select="[toolbarActions]" />
         </div>
       </div>
+      }
 
       <div class="tbx-table-wrap">
         <table class="tbx-table" [attr.aria-label]="caption">
@@ -782,116 +788,118 @@ const SEARCH_DEBOUNCE_MS = 350;
         }
       </div>
 
-      <div class="tbx-footer">
-        <div class="tbx-range">
-          <!--
-            Written whitespace-tight on purpose: the "Showing 1 to 10 of 240 entries"
-            sentence comes from the locale and is split around its placeholders, so
-            each fragment already carries its own spacing. Indenting the blocks would
-            inject extra text nodes between the numbers and the words around them.
-          -->
-          <span
-            >@for (part of rangeParts; track part.key) {@if (part.strong) {<strong
-                [class.tbx-range-total]="part.total"
-                >{{ part.value }}</strong
-              >} @else {{{ part.value }}}}</span
-          >
-          @if (selectedCount > 0) {
-            <span class="tbx-selected-badge">{{ selectedBadge }}</span>
-          }
-        </div>
-
-        <div class="tbx-pagination">
-          <div class="tbx-rows-per-page">
-            <span>{{ strings.rowsPerPage }}</span>
-            <select
-              class="tbx-rows-select"
-              [attr.aria-label]="strings.rowsPerPage"
-              (change)="onPageSizeChange($event)"
+      @if (showFooter) {
+        <div class="tbx-footer">
+          <div class="tbx-range">
+            <span
+              >@for (part of rangeParts; track part.key) {@if (part.strong) {<strong
+                  [class.tbx-range-total]="part.total"
+                  >{{ part.value }}</strong
+                >} @else {{{ part.value }}}}</span
             >
-              @for (size of pageSizes; track size) {
-                <option [attr.value]="size" [selected]="size === query.pageSize">{{ size }} rows</option>
-              }
-            </select>
+            @if (selectedCount > 0) {
+              <span class="tbx-selected-badge">{{ selectedBadge }}</span>
+            }
           </div>
 
-          <div class="tbx-pager">
-            <button
-              type="button"
-              class="tbx-page-nav"
-              [disabled]="currentPage <= 1"
-              [attr.aria-label]="strings.previousPage"
-              (click)="goToPage(currentPage - 1)"
-            >
-              <svg
-                class="tbx-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-              <span class="tbx-sr-only">{{ strings.previousPage }}</span>
-            </button>
-            @for (item of pagerItems; track item.key) {
-              @if (item.gap) {
-                <span class="tbx-page-ellipsis">…</span>
-              } @else {
+          <div class="tbx-pagination">
+            @if (isRowsPerPageVisible) {
+              <div class="tbx-rows-per-page">
+                <span>{{ strings.rowsPerPage }}</span>
+                <select
+                  class="tbx-rows-select"
+                  [attr.aria-label]="strings.rowsPerPage"
+                  (change)="onPageSizeChange($event)"
+                >
+                  @for (size of pageSizes; track size) {
+                    <option [attr.value]="size" [selected]="size === query.pageSize">{{ size }} rows</option>
+                  }
+                </select>
+              </div>
+            }
+
+            @if (isPaginationVisible) {
+              <div class="tbx-pager">
                 <button
                   type="button"
-                  class="tbx-page-btn"
-                  [class.tbx-page-btn--current]="item.current"
-                  [attr.aria-current]="item.current ? 'page' : null"
-                  [attr.aria-label]="item.label"
-                  (click)="goToPage(item.page)"
+                  class="tbx-page-nav"
+                  [disabled]="currentPage <= 1"
+                  [attr.aria-label]="strings.previousPage"
+                  (click)="goToPage(currentPage - 1)"
                 >
-                  {{ item.page }}
+                  <svg
+                    class="tbx-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                  <span class="tbx-sr-only">{{ strings.previousPage }}</span>
                 </button>
-              }
+                @for (item of pagerItems; track item.key) {
+                  @if (item.gap) {
+                    <span class="tbx-page-ellipsis">…</span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="tbx-page-btn"
+                      [class.tbx-page-btn--current]="item.current"
+                      [attr.aria-current]="item.current ? 'page' : null"
+                      [attr.aria-label]="item.label"
+                      (click)="goToPage(item.page)"
+                    >
+                      {{ item.page }}
+                    </button>
+                  }
+                }
+                <button
+                  type="button"
+                  class="tbx-page-nav"
+                  [disabled]="currentPage >= totalPages"
+                  [attr.aria-label]="strings.nextPage"
+                  (click)="goToPage(currentPage + 1)"
+                >
+                  <svg
+                    class="tbx-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                  <span class="tbx-sr-only">{{ strings.nextPage }}</span>
+                </button>
+              </div>
             }
-            <button
-              type="button"
-              class="tbx-page-nav"
-              [disabled]="currentPage >= totalPages"
-              [attr.aria-label]="strings.nextPage"
-              (click)="goToPage(currentPage + 1)"
-            >
-              <svg
-                class="tbx-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-              <span class="tbx-sr-only">{{ strings.nextPage }}</span>
-            </button>
-          </div>
 
-          <form class="tbx-jump" (submit)="onJumpSubmit($event)">
-            <label class="tbx-jump-label" [attr.for]="jumpInputId">{{ strings.goToPage }}</label>
-            <input
-              class="tbx-jump-input"
-              type="number"
-              [attr.id]="jumpInputId"
-              [attr.min]="1"
-              [attr.max]="totalPages"
-              [value]="jumpValue"
-              [attr.aria-label]="strings.goToPageOf"
-              (input)="onJumpInput($event)"
-              (blur)="submitJump()"
-            />
-          </form>
+            @if (isJumpToPageVisible) {
+              <form class="tbx-jump" (submit)="onJumpSubmit($event)">
+                <label class="tbx-jump-label" [attr.for]="jumpInputId">{{ strings.goToPage }}</label>
+                <input
+                  class="tbx-jump-input"
+                  type="number"
+                  [attr.id]="jumpInputId"
+                  [attr.min]="1"
+                  [attr.max]="totalPages"
+                  [value]="jumpValue"
+                  [attr.aria-label]="strings.goToPageOf"
+                  (input)="onJumpInput($event)"
+                  (blur)="submitJump()"
+                />
+              </form>
+            }
+          </div>
         </div>
-      </div>
+      }
     }
   `,
 })
@@ -950,8 +958,38 @@ export class TableXComponent<TData>
   /** Show the automatic `S.No.` column. */
   @Input({ transform: booleanAttribute }) showSerialNumber = true;
 
+  /** Show the columns toggle dropdown menu button. */
+  @Input({ transform: booleanAttribute }) enableColumns = true;
+  @Input({ transform: booleanAttribute }) showColumnsButton?: boolean;
+
+  /** Show the density dropdown menu button. */
+  @Input({ transform: booleanAttribute }) enableDensity = true;
+  @Input({ transform: booleanAttribute }) showDensityButton?: boolean;
+
   /** Show the export menu. */
   @Input({ transform: booleanAttribute }) enableExport = true;
+  @Input({ transform: booleanAttribute }) showExportButton?: boolean;
+
+  /** Enable sorting across all columns. */
+  @Input({ transform: booleanAttribute }) enableSorting = true;
+
+  /** Show the footer pagination controls. */
+  @Input({ transform: booleanAttribute }) enablePagination = true;
+  @Input({ transform: booleanAttribute }) showPagination?: boolean;
+
+  /** Show the rows-per-page dropdown in the footer. */
+  @Input({ transform: booleanAttribute }) enableRowsPerPage = true;
+  @Input({ transform: booleanAttribute }) showRowsPerPage?: boolean;
+
+  /** Show the jump to page input in the footer. */
+  @Input({ transform: booleanAttribute }) enableJumpToPage = true;
+  @Input({ transform: booleanAttribute }) showJumpToPage?: boolean;
+
+  /** Show the entire toolbar area. */
+  @Input({ transform: booleanAttribute }) showToolbar = true;
+
+  /** Show the entire footer area. */
+  @Input({ transform: booleanAttribute }) showFooter = true;
 
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
@@ -1035,6 +1073,7 @@ export class TableXComponent<TData>
   protected densityButtonLabel = "";
   protected pagerItems: NexGridPagerItem[] = [];
   protected rangeParts: NexGridRangePart[] = [];
+  protected rangeLabel = "";
   protected selectedBadge = "";
   protected selectedCount = 0;
   protected allPageSelected = false;
@@ -1046,6 +1085,30 @@ export class TableXComponent<TData>
   /** Row clicks are live when a host listens, or when forced by the input. */
   protected get isRowClickable(): boolean {
     return this.rowClickable || this.rowClick.observed;
+  }
+
+  get isColumnsVisible(): boolean {
+    return this.enableColumns && this.showColumnsButton !== false;
+  }
+
+  get isDensityVisible(): boolean {
+    return this.enableDensity && this.showDensityButton !== false;
+  }
+
+  get isExportVisible(): boolean {
+    return this.enableExport && this.showExportButton !== false;
+  }
+
+  get isPaginationVisible(): boolean {
+    return this.enablePagination && this.showPagination !== false;
+  }
+
+  get isRowsPerPageVisible(): boolean {
+    return this.enableRowsPerPage && this.showRowsPerPage !== false;
+  }
+
+  get isJumpToPageVisible(): boolean {
+    return this.enableJumpToPage && this.showJumpToPage !== false;
   }
 
   // ---------------------------------------------------------------------
@@ -1517,7 +1580,8 @@ export class TableXComponent<TData>
         sortable,
         sortState: direction ?? "none",
         sortOrder,
-        serverFilterable: isFilterable(column, this.enableColumnFilters),
+        serverSortable: isSortable(column) && this.enableSorting !== false,
+        serverFilterable: isFilterable(column, this.enableColumnFilters !== false),
         filterOptions: column.meta?.filterOptions,
         activeFilter,
         ariaSort: !sortable

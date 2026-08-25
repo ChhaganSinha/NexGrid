@@ -140,17 +140,31 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     onRetry,
     enableSelection = false,
     selectionMode = "multi",
-    enableColumnFilters = false,
+    enableColumnFilters = true,
     enableColumnResize = true,
     onSelectionChange,
     enableSearch = true,
     searchPlaceholder,
+    enableColumns = true,
+    showColumnsButton,
+    enableDensity = true,
+    showDensityButton,
+    enableExport = true,
+    showExportButton,
+    enableSorting = true,
+    enablePagination = true,
+    showPagination,
+    enableRowsPerPage = true,
+    showRowsPerPage,
+    enableJumpToPage = true,
+    showJumpToPage,
+    showToolbar = true,
+    showFooter = true,
     toolbarActions,
     onRowClick,
     getRowId = defaultRowId,
     className,
     showSerialNumber = true,
-    enableExport = true,
     exportFileName,
     onExportAll,
     fetchEndpoint,
@@ -161,6 +175,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   } = props;
   const locale = resolveLocale(localeOverrides);
   const boolLabels = { yes: locale.booleanYes, no: locale.booleanNo };
+
+  const isColumnsVisible = enableColumns && showColumnsButton !== false;
+  const isDensityVisible = enableDensity && showDensityButton !== false;
+  const isExportVisible = enableExport && showExportButton !== false;
+  const isPaginationVisible = enablePagination && showPagination !== false;
+  const isRowsPerPageVisible = enableRowsPerPage && showRowsPerPage !== false;
+  const isJumpToPageVisible = enableJumpToPage && showJumpToPage !== false;
 
   const [density, setDensity] = React.useState<Density>(initialDensity);
   const [hiddenCols, setHiddenCols] = React.useState<Record<string, boolean>>(() =>
@@ -416,7 +437,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   return (
     <div className={rootClassName} data-density={density}>
       {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
-      <div className="tbx-toolbar">
+      {showToolbar ? (
+        <div className="tbx-toolbar">
         <div className="tbx-toolbar-group">
           {enableSearch ? (
             <div className="tbx-search">
@@ -447,19 +469,20 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
         <div className="tbx-toolbar-group tbx-toolbar-group--end">
           {/* Column visibility */}
-          <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
-            <button
-              type="button"
-              id={columnsButtonId}
-              className="tbx-btn"
-              ref={columnsMenu.triggerRef}
-              aria-haspopup="menu"
-              aria-expanded={columnsMenu.isOpen}
-              onClick={columnsMenu.toggle}
-            >
-              <SlidersIcon className="tbx-icon" />
-              <span>{locale.columnsButton}</span>
-            </button>
+          {isColumnsVisible ? (
+            <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
+              <button
+                type="button"
+                id={columnsButtonId}
+                className="tbx-btn"
+                ref={columnsMenu.triggerRef}
+                aria-haspopup="menu"
+                aria-expanded={columnsMenu.isOpen}
+                onClick={columnsMenu.toggle}
+              >
+                <ColumnsIcon className="tbx-icon" />
+                <span>{locale.columnsButton}</span>
+              </button>
             {columnsMenu.isOpen ? (
               <div className="tbx-menu" role="menu" aria-labelledby={columnsButtonId}>
                 <div className="tbx-menu-label">{locale.toggleColumnsLabel}</div>
@@ -484,21 +507,23 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               </div>
             ) : null}
           </div>
+          ) : null}
 
           {/* Density */}
-          <div className="tbx-menu-wrap" ref={densityMenu.containerRef}>
-            <button
-              type="button"
-              id={densityButtonId}
-              className="tbx-btn tbx-capitalize"
-              ref={densityMenu.triggerRef}
-              aria-haspopup="menu"
-              aria-expanded={densityMenu.isOpen}
-              onClick={densityMenu.toggle}
-            >
-              <FilterIcon className="tbx-icon" />
-              <span>{formatMessage(locale.densityButton, { density })}</span>
-            </button>
+          {isDensityVisible ? (
+            <div className="tbx-menu-wrap" ref={densityMenu.containerRef}>
+              <button
+                type="button"
+                id={densityButtonId}
+                className="tbx-btn tbx-capitalize"
+                ref={densityMenu.triggerRef}
+                aria-haspopup="menu"
+                aria-expanded={densityMenu.isOpen}
+                onClick={densityMenu.toggle}
+              >
+                <DensityIcon className="tbx-icon" />
+                <span>{formatMessage(locale.densityButton, { density })}</span>
+              </button>
             {densityMenu.isOpen ? (
               <div className="tbx-menu" role="menu" aria-labelledby={densityButtonId}>
                 {DENSITIES.map((option) => (
@@ -520,8 +545,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               </div>
             ) : null}
           </div>
+          ) : null}
 
-          {enableExport ? (
+          {isExportVisible ? (
             <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
               <button
                 type="button"
@@ -587,6 +613,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           {toolbarActions}
         </div>
       </div>
+      ) : null}
 
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
       <div className="tbx-table-wrap">
@@ -618,7 +645,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
               {visible.map((col, index) => {
                 const id = getColumnId(col);
-                const sortable = isSortable(col);
+                const sortable = isSortable(col) && enableSorting !== false;
                 const sortIndex = query.sort.findIndex((s) => s.field === id);
                 const sortItem = sortIndex >= 0 ? query.sort[sortIndex] : undefined;
                 const sorted = sortable && sortItem !== undefined;
@@ -1000,104 +1027,112 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       </div>
 
       {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-      <div className="tbx-footer">
-        <div className="tbx-range">
-          <span>
-            {renderTemplate(locale.showingRange, {
-              start: <strong>{range.start}</strong>,
-              end: <strong>{range.end}</strong>,
-              total: <strong className="tbx-range-total">{total.toLocaleString()}</strong>,
-            })}
-          </span>
-          {selectedIds.size > 0 ? (
-            <span className="tbx-selected-badge">
-              {formatMessage(locale.selectedBadge, { count: selectedIds.size })}
+      {showFooter ? (
+        <div className="tbx-footer">
+          <div className="tbx-range">
+            <span>
+              {renderTemplate(locale.showingRange, {
+                start: <strong>{range.start}</strong>,
+                end: <strong>{range.end}</strong>,
+                total: <strong className="tbx-range-total">{total.toLocaleString()}</strong>,
+              })}
             </span>
-          ) : null}
-        </div>
-
-        <div className="tbx-pagination">
-          <div className="tbx-rows-per-page">
-            <span>{locale.rowsPerPage}</span>
-            <select
-              className="tbx-rows-select"
-              value={String(pageSize)}
-              onChange={(event) => {
-                onQueryChange(withPageSize(query, Number.parseInt(event.target.value, 10)));
-              }}
-              aria-label={locale.rowsPerPage}
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size} rows
-                </option>
-              ))}
-            </select>
+            {selectedIds.size > 0 ? (
+              <span className="tbx-selected-badge">
+                {formatMessage(locale.selectedBadge, { count: selectedIds.size })}
+              </span>
+            ) : null}
           </div>
 
-          <div className="tbx-pager">
-            <button
-              type="button"
-              className="tbx-page-nav"
-              disabled={currentPage <= 1}
-              onClick={() => onQueryChange(withPage(query, currentPage - 1, totalPages))}
-              aria-label={locale.previousPage}
-            >
-              <ChevronLeftIcon size={16} />
-              <span className="tbx-sr-only">{locale.previousPage}</span>
-            </button>
-
-            {pageItems.map((item, index) =>
-              item === "..." ? (
-                <span key={`gap-${index}`} className="tbx-page-ellipsis">
-                  …
-                </span>
-              ) : (
-                <button
-                  key={`page-${item}`}
-                  type="button"
-                  className={
-                    item === currentPage ? "tbx-page-btn tbx-page-btn--current" : "tbx-page-btn"
-                  }
-                  onClick={() => onQueryChange(withPage(query, item, totalPages))}
-                  aria-label={formatMessage(locale.pageLabel, { page: item })}
-                  aria-current={item === currentPage ? "page" : undefined}
+          <div className="tbx-pagination">
+            {isRowsPerPageVisible ? (
+              <div className="tbx-rows-per-page">
+                <span>{locale.rowsPerPage}</span>
+                <select
+                  className="tbx-rows-select"
+                  value={String(pageSize)}
+                  onChange={(event) => {
+                    onQueryChange(withPageSize(query, Number.parseInt(event.target.value, 10)));
+                  }}
+                  aria-label={locale.rowsPerPage}
                 >
-                  {item}
+                  {PAGE_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size} rows
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {isPaginationVisible ? (
+              <div className="tbx-pager">
+                <button
+                  type="button"
+                  className="tbx-page-nav"
+                  disabled={currentPage <= 1}
+                  onClick={() => onQueryChange(withPage(query, currentPage - 1, totalPages))}
+                  aria-label={locale.previousPage}
+                >
+                  <ChevronLeftIcon size={16} />
+                  <span className="tbx-sr-only">{locale.previousPage}</span>
                 </button>
-              ),
-            )}
 
-            <button
-              type="button"
-              className="tbx-page-nav"
-              disabled={currentPage >= totalPages}
-              onClick={() => onQueryChange(withPage(query, currentPage + 1, totalPages))}
-              aria-label={locale.nextPage}
-            >
-              <ChevronRightIcon size={16} />
-              <span className="tbx-sr-only">{locale.nextPage}</span>
-            </button>
+                {pageItems.map((item, index) =>
+                  item === "..." ? (
+                    <span key={`gap-${index}`} className="tbx-page-ellipsis">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${item}`}
+                      type="button"
+                      className={
+                        item === currentPage ? "tbx-page-btn tbx-page-btn--current" : "tbx-page-btn"
+                      }
+                      onClick={() => onQueryChange(withPage(query, item, totalPages))}
+                      aria-label={formatMessage(locale.pageLabel, { page: item })}
+                      aria-current={item === currentPage ? "page" : undefined}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  type="button"
+                  className="tbx-page-nav"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => onQueryChange(withPage(query, currentPage + 1, totalPages))}
+                  aria-label={locale.nextPage}
+                >
+                  <ChevronRightIcon size={16} />
+                  <span className="tbx-sr-only">{locale.nextPage}</span>
+                </button>
+              </div>
+            ) : null}
+
+            {isJumpToPageVisible ? (
+              <form className="tbx-jump" onSubmit={submitJump}>
+                <label className="tbx-jump-label" htmlFor={jumpInputId}>
+                  {locale.goToPage}
+                </label>
+                <input
+                  id={jumpInputId}
+                  type="number"
+                  className="tbx-jump-input"
+                  min={1}
+                  max={totalPages}
+                  value={jumpText}
+                  onChange={(event) => setJumpText(event.target.value)}
+                  onBlur={() => submitJump()}
+                  aria-label={locale.goToPageOf}
+                />
+              </form>
+            ) : null}
           </div>
-
-          <form className="tbx-jump" onSubmit={submitJump}>
-            <label className="tbx-jump-label" htmlFor={jumpInputId}>
-              {locale.goToPage}
-            </label>
-            <input
-              id={jumpInputId}
-              type="number"
-              className="tbx-jump-input"
-              min={1}
-              max={totalPages}
-              value={jumpText}
-              onChange={(event) => setJumpText(event.target.value)}
-              onBlur={() => submitJump()}
-              aria-label={locale.goToPageOf}
-            />
-          </form>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
