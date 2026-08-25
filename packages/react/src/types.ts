@@ -120,6 +120,20 @@ export interface TableXProps<TData> {
   showToolbar?: boolean;
   /** Show the entire footer area. Default `true`. */
   showFooter?: boolean;
+  /** Custom renderer for expanded accordion sub-rows. */
+  renderExpandedRow?: (row: TData) => ReactNode;
+  /** Enable floating bulk actions bar when rows are selected. Default `true`. */
+  enableBulkActions?: boolean;
+  /** Custom bulk actions renderer receiving selected IDs. */
+  bulkActions?: (selectedIds: string[], deselectAll: () => void) => ReactNode;
+  /** Enable summary / aggregation footer row. Default auto (true if any column defines meta.aggregation). */
+  enableSummaryRow?: boolean;
+  /** Enable drag-and-drop column header reordering. Default `false`. */
+  enableColumnReorder?: boolean;
+  /** Called when column order changes via drag-and-drop reordering. */
+  onColumnOrderChange?: (newOrder: string[]) => void;
+  /** Called when a cell's value is committed via inline cell editing. */
+  onCellEdit?: (edit: { row: TData; columnId: string; oldValue: unknown; newValue: unknown }) => void;
   /** Rendered at the end of the toolbar, after the export menu. */
   toolbarActions?: ReactNode;
   /** Clicking a row (or a card) invokes this. Adds a pointer cursor. */

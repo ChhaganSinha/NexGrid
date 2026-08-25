@@ -23,6 +23,8 @@ export interface TableXColumnMeta {
   flex?: number;
   /** Cell and header alignment. Defaults to `"left"`. */
   align?: "left" | "center" | "right";
+  /** Freeze / pin this column to the left or right of the table during horizontal scrolling. */
+  pinned?: "left" | "right";
   /** Start with this column hidden (still listed in the Columns menu). */
   hidden?: boolean;
   /** Allow hiding via the Columns menu. Defaults to true (except structural columns). */
@@ -37,12 +39,22 @@ export interface TableXColumnMeta {
   serverFilterable?: boolean;
   /** The key the API expects in `filter[<key>]` when it differs from the column id. */
   serverFilterField?: string;
-  /** Filter input type: 'text' (default), 'select', 'number', 'date'. */
-  filterType?: "text" | "select" | "number" | "date";
+  /** Filter input type: 'text' (default), 'select', 'number', 'number-range', 'date', 'date-range'. */
+  filterType?: "text" | "select" | "number" | "number-range" | "date" | "date-range";
   /** Allowed values for a filterable column (renders a picker dropdown/list). */
   filterOptions?: readonly string[];
   /** Custom placeholder for the filter input. */
   filterPlaceholder?: string;
+  /** Aggregation calculation to display in the summary footer row. */
+  aggregation?: "sum" | "avg" | "count" | "min" | "max" | ((values: unknown[], rows: unknown[]) => string | number);
+  /** Custom label prefix for aggregation in summary row (e.g. "Total", "Avg"). */
+  aggregationLabel?: string;
+  /** Enable double-click / inline cell editing on this column. */
+  editable?: boolean;
+  /** Editor type for inline cell editing. */
+  editType?: "text" | "number" | "select";
+  /** Options list for select editor. */
+  editOptions?: readonly string[];
 }
 export type NexGridColumnMeta = TableXColumnMeta;
 
@@ -174,4 +186,65 @@ export function isFilterable<TData, TRender>(
   }
   if (col.meta?.filterOptions && col.meta.filterOptions.length > 0) return true;
   return globalFilterable;
+}
+
+/** Check if column is pinned to left or right. */
+export function isPinned<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+): "left" | "right" | false {
+  return col.meta?.pinned || false;
+}
+
+/** Check if column has inline editing enabled. */
+export function isEditable<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+): boolean {
+  return col.meta?.editable === true;
+}
+
+/** Compute aggregation value for a column across a set of rows. */
+export function computeAggregation<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+  rows: readonly TData[],
+): string | number | null {
+  const meta = col.meta;
+  if (!meta?.aggregation || rows.length === 0) return null;
+
+  const agg = meta.aggregation;
+  const values = rows.map((row) => getCellValue(col, row));
+
+  if (typeof agg === "function") {
+    return agg(values, rows as unknown[]);
+  }
+
+  if (agg === "count") {
+    return values.length;
+  }
+
+  const numericValues = values
+    .map((v) => (typeof v === "number" ? v : Number.parseFloat(String(v ?? "").replace(/[^0-9.-]+/g, ""))))
+    .filter((n) => Number.isFinite(n)) as number[];
+
+  if (numericValues.length === 0) return null;
+
+  if (agg === "sum") {
+    const sum = numericValues.reduce((acc, n) => acc + n, 0);
+    return Math.round(sum * 100) / 100;
+  }
+
+  if (agg === "avg") {
+    const sum = numericValues.reduce((acc, n) => acc + n, 0);
+    const avg = sum / numericValues.length;
+    return Math.round(avg * 100) / 100;
+  }
+
+  if (agg === "min") {
+    return Math.min(...numericValues);
+  }
+
+  if (agg === "max") {
+    return Math.max(...numericValues);
+  }
+
+  return null;
 }

@@ -67,12 +67,53 @@ export function queryClientData<TData>(
     });
   }
 
-/** Check if a cell value matches a column filter criteria (smart text, numeric, date, boolean). */
+/** Check if a cell value matches a column filter criteria (smart text, numeric, date, boolean, range). */
 function matchesFilterValue(val: unknown, filterVal: string): boolean {
   if (val === null || val === undefined) return false;
   const rawStr = String(val).trim().toLowerCase();
   const wanted = filterVal.trim().toLowerCase();
   if (rawStr === wanted) return true;
+
+  // Range syntax: e.g. "10..50" or "2023-01-01..2023-12-31" or "10.." or "..50"
+  if (wanted.includes("..")) {
+    const [minStr, maxStr] = wanted.split("..");
+    const minTrim = minStr ? minStr.trim() : "";
+    const maxTrim = maxStr ? maxStr.trim() : "";
+
+    // Date range
+    if ((minTrim && /^\d{4}-\d{2}-\d{2}/.test(minTrim)) || (maxTrim && /^\d{4}-\d{2}-\d{2}/.test(maxTrim))) {
+      const valStr = String(val).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}/.test(valStr)) {
+        const valDate = new Date(valStr + "T00:00:00Z").getTime();
+        if (!Number.isNaN(valDate)) {
+          if (minTrim) {
+            const minDate = new Date(minTrim + "T00:00:00Z").getTime();
+            if (valDate < minDate) return false;
+          }
+          if (maxTrim) {
+            const maxDate = new Date(maxTrim + "T23:59:59Z").getTime();
+            if (valDate > maxDate) return false;
+          }
+          return true;
+        }
+      }
+    }
+
+    // Number range
+    const num = typeof val === "number" ? val : Number.parseFloat(String(val).replace(/[^0-9.-]+/g, ""));
+    if (Number.isFinite(num)) {
+      if (minTrim) {
+        const minNum = Number.parseFloat(minTrim);
+        if (Number.isFinite(minNum) && num < minNum) return false;
+      }
+      if (maxTrim) {
+        const maxNum = Number.parseFloat(maxTrim);
+        if (Number.isFinite(maxNum) && num > maxNum) return false;
+      }
+      return true;
+    }
+  }
+
   if (rawStr.includes(wanted)) return true;
 
   // Percentage / numeric matching: e.g. val is 63 or 63.0, filterVal is "63%" or "63" or "63.0%"

@@ -12,6 +12,9 @@ import {
   isHideable,
   isExportable,
   isStructuralColumn,
+  isPinned,
+  isEditable,
+  computeAggregation,
   initialHiddenColumns,
   visibleColumns,
 } from "../dist/index.js";
@@ -59,6 +62,38 @@ test("hideable and exportable are opt-out via meta", () => {
   assert.equal(isHideable({ accessorKey: "name", meta: { hideable: false } }), false);
   assert.equal(isExportable({ accessorKey: "name" }), true);
   assert.equal(isExportable({ accessorKey: "name", meta: { exportable: false } }), false);
+});
+
+test("isPinned returns false or pinned direction", () => {
+  assert.equal(isPinned({ accessorKey: "name" }), false);
+  assert.equal(isPinned({ accessorKey: "name", meta: { pinned: "left" } }), "left");
+  assert.equal(isPinned({ accessorKey: "action", meta: { pinned: "right" } }), "right");
+});
+
+test("isEditable returns false unless editable is set in meta", () => {
+  assert.equal(isEditable({ accessorKey: "name" }), false);
+  assert.equal(isEditable({ accessorKey: "name", meta: { editable: true } }), true);
+});
+
+test("computeAggregation calculates sum, avg, count, min, max, or custom", () => {
+  const rows = [
+    { score: 10, name: "A" },
+    { score: 20, name: "B" },
+    { score: 30, name: "C" },
+  ];
+  assert.equal(computeAggregation({ accessorKey: "score", meta: { aggregation: "sum" } }, rows), 60);
+  assert.equal(computeAggregation({ accessorKey: "score", meta: { aggregation: "avg" } }, rows), 20);
+  assert.equal(computeAggregation({ accessorKey: "score", meta: { aggregation: "count" } }, rows), 3);
+  assert.equal(computeAggregation({ accessorKey: "score", meta: { aggregation: "min" } }, rows), 10);
+  assert.equal(computeAggregation({ accessorKey: "score", meta: { aggregation: "max" } }, rows), 30);
+  assert.equal(
+    computeAggregation(
+      { accessorKey: "score", meta: { aggregation: (r) => `${r.length} items` } },
+      rows,
+    ),
+    "3 items",
+  );
+  assert.equal(computeAggregation({ accessorKey: "score" }, rows), null);
 });
 
 test("columns marked hidden start hidden", () => {

@@ -112,3 +112,38 @@ test("queryClientData handles empty datasets gracefully", () => {
   assert.equal(result.items.length, 0);
   assert.equal(result.totalPages, 1);
 });
+
+test("queryClientData filters numbers using min..max range", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: { score: "80..90" },
+  };
+  const result = queryClientData(TEST_DATA, query);
+  assert.equal(result.total, 4); // Bob (82), Charlie (88), Fiona (85), Julia (89)
+  assert.deepEqual(
+    result.items.map((i) => i.name),
+    ["Bob Jones", "Charlie Brown", "Fiona Gallagher", "Julia Roberts"],
+  );
+});
+
+test("queryClientData filters dates using from..to range", () => {
+  const dataWithDates = [
+    { id: 1, name: "Jan", created: "2024-01-15" },
+    { id: 2, name: "Feb", created: "2024-02-20" },
+    { id: 3, name: "Mar", created: "2024-03-10" },
+  ];
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: { created: "2024-01-01..2024-02-28" },
+  };
+  const result = queryClientData(dataWithDates, query);
+  assert.equal(result.total, 2);
+  assert.deepEqual(
+    result.items.map((i) => i.name),
+    ["Jan", "Feb"],
+  );
+});
