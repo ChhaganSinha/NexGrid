@@ -75,6 +75,8 @@ export interface TableXProps<TData> {
   enableSelection?: boolean;
   /** Selection mode: `"multi"` (default) or `"single"`. */
   selectionMode?: "multi" | "single";
+  /** Enable column-level filter menus on column headers. Default `false` (or per-column). */
+  enableColumnFilters?: boolean;
   /** Enable dragging column borders to resize columns. Default `true`. */
   enableColumnResize?: boolean;
   /**

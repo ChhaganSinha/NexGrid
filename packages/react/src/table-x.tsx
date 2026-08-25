@@ -33,6 +33,7 @@ import {
   isHideable,
   isPageSize,
   isSortable,
+  isFilterable,
   primarySort,
   resolveLocale,
   serialNumber,
@@ -128,6 +129,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     onRetry,
     enableSelection = false,
     selectionMode = "multi",
+    enableColumnFilters = false,
     enableColumnResize = true,
     onSelectionChange,
     enableSearch = true,
@@ -577,12 +579,6 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         <table className="tbx-table" aria-label={caption}>
           <thead>
             <tr>
-              {showSerialNumber ? (
-                <th className="tbx-th tbx-th--serial" scope="col">
-                  {locale.serialHeader}
-                </th>
-              ) : null}
-
               {enableSelection ? (
                 <th className="tbx-th tbx-th--select" scope="col">
                   {!isSingleSelect ? (
@@ -597,6 +593,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                       aria-label={locale.selectAllLabel}
                     />
                   ) : null}
+                </th>
+              ) : null}
+
+              {showSerialNumber ? (
+                <th className="tbx-th tbx-th--serial" scope="col">
+                  {locale.serialHeader}
                 </th>
               ) : null}
 
@@ -691,7 +693,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                         </span>
                       ) : null}
 
-                      {meta?.serverFilterable ? (
+                      {isFilterable(col, enableColumnFilters) ? (
                         <div className="tbx-col-filter-wrap">
                           <button
                             type="button"
@@ -714,7 +716,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                               className="tbx-filter-popover"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {meta.filterOptions && meta.filterOptions.length > 0 ? (
+                              {meta?.filterOptions && meta.filterOptions.length > 0 ? (
                                 <div className="tbx-filter-popover-options">
                                   <div
                                     className={
@@ -839,12 +841,6 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                     onKeyDown={rowIsClickable ? rowKeyDown(row) : undefined}
                     tabIndex={rowIsClickable ? 0 : undefined}
                   >
-                    {showSerialNumber ? (
-                      <td className="tbx-td tbx-td--serial">
-                        {serialNumber(currentPage, pageSize, index)}
-                      </td>
-                    ) : null}
-
                     {enableSelection ? (
                       <td
                         className="tbx-td tbx-td--select"
@@ -859,6 +855,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                           onClick={(event) => event.stopPropagation()}
                           aria-label={formatMessage(locale.selectRowLabel, { id })}
                         />
+                      </td>
+                    ) : null}
+
+                    {showSerialNumber ? (
+                      <td className="tbx-td tbx-td--serial">
+                        {serialNumber(currentPage, pageSize, index)}
                       </td>
                     ) : null}
 

@@ -53,6 +53,21 @@
         overflow-wrap: anywhere;
       }
 
+      .cell-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #e2e8f0;
+        flex-shrink: 0;
+      }
+
       .cell-stack {
         display: flex;
         flex-direction: column;
@@ -219,7 +234,7 @@
 
         var SORTABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
         var SEARCHABLE = ["name", "email", "department"];
-        var FILTERABLE = ["status", "department"];
+        var FILTERABLE = ["name", "email", "department", "status", "scholarship"];
         var LATENCY_MS = 300;
 
         function compare(a, b) {
@@ -308,26 +323,39 @@
           {
             accessorKey: "name",
             header: "Student",
-            meta: { minWidth: 200 },
+            meta: { minWidth: 230, filterable: true, filterPlaceholder: "Search student..." },
             cell: function (ctx) {
               var row = ctx.row.original;
-              return el("div", { class: "cell-stack" }, [
-                el("strong", { text: row.name }),
-                el("small", { text: row.email }),
+              var avatar = el("img", {
+                class: "avatar",
+                attrs: {
+                  src: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + encodeURIComponent(row.name),
+                  alt: row.name,
+                  width: "32",
+                  height: "32",
+                  loading: "lazy",
+                },
+              });
+              return el("div", { class: "cell-user" }, [
+                avatar,
+                el("div", { class: "cell-stack" }, [
+                  el("strong", { text: row.name }),
+                  el("small", { text: row.email }),
+                ]),
               ]);
             },
           },
           // Starts hidden; still listed in the Columns menu, and exported once
           // the user switches it on.
-          { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220 } },
-          { accessorKey: "department", header: "Department", meta: { minWidth: 160 } },
+          { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220, filterable: true } },
+          { accessorKey: "department", header: "Department", meta: { minWidth: 160, filterable: true, filterOptions: DEPARTMENTS } },
           {
             accessorKey: "status",
             header: "Status",
             meta: {
               align: "center",
               width: 130,
-              serverFilterable: true,
+              filterable: true,
               filterOptions: STATUSES,
             },
             // Presentation only — exports still write "Active", not the badge.
@@ -436,6 +464,7 @@
           total: 0,
           query: query,
           enableSelection: true,
+          enableColumnFilters: true,
           exportFileName: "students",
           searchPlaceholder: "Search name, email or department…",
           toolbarActions: toolbarActions,

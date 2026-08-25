@@ -37,6 +37,7 @@ import {
   isHideable,
   isPageSize,
   isSortable,
+  isFilterable,
   primarySort,
   resolveLocale,
   serialNumber,
@@ -1028,10 +1029,6 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private renderHead(): void {
     const cells: ElementChild[] = [];
 
-    if (this.showSerial()) {
-      cells.push(el("th", { class: "tbx-th tbx-th--serial", text: this.locale.serialHeader }));
-    }
-
     if (this.selectionEnabled()) {
       if (this.isSingleSelection()) {
         cells.push(el("th", { class: "tbx-th tbx-th--select" }));
@@ -1054,11 +1051,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
     }
 
+    if (this.showSerial()) {
+      cells.push(el("th", { class: "tbx-th tbx-th--serial", text: this.locale.serialHeader }));
+    }
+
     const sorts = this.query.sort;
 
     for (const column of this.visibleCols()) {
       const id = getColumnId(column);
       const sortable = isSortable(column);
+      const filterable = isFilterable(column, this.options.enableColumnFilters === true);
       const sortIndex = sorts.findIndex((s) => s.field === id);
       const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
       const sorted = sortable && sortItem ? sortItem.dir : null;
@@ -1087,7 +1089,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         inner.appendChild(iconWrap);
       }
 
-      if (meta.serverFilterable) {
+      if (filterable) {
         const activeFilter = this.query.filter?.[id];
         const isFilterActive = activeFilter !== undefined && activeFilter !== "";
         const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
@@ -1265,20 +1267,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const cells: ElementChild[] = [];
 
+    if (this.selectionEnabled()) {
+      cells.push(
+        el("td", { class: "tbx-td tbx-td--select" }, [
+          this.buildRowCheckbox(id, selected, `row-select:${id}`),
+        ]),
+      );
+    }
+
     if (this.showSerial()) {
       cells.push(
         el("td", {
           class: "tbx-td tbx-td--serial",
           text: String(serialNumber(this.currentPage(), this.query.pageSize, index)),
         }),
-      );
-    }
-
-    if (this.selectionEnabled()) {
-      cells.push(
-        el("td", { class: "tbx-td tbx-td--select" }, [
-          this.buildRowCheckbox(id, selected, `row-select:${id}`),
-        ]),
       );
     }
 

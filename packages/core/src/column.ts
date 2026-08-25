@@ -29,12 +29,20 @@ export interface TableXColumnMeta {
   hideable?: boolean;
   /** Include in CSV/Excel exports. Defaults to true (except structural columns). */
   exportable?: boolean;
+  /** Marks the column as filterable (`filter[field]=value`). */
+  filterable?: boolean;
+  /** Explicit toggle for filtering on this column. */
+  enableFiltering?: boolean;
   /** Marks the column as filterable on the server (`filter[field]=value`). */
   serverFilterable?: boolean;
   /** The key the API expects in `filter[<key>]` when it differs from the column id. */
   serverFilterField?: string;
-  /** Allowed values for a server-filterable column (renders a picker, not free text). */
+  /** Filter input type: 'text' (default), 'select', 'number', 'date'. */
+  filterType?: "text" | "select" | "number" | "date";
+  /** Allowed values for a filterable column (renders a picker dropdown/list). */
   filterOptions?: readonly string[];
+  /** Custom placeholder for the filter input. */
+  filterPlaceholder?: string;
 }
 export type NexGridColumnMeta = TableXColumnMeta;
 
@@ -55,6 +63,10 @@ export interface TableXColumn<TData, TRender = unknown> {
   cell?: (ctx: TableXCellContext<TData>) => TRender;
   /** Sorting is ON by default; structural columns opt out with `false`. */
   enableSorting?: boolean;
+  /** Filtering can be enabled/disabled per column with boolean. */
+  enableFiltering?: boolean;
+  /** Alias for enableFiltering. */
+  filterable?: boolean;
   /** Layout and behavior hints. */
   meta?: TableXColumnMeta;
 }
@@ -146,4 +158,20 @@ export function visibleColumns<TData, TRender>(
     const id = getColumnId(col);
     return !id || hidden[id] !== true;
   });
+}
+
+/** Is this column filterable? Defaults to true if meta.serverFilterable, meta.filterable, or meta.filterOptions is set, or if global column filtering is enabled. */
+export function isFilterable<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+  globalFilterable = false,
+): boolean {
+  if (isStructuralColumn(col) || getColumnId(col) === "") return false;
+  if (col.enableFiltering === false || col.filterable === false) return false;
+  if (col.meta?.filterable === false || col.meta?.enableFiltering === false) return false;
+  if (col.enableFiltering === true || col.filterable === true) return true;
+  if (col.meta?.serverFilterable === true || col.meta?.filterable === true || col.meta?.enableFiltering === true) {
+    return true;
+  }
+  if (col.meta?.filterOptions && col.meta.filterOptions.length > 0) return true;
+  return globalFilterable;
 }

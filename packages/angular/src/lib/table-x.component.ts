@@ -65,6 +65,7 @@ import {
   isHideable,
   isPageSize,
   isSortable,
+  isFilterable,
   primarySort,
   resolveLocale,
   serialNumber,
@@ -436,9 +437,6 @@ const SEARCH_DEBOUNCE_MS = 350;
         <table class="tbx-table" [attr.aria-label]="caption">
           <thead>
             <tr>
-              @if (showSerialNumber) {
-                <th class="tbx-th tbx-th--serial" scope="col">{{ strings.serialHeader }}</th>
-              }
               @if (enableSelection) {
                 <th class="tbx-th tbx-th--select" scope="col">
                   @if (selectionMode !== 'single') {
@@ -451,6 +449,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                     />
                   }
                 </th>
+              }
+              @if (showSerialNumber) {
+                <th class="tbx-th tbx-th--serial" scope="col">{{ strings.serialHeader }}</th>
               }
               @for (header of headers; track header.key) {
                 <th
@@ -637,9 +638,6 @@ const SEARCH_DEBOUNCE_MS = 350;
                   [class.tbx-row--clickable]="isRowClickable"
                   (click)="onRowActivate(row)"
                 >
-                  @if (showSerialNumber) {
-                    <td class="tbx-td tbx-td--serial">{{ row.serial }}</td>
-                  }
                   @if (enableSelection) {
                     <td class="tbx-td tbx-td--select" (click)="$event.stopPropagation()">
                       <input
@@ -650,6 +648,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                         (change)="toggleRow(row)"
                       />
                     </td>
+                  }
+                  @if (showSerialNumber) {
+                    <td class="tbx-td tbx-td--serial">{{ row.serial }}</td>
                   }
                   @for (cell of row.cells; track cell.key) {
                     <td class="tbx-td" [style.textAlign]="cell.align">
@@ -882,6 +883,9 @@ export class TableXComponent<TData>
 
   /** Selection mode: multi (default) or single. */
   @Input() selectionMode: "multi" | "single" = "multi";
+
+  /** Enable column-level filter menus on column headers. */
+  @Input({ transform: booleanAttribute }) enableColumnFilters = false;
 
   /** Enable dragging column borders to resize columns. */
   @Input({ transform: booleanAttribute }) enableColumnResize = true;
@@ -1462,7 +1466,7 @@ export class TableXComponent<TData>
         sortable,
         sortState: direction ?? "none",
         sortOrder,
-        serverFilterable: column.meta?.serverFilterable ?? false,
+        serverFilterable: isFilterable(column, this.enableColumnFilters),
         filterOptions: column.meta?.filterOptions,
         activeFilter,
         ariaSort: !sortable

@@ -38,12 +38,22 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "name",
       header: "Student",
-      meta: { minWidth: 200 },
-      // A cell composed from more than one field: reach through `row.original`.
+      meta: { minWidth: 230, filterable: true, filterPlaceholder: "Search student..." },
+      // A cell composed from avatar, name, and email: reach through `row.original`.
       cell: ({ row }) => (
-        <div className="cell-stack">
-          <strong>{row.original.name}</strong>
-          <small>{row.original.email}</small>
+        <div className="cell-user">
+          <img
+            className="avatar"
+            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(row.original.name)}`}
+            alt={row.original.name}
+            width={32}
+            height={32}
+            loading="lazy"
+          />
+          <div className="cell-stack">
+            <strong>{row.original.name}</strong>
+            <small>{row.original.email}</small>
+          </div>
         </div>
       ),
     },
@@ -52,12 +62,23 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
       header: "Email",
       // Redundant with the cell above, so it starts hidden — the user can still
       // switch it on from the Columns menu, and exports include it when visible.
-      meta: { hidden: true, minWidth: 220 },
+      meta: { hidden: true, minWidth: 220, filterable: true },
     },
     {
       accessorKey: "department",
       header: "Department",
-      meta: { minWidth: 160 },
+      meta: {
+        minWidth: 160,
+        filterable: true,
+        filterOptions: [
+          "Computer Science",
+          "Mechanical",
+          "Electrical",
+          "Mathematics",
+          "Physics",
+          "Economics",
+        ],
+      },
     },
     {
       accessorKey: "status",
@@ -65,10 +86,7 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
       meta: {
         align: "center",
         width: 130,
-        // Declares the column as server-filterable. The grid does not render a
-        // filter control itself — see the toolbar select in App.tsx, which
-        // builds the same `filter[status]=…` through `withFilter`.
-        serverFilterable: true,
+        filterable: true,
         filterOptions: ["Active", "Pending", "Suspended", "Alumni"],
       },
       cell: ({ getValue }) => {

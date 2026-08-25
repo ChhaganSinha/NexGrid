@@ -26,6 +26,7 @@ export {
   getCellValue,
   getCellText,
   isSortable,
+  isFilterable,
   isHideable,
   isExportable,
   isStructuralColumn,

@@ -61,6 +61,21 @@ body {
 
 /* ---- Custom cell renderers ---------------------------------------------- */
 
+.cell-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
 .cell-stack {
   display: flex;
   flex-direction: column;

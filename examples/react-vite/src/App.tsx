@@ -134,6 +134,7 @@ export function App() {
         onRetry={() => void load(query)}
         theme={theme}
         enableSelection
+        enableColumnFilters
         onSelectionChange={(ids) => setSelectedIds(ids)}
         onRowClick={(student) =>
           setNotice({ type: "info", message: `Opened ${student.name} (#${student.id})` })
