@@ -224,11 +224,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const columnsButton = this.createMenuButton("columns", slidersIcon(), this.locale.columnsButton);
-    startGroup.appendChild(this.wrapMenu("columns", columnsButton));
+    endGroup.appendChild(this.wrapMenu("columns", columnsButton));
 
     this.densityLabel = el("span", { class: "tbx-capitalize" });
     const densityButton = this.createMenuButton("density", filterIcon(), this.densityLabel);
-    startGroup.appendChild(this.wrapMenu("density", densityButton));
+    endGroup.appendChild(this.wrapMenu("density", densityButton));
 
     this.exportLabel = el("span");
     const exportButton = this.createMenuButton("export", downloadIcon(), this.exportLabel);

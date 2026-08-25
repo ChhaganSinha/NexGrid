@@ -431,6 +431,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             </div>
           ) : null}
 
+        </div>
+
+        <div className="tbx-toolbar-group tbx-toolbar-group--end">
           {/* Column visibility */}
           <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
             <button
@@ -505,9 +508,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               </div>
             ) : null}
           </div>
-        </div>
 
-        <div className="tbx-toolbar-group tbx-toolbar-group--end">
           {enableExport ? (
             <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
               <button

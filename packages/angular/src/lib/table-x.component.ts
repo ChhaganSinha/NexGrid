@@ -192,14 +192,15 @@ const SEARCH_DEBOUNCE_MS = 350;
               }
             </div>
           }
+        </div>
 
+        <div class="tbx-toolbar-group tbx-toolbar-group--end">
           <div class="tbx-menu-wrap">
             <button
               type="button"
               class="tbx-btn"
               aria-haspopup="menu"
               [attr.aria-expanded]="openMenu === 'columns'"
-              [attr.aria-label]="strings.toggleColumnsLabel"
               (click)="toggleMenu('columns', $event)"
             >
               <svg
@@ -305,9 +306,7 @@ const SEARCH_DEBOUNCE_MS = 350;
               </div>
             }
           </div>
-        </div>
 
-        <div class="tbx-toolbar-group tbx-toolbar-group--end">
           @if (enableExport) {
             <div class="tbx-menu-wrap">
               <button
