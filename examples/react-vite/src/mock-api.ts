@@ -61,8 +61,57 @@ const SORTABLE: readonly StudentField[] = [
 /** Columns the global search looks at. */
 const SEARCHABLE: readonly StudentField[] = ["name", "email", "department"];
 
-/** Columns a `filter[<field>]=value` may name. Compared for equality. */
-const FILTERABLE: readonly StudentField[] = ["status", "department"];
+/** Columns a `filter[<field>]=value` may name. */
+const FILTERABLE: readonly StudentField[] = [
+  "name",
+  "email",
+  "department",
+  "status",
+  "score",
+  "enrolledAt",
+  "scholarship",
+];
+
+/** Check if a cell value matches a column filter criteria (smart text, numeric, date, boolean). */
+function matchesFilterValue(val: unknown, filterVal: string): boolean {
+  if (val === null || val === undefined) return false;
+  const rawStr = String(val).trim().toLowerCase();
+  const wanted = filterVal.trim().toLowerCase();
+  if (rawStr === wanted) return true;
+  if (rawStr.includes(wanted)) return true;
+
+  // Percentage / numeric matching: e.g. val is 63 or 63.0, filterVal is "63%" or "63" or "63.0%"
+  const cleanWanted = wanted.replace(/%/g, "").trim();
+  const cleanRaw = rawStr.replace(/%/g, "").trim();
+  if (cleanRaw === cleanWanted || cleanRaw.includes(cleanWanted)) return true;
+
+  const numVal = Number(cleanRaw);
+  const numWanted = Number(cleanWanted);
+  if (!Number.isNaN(numVal) && !Number.isNaN(numWanted) && numVal === numWanted) {
+    return true;
+  }
+
+  // Boolean matching: "true" / "yes" vs true, "false" / "no" vs false
+  if (typeof val === "boolean") {
+    if (val && (wanted === "true" || wanted === "yes" || wanted === "active")) return true;
+    if (!val && (wanted === "false" || wanted === "no")) return true;
+  }
+
+  // Date matching: e.g. val is "2023-04-12"
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+    const d = new Date(val + "T00:00:00Z");
+    if (!Number.isNaN(d.getTime())) {
+      const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+      const fullMonthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+      const m = d.getUTCMonth();
+      const formatted = `${monthNames[m]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`.toLowerCase();
+      const formattedFull = `${fullMonthNames[m]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`.toLowerCase();
+      if (formatted.includes(wanted) || formattedFull.includes(wanted)) return true;
+    }
+  }
+
+  return false;
+}
 
 /** Simulated network latency, in milliseconds. */
 export const LATENCY_MS = 320;
@@ -175,11 +224,10 @@ export function queryStudents(
     );
   }
 
-  // 2. Column filters (`filter[status]=Active`), equality, allowlisted.
+  // 2. Column filters
   for (const [field, value] of Object.entries(query.filter ?? {})) {
     if (!value || !isAllowed(field, FILTERABLE)) continue;
-    const wanted = value.toLowerCase();
-    matching = matching.filter((row) => String(row[field]).toLowerCase() === wanted);
+    matching = matching.filter((row) => matchesFilterValue(row[field], value));
   }
 
   // 3. Sort. Unknown fields are dropped, exactly as the server allowlist does.

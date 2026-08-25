@@ -245,7 +245,7 @@
 
         var SORTABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
         var SEARCHABLE = ["name", "email", "department"];
-        var FILTERABLE = ["name", "email", "department", "status", "scholarship"];
+        var FILTERABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
         var LATENCY_MS = 300;
 
         function compare(a, b) {
@@ -255,6 +255,43 @@
             numeric: true,
             sensitivity: "base",
           });
+        }
+
+        function matchesFilterValue(val, filterVal) {
+          if (val === null || val === undefined) return false;
+          var rawStr = String(val).trim().toLowerCase();
+          var wanted = filterVal.trim().toLowerCase();
+          if (rawStr === wanted) return true;
+          if (rawStr.indexOf(wanted) !== -1) return true;
+
+          var cleanWanted = wanted.replace(/%/g, "").trim();
+          var cleanRaw = rawStr.replace(/%/g, "").trim();
+          if (cleanRaw === cleanWanted || cleanRaw.indexOf(cleanWanted) !== -1) return true;
+
+          var numVal = Number(cleanRaw);
+          var numWanted = Number(cleanWanted);
+          if (!isNaN(numVal) && !isNaN(numWanted) && numVal === numWanted) {
+            return true;
+          }
+
+          if (typeof val === "boolean") {
+            if (val && (wanted === "true" || wanted === "yes" || wanted === "active")) return true;
+            if (!val && (wanted === "false" || wanted === "no")) return true;
+          }
+
+          if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+            var d = new Date(val + "T00:00:00Z");
+            if (!isNaN(d.getTime())) {
+              var monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+              var fullMonthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+              var m = d.getUTCMonth();
+              var formatted = (monthNames[m] + " " + d.getUTCDate() + ", " + d.getUTCFullYear()).toLowerCase();
+              var formattedFull = (fullMonthNames[m] + " " + d.getUTCDate() + ", " + d.getUTCFullYear()).toLowerCase();
+              if (formatted.indexOf(wanted) !== -1 || formattedFull.indexOf(wanted) !== -1) return true;
+            }
+          }
+
+          return false;
         }
 
         function queryStudents(query) {
@@ -270,14 +307,13 @@
             });
           }
 
-          // 2. Column filters — filter[status]=Active — compared for equality.
+          // 2. Column filters
           var filter = query.filter || {};
           Object.keys(filter).forEach(function (field) {
             var value = filter[field];
             if (!value || FILTERABLE.indexOf(field) === -1) return;
-            var wanted = String(value).toLowerCase();
             matching = matching.filter(function (row) {
-              return String(row[field]).toLowerCase() === wanted;
+              return matchesFilterValue(row[field], value);
             });
           });
 

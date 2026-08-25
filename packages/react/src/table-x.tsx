@@ -716,6 +716,35 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                               className="tbx-filter-popover"
                               onClick={(e) => e.stopPropagation()}
                             >
+                              <input
+                                autoFocus
+                                type="text"
+                                className="tbx-filter-popover-input"
+                                defaultValue={activeFilter ?? ""}
+                                placeholder={meta?.filterPlaceholder || formatMessage(locale.filterColumnPlaceholder, { column: title })}
+                                aria-label={`Filter ${title}`}
+                                onChange={(e) => {
+                                  const val = e.currentTarget.value.toLowerCase().trim();
+                                  const pop = e.currentTarget.closest(".tbx-filter-popover");
+                                  const opts = pop?.querySelectorAll<HTMLElement>(".tbx-filter-option:not(:first-child)");
+                                  opts?.forEach((opt) => {
+                                    const text = opt.textContent?.toLowerCase() ?? "";
+                                    opt.style.display = !val || text.includes(val) ? "" : "none";
+                                  });
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const val = (e.currentTarget as HTMLInputElement).value.trim();
+                                    setOpenFilterCol(null);
+                                    onQueryChange(withFilter(query, id, val || undefined));
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setOpenFilterCol(null);
+                                  }
+                                }}
+                              />
+
                               {meta?.filterOptions && meta.filterOptions.length > 0 ? (
                                 <div className="tbx-filter-popover-options">
                                   <div
@@ -748,51 +777,35 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                                     </div>
                                   ))}
                                 </div>
-                              ) : (
-                                <div>
-                                  <input
-                                    type="text"
-                                    className="tbx-filter-popover-input"
-                                    defaultValue={activeFilter ?? ""}
-                                    placeholder={formatMessage(locale.filterColumnPlaceholder, { column: title })}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        const val = (e.currentTarget as HTMLInputElement).value.trim();
-                                        setOpenFilterCol(null);
-                                        onQueryChange(withFilter(query, id, val || undefined));
-                                      }
+                              ) : null}
+
+                              <div className="tbx-filter-popover-actions">
+                                {activeFilter ? (
+                                  <button
+                                    type="button"
+                                    className="tbx-filter-popover-btn"
+                                    onClick={() => {
+                                      setOpenFilterCol(null);
+                                      onQueryChange(withFilter(query, id, undefined));
                                     }}
-                                  />
-                                  <div className="tbx-filter-popover-actions">
-                                    {activeFilter ? (
-                                      <button
-                                        type="button"
-                                        className="tbx-filter-popover-btn"
-                                        onClick={() => {
-                                          setOpenFilterCol(null);
-                                          onQueryChange(withFilter(query, id, undefined));
-                                        }}
-                                      >
-                                        {locale.clearFilter}
-                                      </button>
-                                    ) : null}
-                                    <button
-                                      type="button"
-                                      className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                                      onClick={(e) => {
-                                        const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
-                                        const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
-                                        const val = inputEl?.value.trim();
-                                        setOpenFilterCol(null);
-                                        onQueryChange(withFilter(query, id, val || undefined));
-                                      }}
-                                    >
-                                      {locale.applyFilter}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
+                                  >
+                                    {locale.clearFilter}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+                                  onClick={(e) => {
+                                    const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
+                                    const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
+                                    const val = inputEl?.value.trim();
+                                    setOpenFilterCol(null);
+                                    onQueryChange(withFilter(query, id, val || undefined));
+                                  }}
+                                >
+                                  {locale.applyFilter}
+                                </button>
+                              </div>
                             </div>
                           ) : null}
                         </div>

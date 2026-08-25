@@ -93,6 +93,7 @@ internal static class TableXExpressions
     {
         value = null;
         var type = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        var trimmed = raw.Trim();
 
         if (type == typeof(string))
         {
@@ -102,7 +103,7 @@ internal static class TableXExpressions
 
         if (type.IsEnum)
         {
-            if (Enum.TryParse(type, raw, ignoreCase: true, out var parsedEnum))
+            if (Enum.TryParse(type, trimmed, ignoreCase: true, out var parsedEnum))
             {
                 value = parsedEnum;
                 return true;
@@ -113,9 +114,22 @@ internal static class TableXExpressions
 
         if (type == typeof(bool))
         {
-            if (bool.TryParse(raw, out var parsedBool))
+            if (bool.TryParse(trimmed, out var parsedBool))
             {
                 value = parsedBool;
+                return true;
+            }
+
+            if (string.Equals(trimmed, "yes", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "active", StringComparison.OrdinalIgnoreCase))
+            {
+                value = true;
+                return true;
+            }
+
+            if (string.Equals(trimmed, "no", StringComparison.OrdinalIgnoreCase))
+            {
+                value = false;
                 return true;
             }
 
@@ -124,7 +138,7 @@ internal static class TableXExpressions
 
         if (type == typeof(Guid))
         {
-            if (Guid.TryParse(raw, out var parsedGuid))
+            if (Guid.TryParse(trimmed, out var parsedGuid))
             {
                 value = parsedGuid;
                 return true;
@@ -135,7 +149,8 @@ internal static class TableXExpressions
 
         if (type == typeof(DateTime))
         {
-            if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDate))
+            if (DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate) ||
+                DateTime.TryParse(trimmed, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate))
             {
                 value = parsedDate;
                 return true;
@@ -146,7 +161,8 @@ internal static class TableXExpressions
 
         if (type == typeof(DateTimeOffset))
         {
-            if (DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedOffset))
+            if (DateTimeOffset.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedOffset) ||
+                DateTimeOffset.TryParse(trimmed, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedOffset))
             {
                 value = parsedOffset;
                 return true;
@@ -157,7 +173,8 @@ internal static class TableXExpressions
 
         if (type == typeof(DateOnly))
         {
-            if (DateOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDay))
+            if (DateOnly.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDay) ||
+                DateOnly.TryParse(trimmed, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDay))
             {
                 value = parsedDay;
                 return true;
@@ -168,7 +185,8 @@ internal static class TableXExpressions
 
         if (type == typeof(TimeOnly))
         {
-            if (TimeOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTime))
+            if (TimeOnly.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTime) ||
+                TimeOnly.TryParse(trimmed, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedTime))
             {
                 value = parsedTime;
                 return true;
@@ -181,7 +199,8 @@ internal static class TableXExpressions
         {
             try
             {
-                value = Convert.ChangeType(raw, type, CultureInfo.InvariantCulture);
+                var cleanNumber = trimmed.TrimEnd('%').Trim();
+                value = Convert.ChangeType(cleanNumber, type, CultureInfo.InvariantCulture);
                 return true;
             }
             catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)

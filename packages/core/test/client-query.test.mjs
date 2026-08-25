@@ -61,6 +61,34 @@ test("queryClientData performs column filtering", () => {
   );
 });
 
+test("queryClientData performs numeric and percentage column filtering", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: { score: "95%" },
+  };
+  const result = queryClientData(TEST_DATA, query);
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].name, "Alice Smith");
+});
+
+test("queryClientData performs date column filtering", () => {
+  const dataWithDates = [
+    { id: 1, name: "Alice", enrolledAt: "2023-04-12" },
+    { id: 2, name: "Bob", enrolledAt: "2023-05-15" },
+  ];
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: { enrolledAt: "Apr 12" },
+  };
+  const result = queryClientData(dataWithDates, query);
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].name, "Alice");
+});
+
 test("queryClientData sorts ascending and descending", () => {
   const ascQuery = { page: 1, pageSize: 10, sort: [{ field: "score", dir: "asc" }] };
   const ascResult = queryClientData(TEST_DATA, ascQuery);

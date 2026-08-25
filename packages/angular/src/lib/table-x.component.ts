@@ -556,6 +556,14 @@ const SEARCH_DEBOUNCE_MS = 350;
 
                         @if (openFilterColumn === header.id) {
                           <div class="tbx-filter-popover" (click)="$event.stopPropagation()">
+                            <input
+                              #filterInput
+                              type="text"
+                              class="tbx-filter-popover-input"
+                              [value]="header.activeFilter ?? ''"
+                              [placeholder]="'Filter ' + header.title + '…'"
+                              (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                            />
                             @if (header.filterOptions && header.filterOptions.length > 0) {
                               <div class="tbx-filter-popover-options">
                                 <div
@@ -575,36 +583,25 @@ const SEARCH_DEBOUNCE_MS = 350;
                                   </div>
                                 }
                               </div>
-                            } @else {
-                              <div>
-                                <input
-                                  #filterInput
-                                  type="text"
-                                  class="tbx-filter-popover-input"
-                                  [value]="header.activeFilter ?? ''"
-                                  [placeholder]="'Filter ' + header.title + '…'"
-                                  (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                                />
-                                <div class="tbx-filter-popover-actions">
-                                  @if (header.activeFilter) {
-                                    <button
-                                      type="button"
-                                      class="tbx-filter-popover-btn"
-                                      (click)="applyColumnFilter(header.id, undefined)"
-                                    >
-                                      {{ strings.clearFilter }}
-                                    </button>
-                                  }
-                                  <button
-                                    type="button"
-                                    class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                                    (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                                  >
-                                    {{ strings.applyFilter }}
-                                  </button>
-                                </div>
-                              </div>
                             }
+                            <div class="tbx-filter-popover-actions">
+                              @if (header.activeFilter) {
+                                <button
+                                  type="button"
+                                  class="tbx-filter-popover-btn"
+                                  (click)="applyColumnFilter(header.id, undefined)"
+                                >
+                                  {{ strings.clearFilter }}
+                                </button>
+                              }
+                              <button
+                                type="button"
+                                class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+                                (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                              >
+                                {{ strings.applyFilter }}
+                              </button>
+                            </div>
                           </div>
                         }
                       </div>

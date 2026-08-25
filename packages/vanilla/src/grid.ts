@@ -1312,80 +1312,106 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const popover = el("div", { class: "tbx-filter-popover" });
     popover.addEventListener("click", (e) => e.stopPropagation());
 
+    const title = getColumnTitle(column) || id;
+    const placeholder = meta.filterPlaceholder || formatMessage(this.locale.filterColumnPlaceholder, { column: title });
+
+    const input = el("input", {
+      class: "tbx-filter-popover-input",
+      attrs: {
+        type: "text",
+        placeholder: placeholder,
+        value: currentValue ?? "",
+        "aria-label": `Filter ${title}`,
+      },
+    }) as HTMLInputElement;
+
+    setTimeout(() => {
+      input.focus?.();
+      input.select?.();
+    }, 10);
+
+    const apply = (valToApply?: string) => {
+      const val = (valToApply !== undefined ? valToApply : input.value).trim();
+      this.openFilterColumn = null;
+      this.applyQuery(withFilter(this.query, id, val || undefined));
+    };
+
+    input.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        apply();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.openFilterColumn = null;
+        this.render();
+      }
+    });
+
+    popover.appendChild(input);
+
     if (meta.filterOptions && meta.filterOptions.length > 0) {
       const optionsWrap = el("div", { class: "tbx-filter-popover-options" });
-      const allOption = el("div", {
-        class: !currentValue ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
-        text: this.locale.filterAll,
-      });
-      allOption.addEventListener("click", () => {
-        this.openFilterColumn = null;
-        this.applyQuery(withFilter(this.query, id, undefined));
-      });
-      optionsWrap.appendChild(allOption);
 
-      for (const opt of meta.filterOptions) {
-        const isSelected = currentValue === opt;
-        const optEl = el("div", {
-          class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
-          text: opt,
-        });
-        optEl.addEventListener("click", () => {
-          this.openFilterColumn = null;
-          this.applyQuery(withFilter(this.query, id, opt));
-        });
-        optionsWrap.appendChild(optEl);
-      }
-      popover.appendChild(optionsWrap);
-    } else {
-      const title = getColumnTitle(column) || id;
-      const input = el("input", {
-        class: "tbx-filter-popover-input",
-        attrs: {
-          type: "text",
-          placeholder: formatMessage(this.locale.filterColumnPlaceholder, { column: title }),
-          value: currentValue ?? "",
-        },
-      });
+      const renderOptions = (filterTerm: string) => {
+        replaceChildren(optionsWrap, []);
+        const term = filterTerm.trim().toLowerCase();
 
-      const apply = () => {
-        const val = input.value.trim();
-        this.openFilterColumn = null;
-        this.applyQuery(withFilter(this.query, id, val || undefined));
+        const allOption = el("div", {
+          class: !currentValue ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+          text: this.locale.filterAll,
+        });
+        allOption.addEventListener("click", () => {
+          apply("");
+        });
+        optionsWrap.appendChild(allOption);
+
+        const filtered = meta.filterOptions!.filter((opt) =>
+          !term || opt.toLowerCase().includes(term)
+        );
+
+        for (const opt of filtered) {
+          const isSelected = currentValue === opt;
+          const optEl = el("div", {
+            class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+            text: opt,
+          });
+          optEl.addEventListener("click", () => {
+            apply(opt);
+          });
+          optionsWrap.appendChild(optEl);
+        }
       };
 
-      input.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          apply();
-        }
+      renderOptions(input.value);
+      input.addEventListener("input", () => {
+        renderOptions(input.value);
       });
 
-      const actions = el("div", { class: "tbx-filter-popover-actions" });
-      if (currentValue) {
-        const clearBtn = el("button", {
-          class: "tbx-filter-popover-btn",
-          attrs: { type: "button" },
-          text: this.locale.clearFilter,
-        });
-        clearBtn.addEventListener("click", () => {
-          this.openFilterColumn = null;
-          this.applyQuery(withFilter(this.query, id, undefined));
-        });
-        actions.appendChild(clearBtn);
-      }
-
-      const applyBtn = el("button", {
-        class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
-        attrs: { type: "button" },
-        text: this.locale.applyFilter,
-      });
-      applyBtn.addEventListener("click", apply);
-      actions.appendChild(applyBtn);
-
-      popover.appendChild(input);
-      popover.appendChild(actions);
+      popover.appendChild(optionsWrap);
     }
+
+    const actions = el("div", { class: "tbx-filter-popover-actions" });
+    if (currentValue) {
+      const clearBtn = el("button", {
+        class: "tbx-filter-popover-btn",
+        attrs: { type: "button" },
+        text: this.locale.clearFilter,
+      });
+      clearBtn.addEventListener("click", () => {
+        apply("");
+      });
+      actions.appendChild(clearBtn);
+    }
+
+    const applyBtn = el("button", {
+      class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
+      attrs: { type: "button" },
+      text: this.locale.applyFilter,
+    });
+    applyBtn.addEventListener("click", () => apply());
+    actions.appendChild(applyBtn);
+
+    popover.appendChild(actions);
 
     return popover;
   }
