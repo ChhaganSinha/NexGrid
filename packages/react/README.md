@@ -21,6 +21,10 @@ identical on every platform.
 - Ships ESM and CJS, with a `"use client"` banner so it drops straight into the
   Next.js App Router.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX React Data Grid Preview" width="100%" />
+</p>
+
 ## Installation
 
 ```bash

@@ -15,6 +15,24 @@ One Engine · One Stylesheet · One Server Contract · Four Frameworks
 
 [**Explore Documentation**](docs/README.md) · [**View Examples**](examples/README.md) · [**Getting Started**](docs/getting-started.md) · [**Changelog**](CHANGELOG.md)
 
+<br/><br/>
+
+<p align="center">
+  <img src="docs/assets/tablex-preview.png" alt="TableX Data Grid Interface Preview (Light Mode)" width="100%" />
+</p>
+
+</div>
+
+---
+
+## 📸 Visual Showcase
+
+<div align="center">
+
+| ☀️ **Light Mode (Default Theme)** | 🌙 **Dark Mode (`theme="dark"`)** |
+| :---: | :---: |
+| [![TableX Light Mode](docs/assets/tablex-preview.png)](docs/assets/tablex-preview.png) | [![TableX Dark Mode](docs/assets/tablex-dark-preview.png)](docs/assets/tablex-dark-preview.png) |
+
 </div>
 
 ---

@@ -20,6 +20,10 @@ page in. Search, sorting, paging and filtering happen where the data lives.
 - Light / dark / auto theming through CSS custom properties
 - Every user-facing string localizable
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX Angular Data Grid Preview" width="100%" />
+</p>
+
 ---
 
 ## Install

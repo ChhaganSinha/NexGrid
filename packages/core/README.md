@@ -22,6 +22,10 @@ export engine (e.g. in server code or tests).
 | **Locale** | `TableXLocale`, `DEFAULT_LOCALE`, `formatMessage` |
 | **Theme** | `@tablex/core/styles.css` — the shared stylesheet, themed entirely via `--tbx-*` CSS custom properties |
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX Core Engine & Data Grid Preview" width="100%" />
+</p>
+
 ## Install
 
 ```bash

@@ -122,6 +122,12 @@ already uses. The `theme` prop is a convenience that adds it:
 | `"dark"` | `.tbx-dark` on the root | Always dark. |
 | `"auto"` | `.tbx-auto` on the root | Dark only when `prefers-color-scheme: dark`. |
 
+### Light Mode vs. Dark Mode Preview
+
+| ☀️ Light Mode (`theme="light"`) | 🌙 Dark Mode (`theme="dark"`) |
+| :---: | :---: |
+| ![TableX Light Mode](assets/tablex-preview.png) | ![TableX Dark Mode](assets/tablex-dark-preview.png) |
+
 ```tsx
 <TableX theme="dark" {...props} />
 <TableX theme="auto" {...props} />

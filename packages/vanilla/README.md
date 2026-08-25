@@ -18,6 +18,10 @@ you point the grid at an endpoint and let it fetch for itself.
 
 This is also the bundle that powers `TableX.AspNetCore`.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX Vanilla JS Data Grid Preview" width="100%" />
+</p>
+
 ---
 
 ## Install

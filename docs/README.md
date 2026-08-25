@@ -2,6 +2,10 @@
 
 Welcome to the official documentation for **TableX** — the server-driven data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
 
+<p align="center">
+  <img src="assets/tablex-preview.png" alt="TableX Data Grid Actual View" width="100%" />
+</p>
+
 ---
 
 ## 🧭 Navigation Guide

@@ -14,7 +14,7 @@ This package gives you three things and nothing you have to glue together:
 | --- | --- |
 | **`TableXQuery`** | Binds TableX's wire format straight off the query string. No configuration, no `[FromQuery]` gymnastics. |
 | **`ToPagedResponseAsync`** | Applies search, filters, sorting and paging to an `IQueryable<T>` through an **explicit allowlist**, and returns a `PagedResponse<T>`. On EF Core it leaves as two SQL statements. |
-| **Tag Helpers** | `<nex-grid>` and `<nex-grid-column>` render the grid, with the browser bundle shipped inside the package as a static web asset. |
+| **Tag Helpers** | `<table-x>` and `<table-x-column>` render the grid, with the browser bundle shipped inside the package as a static web asset. |
 
 - ASP.NET Core 8.0+ · zero package dependencies · MIT
 - Excel (`.xls`, styled badges) and CSV export, including the **whole filtered
@@ -23,6 +23,10 @@ This package gives you three things and nothing you have to glue together:
   automatic `S.No.`, numbered pagination with a page-jump box
 - Responsive: a table at ≥ 768 px, a card per record below
 - Light / dark / auto theming, fully localizable, accessible by construction
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX ASP.NET Core Data Grid Preview" width="100%" />
+</p>
 
 ---
 
