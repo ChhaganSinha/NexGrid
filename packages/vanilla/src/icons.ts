@@ -191,3 +191,57 @@ export function arrowUpDownIcon(className = "tbx-sort-icon tbx-sort-icon--idle")
 export function checkIcon(className = "tbx-check"): SVGSVGElement {
   return icon([["path", { d: "M20 6 9 17l-5-5" }]], className);
 }
+
+/** Funnel icon for column filter trigger. */
+export function funnelIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [["polygon", { points: "22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" }]],
+    className,
+  );
+}
+
+/** Rotate counter-clockwise / reset icon. */
+export function rotateCcwIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }],
+      ["path", { d: "M3 3v5h5" }],
+    ],
+    className,
+  );
+}
+
+/** Trash / delete icon for actions. */
+export function trashIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["path", { d: "M3 6h18" }],
+      ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }],
+      ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }],
+    ],
+    className,
+  );
+}
+
+/** Eye / view icon. */
+export function eyeIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["path", { d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" }],
+      ["circle", { cx: "12", cy: "12", r: "3" }],
+    ],
+    className,
+  );
+}
+
+/** Download tray icon. */
+export function downloadTrayIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }],
+      ["polyline", { points: "7 10 12 15 17 10" }],
+      ["line", { x1: "12", x2: "12", y1: "15", y2: "3" }],
+    ],
+    className,
+  );
+}

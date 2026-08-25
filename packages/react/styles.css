@@ -817,25 +817,35 @@
 }
 
 .tbx-filter-popover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   color: var(--tbx-fg);
-  background: transparent;
+  background: var(--tbx-card);
   border: 1px solid var(--tbx-border);
   border-radius: 4px;
   cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.tbx-filter-popover-btn .tbx-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .tbx-filter-popover-btn:hover {
-  background: var(--tbx-muted);
+  background: var(--tbx-card-2);
+  border-color: #94a3b8;
 }
 
 .tbx-filter-popover-btn--primary {
-  color: var(--tbx-primary-fg);
-  background: var(--tbx-primary);
-  border-color: var(--tbx-primary);
+  color: #ffffff;
+  background: var(--tbx-primary-active);
+  border-color: var(--tbx-primary-active);
 }
 
 .tbx-filter-popover-btn--primary:hover {

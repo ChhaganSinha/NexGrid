@@ -63,12 +63,17 @@ import {
   ColumnsIcon,
   DensityIcon,
   DownloadIcon,
+  DownloadTrayIcon,
   EditIcon,
+  EyeIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
   FilterIcon,
+  FunnelIcon,
+  RotateCcwIcon,
   SearchIcon,
   SlidersIcon,
+  TrashIcon,
   XIcon,
 } from "./icons.js";
 import {
@@ -383,7 +388,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           <p className="tbx-state-text">{locale.errorText}</p>
           {onRetry ? (
             <button type="button" className="tbx-btn" onClick={onRetry}>
-              {locale.retryButton}
+              <RotateCcwIcon className="tbx-icon" />
+              <span>{locale.retryButton}</span>
             </button>
           ) : null}
         </div>
@@ -794,7 +800,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                                     onQueryChange(withFilter(query, id, undefined));
                                   }}
                                 >
-                                  {locale.clearFilter}
+                                  <RotateCcwIcon className="tbx-icon" />
+                                  <span>{locale.clearFilter}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -808,7 +815,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                                     onQueryChange(withFilter(query, id, val || undefined));
                                   }}
                                 >
-                                  {locale.applyFilter}
+                                  <CheckIcon className="tbx-icon" />
+                                  <span>{locale.applyFilter}</span>
                                 </button>
                               </div>
                             </div>

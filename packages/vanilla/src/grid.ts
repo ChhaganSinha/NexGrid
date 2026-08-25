@@ -70,12 +70,17 @@ import {
   columnsIcon,
   densityIcon,
   downloadIcon,
+  downloadTrayIcon,
   editIcon,
+  eyeIcon,
   fileSpreadsheetIcon,
   fileTextIcon,
   filterIcon,
+  funnelIcon,
+  rotateCcwIcon,
   searchIcon,
   slidersIcon,
+  trashIcon,
   xIcon,
 } from "./icons.js";
 import type {
@@ -781,11 +786,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     // even when the host did not supply one.
     const onRetry = this.options.onRetry;
     if (onRetry || this.options.endpoint !== undefined) {
-      const button = el("button", {
-        class: "tbx-btn",
-        attrs: { type: "button", "data-tbx-focus": "retry" },
-        text: this.locale.retryButton,
-      });
+      const button = el(
+        "button",
+        {
+          class: "tbx-btn",
+          attrs: { type: "button", "data-tbx-focus": "retry" },
+        },
+        [rotateCcwIcon(), el("span", { text: this.locale.retryButton })],
+      );
       button.addEventListener("click", () => {
         if (onRetry) onRetry();
         else this.refresh();
@@ -1407,11 +1415,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const actions = el("div", { class: "tbx-filter-popover-actions" });
-    const clearBtn = el("button", {
-      class: "tbx-filter-popover-btn",
-      attrs: { type: "button" },
-      text: this.locale.clearFilter,
-    });
+    const clearBtn = el(
+      "button",
+      {
+        class: "tbx-filter-popover-btn",
+        attrs: { type: "button" },
+      },
+      [rotateCcwIcon(), el("span", { text: this.locale.clearFilter })],
+    );
     clearBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       input.value = "";
@@ -1419,11 +1430,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     });
     actions.appendChild(clearBtn);
 
-    const applyBtn = el("button", {
-      class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
-      attrs: { type: "button" },
-      text: this.locale.applyFilter,
-    });
+    const applyBtn = el(
+      "button",
+      {
+        class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
+        attrs: { type: "button" },
+      },
+      [checkIcon(), el("span", { text: this.locale.applyFilter })],
+    );
     applyBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       apply();

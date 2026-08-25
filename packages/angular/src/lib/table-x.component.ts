@@ -137,7 +137,20 @@ const SEARCH_DEBOUNCE_MS = 350;
         <p class="tbx-state-text">{{ strings.errorText }}</p>
         @if (retry.observed) {
           <button type="button" class="tbx-btn" (click)="retry.emit()">
-            {{ strings.retryButton }}
+            <svg
+              class="tbx-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            <span>{{ strings.retryButton }}</span>
           </button>
         }
       </div>
@@ -582,14 +595,39 @@ const SEARCH_DEBOUNCE_MS = 350;
                                 class="tbx-filter-popover-btn"
                                 (click)="applyColumnFilter(header.id, undefined)"
                               >
-                                {{ strings.clearFilter }}
+                                <svg
+                                  class="tbx-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                  <path d="M3 3v5h5" />
+                                </svg>
+                                <span>{{ strings.clearFilter }}</span>
                               </button>
                               <button
                                 type="button"
                                 class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
                                 (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
                               >
-                                {{ strings.applyFilter }}
+                                <svg
+                                  class="tbx-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                                <span>{{ strings.applyFilter }}</span>
                               </button>
                             </div>
                           </div>

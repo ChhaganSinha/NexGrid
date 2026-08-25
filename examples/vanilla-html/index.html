@@ -506,11 +506,22 @@
           );
         });
 
+        var zapSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        zapSvg.setAttribute("class", "tbx-icon");
+        zapSvg.setAttribute("viewBox", "0 0 24 24");
+        zapSvg.setAttribute("fill", "none");
+        zapSvg.setAttribute("stroke", "currentColor");
+        zapSvg.setAttribute("stroke-width", "2");
+        zapSvg.setAttribute("stroke-linecap", "round");
+        zapSvg.setAttribute("stroke-linejoin", "round");
+        var zapPath = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        zapPath.setAttribute("points", "13 2 3 14 12 14 11 22 21 10 12 10 13 2");
+        zapSvg.appendChild(zapPath);
+
         var breakButton = el("button", {
           class: "tbx-btn",
-          text: "Break next load",
           attrs: { type: "button" },
-        });
+        }, [zapSvg, el("span", { text: "Break next load" })]);
         breakButton.addEventListener("click", function () {
           failNext = true;
           applyQuery(query);
