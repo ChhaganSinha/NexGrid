@@ -38,7 +38,13 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "name",
       header: "Student",
-      meta: { minWidth: 230, filterable: true, filterPlaceholder: "Search student..." },
+      meta: {
+        minWidth: 230,
+        filterable: true,
+        filterPlaceholder: "Search student...",
+        pinned: "left",
+        editable: true,
+      },
       // A cell composed from avatar, name, and email: reach through `row.original`.
       cell: ({ row }) => (
         <div className="cell-user">
@@ -60,8 +66,6 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "email",
       header: "Email",
-      // Redundant with the cell above, so it starts hidden — the user can still
-      // switch it on from the Columns menu, and exports include it when visible.
       meta: { hidden: true, minWidth: 220, filterable: true },
     },
     {
@@ -88,6 +92,9 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
         width: 130,
         filterable: true,
         filterOptions: ["Active", "Pending", "Suspended", "Alumni"],
+        editable: true,
+        editType: "select",
+        editOptions: ["Active", "Pending", "Suspended", "Alumni"],
       },
       cell: ({ getValue }) => {
         const status = String(getValue());
@@ -97,7 +104,16 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "score",
       header: "Score",
-      meta: { align: "right", width: 90 },
+      meta: {
+        align: "right",
+        width: 110,
+        filterable: true,
+        filterType: "number-range",
+        aggregation: "avg",
+        aggregationLabel: "Avg:",
+        editable: true,
+        editType: "number",
+      },
       cell: ({ getValue }) => {
         const score = Number(getValue());
         return <span className="score">{score.toFixed(1)}%</span>;
@@ -106,7 +122,11 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "enrolledAt",
       header: "Enrolled Date",
-      meta: { width: 140 },
+      meta: {
+        width: 150,
+        filterable: true,
+        filterType: "date-range",
+      },
       // Sorting still happens on the server against the raw ISO value, so the
       // display format is free to be whatever reads best.
       cell: ({ getValue }) => {
@@ -136,7 +156,7 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       id: "actions",
       header: "Actions",
-      meta: { align: "right", width: 80 },
+      meta: { align: "right", width: 80, pinned: "right" },
       cell: ({ row }) => (
         <div className="row-actions">
           <button

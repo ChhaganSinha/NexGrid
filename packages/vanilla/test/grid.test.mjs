@@ -497,3 +497,59 @@ test("createTableX respects feature customization options to hide buttons/featur
 
   handle.destroy();
 });
+
+test("createTableX renders pinned columns, summary row, row expansion, and bulk bar", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "id", header: "ID", meta: { pinned: "left" } },
+    {
+      accessorKey: "score",
+      header: "Score",
+      meta: { aggregation: "avg", aggregationLabel: "Avg Score:" },
+    },
+    { accessorKey: "name", header: "Name" },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Enterprise Test",
+    columns,
+    data: [
+      { id: "1", name: "Alice", score: 90 },
+      { id: "2", name: "Bob", score: 80 },
+    ],
+    total: 2,
+    enableSelection: true,
+    enableSummaryRow: true,
+    enableBulkActions: true,
+    renderExpandedRow: (row) => `Details for ${row.name}`,
+  });
+
+  // Pinned column
+  const pinnedTh = container.querySelector(".tbx-th--pinned-left");
+  assert.ok(pinnedTh, "Pinned th should have .tbx-th--pinned-left class");
+
+  // Row expansion button
+  const expandBtns = container.querySelectorAll(".tbx-expand-btn");
+  assert.equal(expandBtns.length, 2, "Should have 2 expand buttons");
+
+  expandBtns[0].dispatchEvent(new MockMouseEvent("click"));
+  const expandedRow = container.querySelector(".tbx-expanded-row");
+  assert.ok(expandedRow, "Expanded row should exist after clicking expand");
+
+  // Summary row
+  const summaryRow = container.querySelector(".tbx-summary-row");
+  assert.ok(summaryRow, "Summary row should exist");
+
+  // Bulk actions bar on selection
+  const checkboxes = container.querySelectorAll(".tbx-checkbox");
+  assert.ok(checkboxes.length > 1, "Checkboxes should exist");
+  checkboxes[1].checked = true;
+  checkboxes[1].dispatchEvent(new MockEvent("change"));
+
+  const bulkBar = container.querySelector(".tbx-bulk-bar");
+  assert.ok(bulkBar, "Bulk actions floating bar should appear when a row is selected");
+
+  handle.destroy();
+});

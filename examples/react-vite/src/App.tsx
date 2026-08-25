@@ -155,6 +155,31 @@ export function App() {
         theme={theme}
         enableSelection
         enableColumnFilters
+        enableColumnReorder
+        enableBulkActions
+        enableSummaryRow
+        renderExpandedRow={(student) => (
+          <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+            <div>
+              <strong>Student ID:</strong> #{student.id}
+            </div>
+            <div>
+              <strong>Department:</strong> {student.department}
+            </div>
+            <div>
+              <strong>Scholarship:</strong> {student.scholarship ? "Awarded" : "None"}
+            </div>
+            <div>
+              <strong>Enrolled:</strong> {student.enrolledAt}
+            </div>
+          </div>
+        )}
+        onCellEdit={({ row, columnId, oldValue, newValue }) => {
+          setNotice({
+            type: "info",
+            message: `Updated ${columnId} of ${row.name}: ${String(oldValue)} → ${String(newValue)}`,
+          });
+        }}
         onSelectionChange={(ids) => setSelectedIds(ids)}
         onRowClick={(student) =>
           setNotice({ type: "info", message: `Opened ${student.name} (#${student.id})` })
