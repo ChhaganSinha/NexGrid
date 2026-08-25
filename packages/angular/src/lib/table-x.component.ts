@@ -213,15 +213,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                 stroke-linejoin="round"
                 aria-hidden="true"
               >
-                <line x1="21" x2="14" y1="4" y2="4" />
-                <line x1="10" x2="3" y1="4" y2="4" />
-                <line x1="21" x2="12" y1="12" y2="12" />
-                <line x1="8" x2="3" y1="12" y2="12" />
-                <line x1="21" x2="16" y1="20" y2="20" />
-                <line x1="12" x2="3" y1="20" y2="20" />
-                <line x1="14" x2="14" y1="2" y2="6" />
-                <line x1="8" x2="8" y1="10" y2="14" />
-                <line x1="16" x2="16" y1="18" y2="22" />
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M9 3v18" />
+                <path d="M15 3v18" />
               </svg>
               <span>{{ strings.columnsButton }}</span>
             </button>
@@ -274,7 +268,8 @@ const SEARCH_DEBOUNCE_MS = 350;
                 stroke-linejoin="round"
                 aria-hidden="true"
               >
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                <rect x="3" y="4.5" width="18" height="6" rx="1.5" />
+                <rect x="3" y="13.5" width="18" height="6" rx="1.5" />
               </svg>
               <span>{{ densityButtonLabel }}</span>
             </button>
@@ -317,6 +312,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                 [attr.aria-expanded]="openMenu === 'export'"
                 (click)="toggleMenu('export', $event)"
               >
+                <span>{{ isExporting ? strings.exportingButton : strings.exportButton }}</span>
                 <svg
                   class="tbx-icon"
                   viewBox="0 0 24 24"
@@ -327,11 +323,8 @@ const SEARCH_DEBOUNCE_MS = 350;
                   stroke-linejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" x2="12" y1="15" y2="3" />
+                  <path d="m6 9 6 6 6-6" />
                 </svg>
-                <span>{{ isExporting ? strings.exportingButton : strings.exportButton }}</span>
               </button>
               @if (openMenu === 'export') {
                 <div
@@ -763,7 +756,7 @@ const SEARCH_DEBOUNCE_MS = 350;
               (change)="onPageSizeChange($event)"
             >
               @for (size of pageSizes; track size) {
-                <option [attr.value]="size" [selected]="size === query.pageSize">{{ size }}</option>
+                <option [attr.value]="size" [selected]="size === query.pageSize">{{ size }} rows</option>
               }
             </select>
           </div>

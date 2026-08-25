@@ -64,9 +64,13 @@ import {
   arrowUpDownIcon,
   arrowUpIcon,
   checkIcon,
+  chevronDownIcon,
   chevronLeftIcon,
   chevronRightIcon,
+  columnsIcon,
+  densityIcon,
   downloadIcon,
+  editIcon,
   fileSpreadsheetIcon,
   fileTextIcon,
   filterIcon,
@@ -223,15 +227,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
       startGroup.appendChild(this.searchWrap);
     }
 
-    const columnsButton = this.createMenuButton("columns", slidersIcon(), this.locale.columnsButton);
+    const columnsButton = this.createMenuButton("columns", columnsIcon(), this.locale.columnsButton);
     endGroup.appendChild(this.wrapMenu("columns", columnsButton));
 
     this.densityLabel = el("span", { class: "tbx-capitalize" });
-    const densityButton = this.createMenuButton("density", filterIcon(), this.densityLabel);
+    const densityButton = this.createMenuButton("density", densityIcon(), this.densityLabel);
     endGroup.appendChild(this.wrapMenu("density", densityButton));
 
-    this.exportLabel = el("span");
-    const exportButton = this.createMenuButton("export", downloadIcon(), this.exportLabel);
+    this.exportLabel = el("span", { text: this.locale.exportButton });
+    const exportButton = this.createMenuButton("export", null, this.exportLabel, chevronDownIcon());
     exportButton.classList.add("tbx-btn--export");
     if (options.enableExport !== false) {
       endGroup.appendChild(this.wrapMenu("export", exportButton));
@@ -264,7 +268,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       attrs: { "aria-labelledby": rowsLabelId },
     });
     for (const size of PAGE_SIZES) {
-      this.rowsSelect.appendChild(el("option", { attrs: { value: String(size) }, text: String(size) }));
+      this.rowsSelect.appendChild(el("option", { attrs: { value: String(size) }, text: `${size} rows` }));
     }
     this.rowsSelect.addEventListener("change", () => {
       this.applyQuery(withPageSize(this.query, Number.parseInt(this.rowsSelect.value, 10)));
@@ -381,9 +385,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private createMenuButton(
     name: MenuName,
-    glyph: SVGSVGElement,
+    leadingGlyph: SVGSVGElement | null,
     label: string | HTMLSpanElement,
+    trailingGlyph: SVGSVGElement | null = null,
   ): HTMLButtonElement {
+    const children: ElementChild[] = [];
+    if (leadingGlyph) children.push(leadingGlyph);
+    children.push(typeof label === "string" ? el("span", { text: label }) : label);
+    if (trailingGlyph) children.push(trailingGlyph);
+
     const button = el(
       "button",
       {
@@ -395,7 +405,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
           "aria-expanded": "false",
         },
       },
-      [glyph, typeof label === "string" ? el("span", { text: label }) : label],
+      children,
     );
     button.addEventListener("click", () => this.toggleMenu(name));
     this.menuButtons.set(name, button);

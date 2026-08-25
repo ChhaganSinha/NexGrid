@@ -57,9 +57,13 @@ import {
   ArrowUpDownIcon,
   ArrowUpIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ColumnsIcon,
+  DensityIcon,
   DownloadIcon,
+  EditIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
   FilterIcon,
@@ -521,8 +525,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 aria-expanded={exportMenu.isOpen}
                 onClick={exportMenu.toggle}
               >
-                <DownloadIcon className="tbx-icon" />
                 <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
+                <ChevronDownIcon className="tbx-icon" />
               </button>
               {exportMenu.isOpen ? (
                 <div
@@ -1014,7 +1018,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             >
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
-                  {size}
+                  {size} rows
                 </option>
               ))}
             </select>

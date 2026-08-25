@@ -77,11 +77,11 @@ export function App() {
       <label className="filter">
         <span className="tbx-sr-only">Filter by status</span>
         <select
-          className="tbx-rows-select"
+          className="tbx-select"
           value={statusFilter}
           onChange={(event) => onStatusChange(event.target.value)}
         >
-          <option value="">All statuses</option>
+          <option value="">Status filter</option>
           {STATUSES.map((status) => (
             <option key={status} value={status}>
               {status}

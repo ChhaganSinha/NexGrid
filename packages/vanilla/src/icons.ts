@@ -59,42 +59,58 @@ export function xIcon(className = "tbx-icon"): SVGSVGElement {
   );
 }
 
-/** Horizontal sliders — the Columns menu trigger. */
-export function slidersIcon(className = "tbx-icon"): SVGSVGElement {
+/** Columns icon — 3 vertical columns inside a rounded box. */
+export function columnsIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
     [
-      ["line", { x1: "21", x2: "14", y1: "4", y2: "4" }],
-      ["line", { x1: "10", x2: "3", y1: "4", y2: "4" }],
-      ["line", { x1: "21", x2: "12", y1: "12", y2: "12" }],
-      ["line", { x1: "8", x2: "3", y1: "12", y2: "12" }],
-      ["line", { x1: "21", x2: "16", y1: "20", y2: "20" }],
-      ["line", { x1: "12", x2: "3", y1: "20", y2: "20" }],
-      ["line", { x1: "14", x2: "14", y1: "2", y2: "6" }],
-      ["line", { x1: "8", x2: "8", y1: "10", y2: "14" }],
-      ["line", { x1: "16", x2: "16", y1: "18", y2: "22" }],
+      ["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }],
+      ["path", { d: "M9 3v18" }],
+      ["path", { d: "M15 3v18" }],
     ],
     className,
   );
 }
 
-/** Funnel — the Density menu trigger. */
-export function filterIcon(className = "tbx-icon"): SVGSVGElement {
+/** Horizontal sliders — backwards compatible alias to columnsIcon. */
+export function slidersIcon(className = "tbx-icon"): SVGSVGElement {
+  return columnsIcon(className);
+}
+
+/** Density icon — horizontal rows / stacked bars. */
+export function densityIcon(className = "tbx-icon"): SVGSVGElement {
   return icon(
-    [["polygon", { points: "22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" }]],
+    [
+      ["rect", { x: "3", y: "4.5", width: "18", height: "6", rx: "1.5" }],
+      ["rect", { x: "3", y: "13.5", width: "18", height: "6", rx: "1.5" }],
+    ],
+    className,
+  );
+}
+
+/** Funnel — backwards compatible alias to densityIcon. */
+export function filterIcon(className = "tbx-icon"): SVGSVGElement {
+  return densityIcon(className);
+}
+
+/** Chevron down for dropdowns. */
+export function chevronDownIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon([["path", { d: "m6 9 6 6 6-6" }]], className);
+}
+
+/** Edit / pencil icon for actions. */
+export function editIcon(className = "tbx-icon"): SVGSVGElement {
+  return icon(
+    [
+      ["path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }],
+      ["path", { d: "m15 5 4 4" }],
+    ],
     className,
   );
 }
 
 /** Download tray — the Export menu trigger. */
 export function downloadIcon(className = "tbx-icon"): SVGSVGElement {
-  return icon(
-    [
-      ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }],
-      ["polyline", { points: "7 10 12 15 17 10" }],
-      ["line", { x1: "12", x2: "12", y1: "15", y2: "3" }],
-    ],
-    className,
-  );
+  return chevronDownIcon(className);
 }
 
 /** Spreadsheet document — the Excel export option. */

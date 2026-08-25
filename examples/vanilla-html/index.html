@@ -494,8 +494,8 @@
         //    1 either way.
         // =====================================================================
 
-        var statusSelect = el("select", { class: "tbx-rows-select" }, [
-          el("option", { text: "All statuses", attrs: { value: "" } }),
+        var statusSelect = el("select", { class: "tbx-select" }, [
+          el("option", { text: "Status filter", attrs: { value: "" } }),
         ]);
         STATUSES.forEach(function (status) {
           statusSelect.appendChild(el("option", { text: status, attrs: { value: status } }));
