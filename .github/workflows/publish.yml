@@ -32,25 +32,25 @@ jobs:
           npm run typecheck
           npm test
 
-      - name: Publish @nexgrid/core
-        run: npm publish --workspace=@nexgrid/core --access public || echo "@nexgrid/core already published or up-to-date"
+      - name: Publish @tablex/core
+        run: npm publish --workspace=@tablex/core --access public || echo "@tablex/core already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @nexgrid/vanilla
-        run: npm publish --workspace=@nexgrid/vanilla --access public || echo "@nexgrid/vanilla already published or up-to-date"
+      - name: Publish @tablex/vanilla
+        run: npm publish --workspace=@tablex/vanilla --access public || echo "@tablex/vanilla already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @nexgrid/react
-        run: npm publish --workspace=@nexgrid/react --access public || echo "@nexgrid/react already published or up-to-date"
+      - name: Publish @tablex/react
+        run: npm publish --workspace=@tablex/react --access public || echo "@tablex/react already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @nexgrid/angular
+      - name: Publish @tablex/angular
         run: |
           cd packages/angular/dist
-          npm publish --access public || echo "@nexgrid/angular already published or up-to-date"
+          npm publish --access public || echo "@tablex/angular already published or up-to-date"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -78,9 +78,9 @@ jobs:
           npm ci
           npm run build:core && npm run build:vanilla
 
-      - name: Build and Pack NexGrid.AspNetCore
+      - name: Build and Pack TableX.AspNetCore
         run: |
-          dotnet pack dotnet/NexGrid.AspNetCore/NexGrid.AspNetCore.csproj -c Release -o ./nupkg
+          dotnet pack dotnet/TableX.AspNetCore/TableX.AspNetCore.csproj -c Release -o ./nupkg
 
       - name: Push to NuGet.org (Trusted Publishing / OIDC)
         run: |

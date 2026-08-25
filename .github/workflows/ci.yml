@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   javascript:
@@ -22,7 +22,7 @@ jobs:
       - run: npm test
 
   dotnet:
-    name: NexGrid.AspNetCore (build)
+    name: TableX.AspNetCore (build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,5 +36,5 @@ jobs:
       # The RCL embeds the vanilla bundle as static web assets, so build JS first.
       - run: npm ci
       - run: npm run build:core && npm run build:vanilla
-      - run: dotnet build dotnet/NexGrid.sln -c Release
-      - run: dotnet test dotnet/NexGrid.sln -c Release --no-build
+      - run: dotnet build dotnet/TableX.sln -c Release
+      - run: dotnet test dotnet/TableX.sln -c Release --no-build

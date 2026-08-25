@@ -12,6 +12,9 @@ bin/
 obj/
 *.user
 .vs/
+nupkg/
+*.nupkg
+*.snupkg
 
 # Angular
 .angular/
