@@ -656,7 +656,7 @@
 
 .tbx-th {
   position: relative;
-  padding: 12px 14px;
+  padding: 10px 10px 10px 14px;
   font-size: 13px;
   font-weight: 600;
   color: var(--tbx-fg);
@@ -673,7 +673,7 @@
 
 .tbx-th--serial {
   width: 56px;
-  padding: 12px 10px;
+  padding: 10px 8px;
   text-align: center;
   font-weight: 600;
   font-size: 13px;
@@ -682,7 +682,7 @@
 
 .tbx-th--select {
   width: 44px;
-  padding: 12px 8px;
+  padding: 10px 8px;
   text-align: center;
 }
 
@@ -700,25 +700,32 @@
 }
 
 .tbx-th-inner {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .tbx-th-inner--center {
   justify-content: center;
-  width: 100%;
 }
 
 .tbx-th-inner--right {
   justify-content: flex-end;
-  width: 100%;
+}
+
+.tbx-th-inner > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .tbx-sort-icon-wrap {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  flex-shrink: 0;
 }
 
 .tbx-sort-icon {
@@ -760,9 +767,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   padding: 0;
+  margin-right: -4px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
