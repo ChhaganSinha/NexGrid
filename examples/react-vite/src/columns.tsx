@@ -100,12 +100,12 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
       meta: { align: "right", width: 90 },
       cell: ({ getValue }) => {
         const score = Number(getValue());
-        return <span className={score >= 80 ? "score score--high" : "score"}>{score}</span>;
+        return <span className="score">{score.toFixed(1)}%</span>;
       },
     },
     {
       accessorKey: "enrolledAt",
-      header: "Enrolled",
+      header: "Enrolled Date",
       meta: { width: 140 },
       // Sorting still happens on the server against the raw ISO value, so the
       // display format is free to be whatever reads best.
@@ -135,29 +135,31 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     },
     {
       id: "actions",
-      header: "",
-      meta: { align: "right", width: 130 },
+      header: "Actions",
+      meta: { align: "right", width: 80 },
       cell: ({ row }) => (
         <div className="row-actions">
           <button
             type="button"
-            className="tbx-btn"
+            className="btn-action"
+            aria-label={`Edit ${row.original.name}`}
             onClick={(event) => {
               event.stopPropagation();
               actions.onEdit(row.original);
             }}
           >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="tbx-btn"
-            onClick={(event) => {
-              event.stopPropagation();
-              actions.onRemove(row.original);
-            }}
-          >
-            Remove
+            <svg
+              className="tbx-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
+            </svg>
           </button>
         </div>
       ),

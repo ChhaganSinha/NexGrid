@@ -191,9 +191,20 @@
           return x - Math.floor(x);
         }
 
+        var HERO_STUDENTS = [
+          { id: "1", name: "Abne Smith", email: "abnesmith@gmail.com", department: "Computer Science", status: "Active", score: 63.0, enrolledAt: "2023-04-12", scholarship: true },
+          { id: "2", name: "Bnan Mitun", email: "nnanmmav@gmail.com", department: "Electrical", status: "Pending", score: 64.0, enrolledAt: "2023-04-13", scholarship: false },
+          { id: "3", name: "Darry Smith", email: "enithamith@gmail.com", department: "Mechanical", status: "Alumni", score: 90.7, enrolledAt: "2023-04-12", scholarship: false },
+          { id: "4", name: "Davy Name", email: "daryname@gmail.com", department: "Mechanical", status: "Alumni", score: 93.0, enrolledAt: "2023-04-13", scholarship: true },
+          { id: "6", name: "Maval Hamason", email: "parnanisv@gmail.com", department: "Computer Science", status: "Suspended", score: 79.0, enrolledAt: "2023-04-13", scholarship: false },
+          { id: "7", name: "Jaran Jomin", email: "jaransmith@gmail.com", department: "Electrical", status: "Active", score: 88.6, enrolledAt: "2023-04-12", scholarship: false },
+          { id: "8", name: "Saran Smith", email: "saramillf@gmail.com", department: "Mechanical", status: "Pending", score: 95.5, enrolledAt: "2023-04-13", scholarship: true },
+          { id: "10", name: "David Vollin", email: "davivolin@gmail.com", department: "Computer Science", status: "Suspended", score: 80.0, enrolledAt: "2023-01-11", scholarship: false },
+        ];
+
         function buildStudents(count) {
-          var rows = [];
-          for (var i = 0; i < count; i++) {
+          var rows = HERO_STUDENTS.slice();
+          for (var i = HERO_STUDENTS.length; i < count; i++) {
             var first = FIRST_NAMES[(i * 7 + 3) % FIRST_NAMES.length];
             var last = LAST_NAMES[(i * 5 + 1) % LAST_NAMES.length];
 
@@ -201,12 +212,12 @@
             day.setUTCDate(day.getUTCDate() + i * 7 + (i % 5));
 
             rows.push({
-              id: 1000 + i,
+              id: String(1000 + i),
               name: first + " " + last,
               email: (first + "." + last + i).toLowerCase() + "@example.edu",
               department: DEPARTMENTS[(i * 5 + 2) % DEPARTMENTS.length],
               status: STATUSES[Math.floor(pseudoRandom(i + 1) * STATUSES.length)],
-              score: Math.round(45 + pseudoRandom(i + 101) * 55),
+              score: parseFloat((45 + pseudoRandom(i + 101) * 55).toFixed(1)),
               enrolledAt: day.toISOString().slice(0, 10),
               scholarship: pseudoRandom(i + 7) > 0.68,
             });
@@ -214,7 +225,7 @@
           return rows;
         }
 
-        var STUDENTS = buildStudents(200);
+        var STUDENTS = buildStudents(1284);
 
         // =====================================================================
         // 2. The "endpoint" — answer a QueryState from that array.
@@ -374,14 +385,14 @@
             cell: function (ctx) {
               var score = Number(ctx.getValue());
               return el("span", {
-                class: score >= 80 ? "score score--high" : "score",
-                text: String(score),
+                class: "score",
+                text: score.toFixed(1) + "%",
               });
             },
           },
           {
             accessorKey: "enrolledAt",
-            header: "Enrolled",
+            header: "Enrolled Date",
             meta: { width: 140, filterable: true },
             // Sorting happens against the raw ISO value, so the display format
             // is free to be whatever reads best.
@@ -409,10 +420,25 @@
             // `actions` is a structural id: never sorted, never exported, never
             // listed in the Columns menu.
             id: "actions",
-            header: "",
-            meta: { align: "right", width: 90 },
+            header: "Actions",
+            meta: { align: "right", width: 80 },
             cell: function (ctx) {
-              var button = el("button", { class: "tbx-btn", text: "Edit", attrs: { type: "button" } });
+              var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+              svg.setAttribute("class", "tbx-icon");
+              svg.setAttribute("viewBox", "0 0 24 24");
+              svg.setAttribute("fill", "none");
+              svg.setAttribute("stroke", "currentColor");
+              svg.setAttribute("stroke-width", "2");
+              svg.setAttribute("stroke-linecap", "round");
+              svg.setAttribute("stroke-linejoin", "round");
+              var p1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+              p1.setAttribute("d", "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z");
+              var p2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+              p2.setAttribute("d", "m15 5 4 4");
+              svg.appendChild(p1);
+              svg.appendChild(p2);
+
+              var button = el("button", { class: "btn-action", attrs: { type: "button", "aria-label": "Edit" } }, [svg]);
               button.addEventListener("click", function (event) {
                 // Without this the row click handler fires too.
                 event.stopPropagation();

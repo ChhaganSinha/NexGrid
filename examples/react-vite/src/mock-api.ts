@@ -93,10 +93,21 @@ function pick<T>(values: readonly T[], index: number, fallback: T): T {
   return values[index % values.length] ?? fallback;
 }
 
-function buildStudents(count: number): Student[] {
-  const rows: Student[] = [];
+const HERO_STUDENTS: Student[] = [
+  { id: 1, name: "Abne Smith", email: "abnesmith@gmail.com", department: "Computer Science", status: "Active", score: 63.0, enrolledAt: "2023-04-12", scholarship: true },
+  { id: 2, name: "Bnan Mitun", email: "nnanmmav@gmail.com", department: "Electrical", status: "Pending", score: 64.0, enrolledAt: "2023-04-13", scholarship: false },
+  { id: 3, name: "Darry Smith", email: "enithamith@gmail.com", department: "Mechanical", status: "Alumni", score: 90.7, enrolledAt: "2023-04-12", scholarship: false },
+  { id: 4, name: "Davy Name", email: "daryname@gmail.com", department: "Mechanical", status: "Alumni", score: 93.0, enrolledAt: "2023-04-13", scholarship: true },
+  { id: 6, name: "Maval Hamason", email: "parnanisv@gmail.com", department: "Computer Science", status: "Suspended", score: 79.0, enrolledAt: "2023-04-13", scholarship: false },
+  { id: 7, name: "Jaran Jomin", email: "jaransmith@gmail.com", department: "Electrical", status: "Active", score: 88.6, enrolledAt: "2023-04-12", scholarship: false },
+  { id: 8, name: "Saran Smith", email: "saramillf@gmail.com", department: "Mechanical", status: "Pending", score: 95.5, enrolledAt: "2023-04-13", scholarship: true },
+  { id: 10, name: "David Vollin", email: "davivolin@gmail.com", department: "Computer Science", status: "Suspended", score: 80.0, enrolledAt: "2023-01-11", scholarship: false },
+];
 
-  for (let i = 0; i < count; i++) {
+function buildStudents(count: number): Student[] {
+  const rows: Student[] = [...HERO_STUDENTS];
+
+  for (let i = HERO_STUDENTS.length; i < count; i++) {
     const first = pick(FIRST_NAMES, i * 7 + 3, "Alex");
     const last = pick(LAST_NAMES, i * 5 + 1, "Doe");
     const name = `${first} ${last}`;
@@ -113,7 +124,7 @@ function buildStudents(count: number): Student[] {
       email: `${first}.${last}${i}`.toLowerCase() + "@example.edu",
       department,
       status,
-      score: Math.round(45 + pseudoRandom(i + 101) * 55),
+      score: parseFloat((45 + pseudoRandom(i + 101) * 55).toFixed(1)),
       enrolledAt: day.toISOString().slice(0, 10),
       scholarship: pseudoRandom(i + 7) > 0.68,
     });
@@ -122,8 +133,8 @@ function buildStudents(count: number): Student[] {
   return rows;
 }
 
-/** The full in-memory dataset. A real app never ships this to the browser. */
-export const STUDENTS: readonly Student[] = buildStudents(200);
+/** The full in-memory dataset with 1,284 entries. */
+export const STUDENTS: readonly Student[] = buildStudents(1284);
 
 // ---------------------------------------------------------------------------
 // The "endpoint"
