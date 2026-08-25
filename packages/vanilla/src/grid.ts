@@ -242,7 +242,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
     endGroup.appendChild(this.wrapMenu("density", densityButton));
 
     this.exportLabel = el("span", { text: this.locale.exportButton });
-    const exportButton = this.createMenuButton("export", null, this.exportLabel, chevronDownIcon());
+    const exportButton = this.createMenuButton(
+      "export",
+      downloadTrayIcon(),
+      this.exportLabel,
+      chevronDownIcon("tbx-icon tbx-chevron"),
+    );
     exportButton.classList.add("tbx-btn--export");
     if (options.enableExport !== false) {
       endGroup.appendChild(this.wrapMenu("export", exportButton));

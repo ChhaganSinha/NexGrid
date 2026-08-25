@@ -533,8 +533,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 aria-expanded={exportMenu.isOpen}
                 onClick={exportMenu.toggle}
               >
+                <DownloadTrayIcon className="tbx-icon" />
                 <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
-                <ChevronDownIcon className="tbx-icon" />
+                <ChevronDownIcon className="tbx-icon tbx-chevron" />
               </button>
               {exportMenu.isOpen ? (
                 <div
