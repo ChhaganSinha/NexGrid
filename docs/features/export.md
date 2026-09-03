@@ -130,7 +130,7 @@ own the flow with [`onExportAll`](#taking-over-the-export) and call
 `complete: false` in your own UI:
 
 ```ts
-import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@tablex/core";
+import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@nexgrid/core";
 
 async function collectEverything<T>(endpoint: string, query: QueryState) {
   const result = await fetchAllPages<T>(async (page, pageSize) => {
@@ -216,7 +216,7 @@ Supplying `badgeRules` **replaces** the defaults rather than extending them.
 Spread them in if you want both:
 
 ```ts
-import { DEFAULT_BADGE_RULES, type ExcelBadgeRule } from "@tablex/core";
+import { DEFAULT_BADGE_RULES, type ExcelBadgeRule } from "@nexgrid/core";
 
 export const badgeRules: readonly ExcelBadgeRule[] = [
   { values: ["Enrolled", "Graduated"], background: "#dcfce7", color: "#15803d" },
@@ -257,7 +257,7 @@ The workbook string is available on its own if you want to inspect or ship it
 elsewhere:
 
 ```ts
-import { toExcelHtml, toExportColumns } from "@tablex/core";
+import { toExcelHtml, toExportColumns } from "@nexgrid/core";
 
 const html = toExcelHtml({
   filename: "students",
@@ -356,8 +356,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: number;
@@ -421,8 +421,8 @@ export function StudentsGrid() {
 
 ```js
 // Vanilla
-import { createTableX, serializeQuery } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, serializeQuery } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const columns = [
   { accessorKey: "name", header: "Name" },
@@ -481,4 +481,4 @@ the hook for audit logging, rate limiting, or requiring elevated permission.
 
 - [Columns](../columns.md#columns-and-export) — `meta.exportable`
 - [Localization](../localization.md) — every export string
-- [`@tablex/core` API](../api/core.md) — `fetchAllPages`, `toExportColumns`, `downloadCsv`, `downloadExcel`
+- [`@nexgrid/core` API](../api/core.md) — `fetchAllPages`, `toExportColumns`, `downloadCsv`, `downloadExcel`

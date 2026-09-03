@@ -33,16 +33,16 @@ Write-Host " All JS packages built and verified." -ForegroundColor Green
 
 # 3. Publish NPM packages
 Write-Host "`n[3/5] Publishing NPM packages..." -ForegroundColor Yellow
-Write-Host " -> Publishing @tablex/core..." -ForegroundColor Gray
-npm publish --workspace=@tablex/core --access public
+Write-Host " -> Publishing @nexgrid/core..." -ForegroundColor Gray
+npm publish --workspace=@nexgrid/core --access public
 
-Write-Host " -> Publishing @tablex/vanilla..." -ForegroundColor Gray
-npm publish --workspace=@tablex/vanilla --access public
+Write-Host " -> Publishing @nexgrid/vanilla..." -ForegroundColor Gray
+npm publish --workspace=@nexgrid/vanilla --access public
 
-Write-Host " -> Publishing @tablex/react..." -ForegroundColor Gray
-npm publish --workspace=@tablex/react --access public
+Write-Host " -> Publishing @nexgrid/react..." -ForegroundColor Gray
+npm publish --workspace=@nexgrid/react --access public
 
-Write-Host " -> Publishing @tablex/angular..." -ForegroundColor Gray
+Write-Host " -> Publishing @nexgrid/angular..." -ForegroundColor Gray
 Push-Location packages/angular/dist
 npm publish --access public
 Pop-Location

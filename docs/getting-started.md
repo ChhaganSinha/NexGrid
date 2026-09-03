@@ -19,13 +19,13 @@ action into a `QueryState`, and hands it to you.
 
 | Platform | Command | Stylesheet |
 | --- | --- | --- |
-| React / Next.js | `npm install @tablex/react` | `import "@tablex/react/styles.css"` |
-| Angular 17+ | `npm install @tablex/angular` | add `node_modules/@tablex/angular/styles.css` to `angular.json` → `styles` |
-| Vanilla (bundler) | `npm install @tablex/vanilla` | `import "@tablex/vanilla/styles.css"` |
+| React / Next.js | `npm install @nexgrid/react` | `import "@nexgrid/react/styles.css"` |
+| Angular 17+ | `npm install @nexgrid/angular` | add `node_modules/@nexgrid/angular/styles.css` to `angular.json` → `styles` |
+| Vanilla (bundler) | `npm install @nexgrid/vanilla` | `import "@nexgrid/vanilla/styles.css"` |
 | Vanilla (script tag) | — | `<link rel="stylesheet" href=".../dist/tablex.css">` |
 | ASP.NET Core 8+ | `dotnet add package TableX.AspNetCore` | `~/_content/TableX.AspNetCore/tablex.css` |
 
-`@tablex/core` arrives as a dependency of every adapter — you only install it
+`@nexgrid/core` arrives as a dependency of every adapter — you only install it
 directly if you want to import engine helpers the adapter does not re-export.
 React needs React >= 18 as a peer; Angular needs `@angular/core`,
 `@angular/common` >= 17 and `rxjs` >= 7.
@@ -51,8 +51,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 export interface Student {
   id: number;
@@ -143,7 +143,7 @@ export default function App() {
 }
 ```
 
-Full prop table: [`@tablex/react` API](api/react.md).
+Full prop table: [`@nexgrid/react` API](api/react.md).
 
 ## Next.js (App Router)
 
@@ -167,7 +167,7 @@ export default function Page() {
 
 ```tsx
 // app/layout.tsx
-import "@tablex/react/styles.css";
+import "@nexgrid/react/styles.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -191,7 +191,7 @@ A matching route handler, so the page works end to end:
 ```ts
 // app/api/students/route.ts
 import { NextResponse } from "next/server";
-import { parseQuery, type PagedResponse } from "@tablex/core";
+import { parseQuery, type PagedResponse } from "@nexgrid/core";
 
 import type { Student } from "../../students/students-grid";
 
@@ -246,7 +246,7 @@ To put the query in the URL instead of component state, swap the state hook:
 
 import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { parseQuery, serializeQuery } from "@tablex/react";
+import { parseQuery, serializeQuery } from "@nexgrid/react";
 
 export function useUrlQuery() {
   const searchParams = useSearchParams();
@@ -274,7 +274,7 @@ Register the stylesheet in `angular.json`:
         "build": {
           "options": {
             "styles": [
-              "node_modules/@tablex/angular/styles.css",
+              "node_modules/@nexgrid/angular/styles.css",
               "src/styles.css"
             ]
           }
@@ -291,7 +291,7 @@ A service that fetches one page:
 // students.service.ts
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
 
 export interface Student {
   id: number;
@@ -325,7 +325,7 @@ import {
   type TableXAngularColumn,
   type TableXNotice,
   type QueryState,
-} from "@tablex/angular";
+} from "@nexgrid/angular";
 
 import { StudentsService, type Student } from "./students.service";
 
@@ -427,7 +427,7 @@ void bootstrapApplication(StudentsComponent, {
 });
 ```
 
-Full input/output table: [`@tablex/angular` API](api/angular.md).
+Full input/output table: [`@nexgrid/angular` API](api/angular.md).
 
 ## ASP.NET Core 8+
 
@@ -559,7 +559,7 @@ Full attribute tables: [`TableX.AspNetCore` API](api/aspnet.md).
 
 ## Vanilla JavaScript
 
-No build step needed. The browser bundle inlines `@tablex/core` and exposes
+No build step needed. The browser bundle inlines `@nexgrid/core` and exposes
 everything on a global called `TableX`.
 
 ```html
@@ -569,13 +569,13 @@ everything on a global called `TableX`.
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Students</title>
-  <link rel="stylesheet" href="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.css" />
 </head>
 <body>
   <h1>Students</h1>
   <div id="grid"></div>
 
-  <script src="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.global.js"></script>
+  <script src="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.global.js"></script>
   <script>
     const grid = TableX.createTableX(document.getElementById("grid"), {
       caption: "Students",
@@ -604,8 +604,8 @@ everything on a global called `TableX`.
 Through a bundler instead:
 
 ```js
-import { createTableX, parseQuery, serializeQuery } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, parseQuery, serializeQuery } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
@@ -622,7 +622,7 @@ const grid = createTableX(document.getElementById("grid"), {
 Call `grid.destroy()` when the containing view goes away — it aborts any
 in-flight request and releases every listener the grid put on `document`.
 
-Full option table: [`@tablex/vanilla` API](api/vanilla.md).
+Full option table: [`@nexgrid/vanilla` API](api/vanilla.md).
 
 ## What you need on the server
 
@@ -635,7 +635,7 @@ Whatever the platform, the endpoint contract is the same:
    the **full filtered count**.
 
 On ASP.NET Core, `TableXQuery` + `ToPagedResponseAsync` do all three. Elsewhere,
-`parseQuery` from `@tablex/core` handles step 1 with the same degradation rules.
+`parseQuery` from `@nexgrid/core` handles step 1 with the same degradation rules.
 Worked endpoints for ASP.NET Core, Node/Express and Next.js are in
 [Server integration](server-integration.md).
 

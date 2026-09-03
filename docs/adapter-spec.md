@@ -5,7 +5,7 @@ Angular, vanilla/ASP.NET) must implement. If an adapter and this spec
 disagree, the adapter is wrong.
 
 The engine — types, query reducers, pagination math, export, locale, theme
-CSS — lives in `@tablex/core` and MUST be imported, never reimplemented.
+CSS — lives in `@nexgrid/core` and MUST be imported, never reimplemented.
 
 ---
 
@@ -66,7 +66,7 @@ Core's `TableXColumn<TData, TRender>` — structurally TanStack-compatible:
 
 ## 4. Adapter APIs
 
-### 4.1 `@tablex/react` — `<TableX />`
+### 4.1 `@nexgrid/react` — `<TableX />`
 
 ```ts
 export interface TableXProps<TData> {
@@ -104,11 +104,11 @@ export function TableX<TData>(props: TableXProps<TData>): JSX.Element;
 
 - File starts with `"use client"` (via build banner) so it drops into Next.js
   App Router pages untouched.
-- No dependency other than `@tablex/core`; `react` is a peer (>= 18).
+- No dependency other than `@nexgrid/core`; `react` is a peer (>= 18).
 - Dropdowns are self-contained (open on click, close on outside click and
   Escape, `role="menu"` / `role="menuitemcheckbox"` with `aria-checked`).
 
-### 4.2 `@tablex/angular` — `<table-x>`
+### 4.2 `@nexgrid/angular` — `<table-x>`
 
 Standalone component (Angular ≥ 17), selector `table-x`.
 
@@ -125,7 +125,7 @@ Standalone component (Angular ≥ 17), selector `table-x`.
   as content children; the template receives `$implicit` = row and `value`.
   Toolbar actions via a `[tableXToolbar]` template or content projection.
 
-### 4.3 `@tablex/vanilla` — `createTableX`
+### 4.3 `@nexgrid/vanilla` — `createTableX`
 
 ```ts
 export interface TableXHandle<TData> {
@@ -294,7 +294,7 @@ chevrons use `width:16;height:16` inline or the `.tbx-icon` class.
 ## 8. Parity checklist (Definition of Done per adapter)
 
 - [ ] All 15 features in §2, behaviorally identical
-- [ ] DOM matches §6; icons match §7; zero runtime deps beyond `@tablex/core`
+- [ ] DOM matches §6; icons match §7; zero runtime deps beyond `@nexgrid/core`
 - [ ] All strings via locale; all query mutations via core reducers
 - [ ] Export flow per §5, including fetch-all with cap and notifications
 - [ ] Compiles under strict TypeScript; package builds green

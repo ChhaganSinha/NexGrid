@@ -19,12 +19,12 @@ One global file, shared by all four renderers.
 
 | Platform | How |
 | --- | --- |
-| React / Next.js | `import "@tablex/react/styles.css";` |
-| Angular | add `node_modules/@tablex/angular/styles.css` to `angular.json` → `styles` |
-| Vanilla (bundler) | `import "@tablex/vanilla/styles.css";` |
+| React / Next.js | `import "@nexgrid/react/styles.css";` |
+| Angular | add `node_modules/@nexgrid/angular/styles.css` to `angular.json` → `styles` |
+| Vanilla (bundler) | `import "@nexgrid/vanilla/styles.css";` |
 | Vanilla (script tag) | `<link rel="stylesheet" href=".../dist/tablex.css">` |
 | ASP.NET Core | `<link rel="stylesheet" href="@TableXAssets.StylesheetPath" />` |
-| From CSS anywhere | `@import "@tablex/core/styles.css";` |
+| From CSS anywhere | `@import "@nexgrid/core/styles.css";` |
 
 It must be **global**. In Angular, component styles are scoped by emulated
 view encapsulation and will not reach the grid's markup — putting the import in

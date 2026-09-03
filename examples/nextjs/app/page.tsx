@@ -11,7 +11,7 @@
 // ./columns.tsx) — defining columns here and passing them down fails at
 // runtime with "Functions cannot be passed directly to Client Components".
 
-import { defaultQuery } from "@tablex/core";
+import { defaultQuery } from "@nexgrid/core";
 
 import { queryStudents } from "@/lib/students";
 

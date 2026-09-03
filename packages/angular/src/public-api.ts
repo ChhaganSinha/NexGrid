@@ -1,4 +1,4 @@
-// @tablex/angular — the public surface of the Angular adapter.
+// @nexgrid/angular — the public surface of the Angular adapter.
 export { TableXComponent, NexGridComponent } from "./lib/table-x.component";
 export { TableXCellDirective, NexGridCellDirective } from "./lib/table-x-cell.directive";
 export { TableXToolbarDirective, NexGridToolbarDirective } from "./lib/table-x-toolbar.directive";
@@ -36,7 +36,7 @@ export {
   serializeQuery,
   withToggledSort,
   withToggledMultiSort,
-} from "@tablex/core";
+} from "@nexgrid/core";
 export type {
   ClientQueryOptions,
   Density,
@@ -52,4 +52,4 @@ export type {
   QueryState,
   SortDir,
   SortSpec,
-} from "@tablex/core";
+} from "@nexgrid/core";

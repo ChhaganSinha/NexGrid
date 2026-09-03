@@ -36,10 +36,10 @@ docs/
 │   ├── export.md               # Excel (.xls) & CSV full-dataset exports
 │   └── responsive.md           # Desktop table to mobile card layout
 └── api/                        # API & Prop References
-    ├── core.md                 # @tablex/core
-    ├── react.md                # @tablex/react
-    ├── angular.md              # @tablex/angular
-    ├── vanilla.md              # @tablex/vanilla
+    ├── core.md                 # @nexgrid/core
+    ├── react.md                # @nexgrid/react
+    ├── angular.md              # @nexgrid/angular
+    ├── vanilla.md              # @nexgrid/vanilla
     └── aspnet.md               # TableX.AspNetCore
 ```
 
@@ -86,10 +86,10 @@ Every feature in TableX behaves with 100% parity across all platforms:
 
 | Package | Documentation |
 | :--- | :--- |
-| [`@tablex/core`](api/core.md) | Engine: types, query reducers, pagination math, URL query serializer, export engine. |
-| [`@tablex/react`](api/react.md) | `<TableX />` props, hooks, and types. |
-| [`@tablex/angular`](api/angular.md) | `<table-x>` inputs, outputs, `*tableXCell`, and `*tableXToolbar` directives. |
-| [`@tablex/vanilla`](api/vanilla.md) | `createTableX()` options, event handlers, and handle methods. |
+| [`@nexgrid/core`](api/core.md) | Engine: types, query reducers, pagination math, URL query serializer, export engine. |
+| [`@nexgrid/react`](api/react.md) | `<TableX />` props, hooks, and types. |
+| [`@nexgrid/angular`](api/angular.md) | `<table-x>` inputs, outputs, `*tableXCell`, and `*tableXToolbar` directives. |
+| [`@nexgrid/vanilla`](api/vanilla.md) | `createTableX()` options, event handlers, and handle methods. |
 | [`TableX.AspNetCore`](api/aspnet.md) | `<table-x>` Tag Helpers, `TableXQuery` model binder, and EF Core `IQueryable` extensions. |
 
 ---

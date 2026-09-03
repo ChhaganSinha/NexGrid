@@ -29,13 +29,13 @@ npm start              # http://localhost:4200
 "dependencies": {
   // ng-packagr's OUTPUT is the publishable package, so the link points at
   // dist/, not at packages/angular itself.
-  "@tablex/angular": "file:../../packages/angular/dist",
-  "@tablex/core": "file:../../packages/core"
+  "@nexgrid/angular": "file:../../packages/angular/dist",
+  "@nexgrid/core": "file:../../packages/core"
 },
-// @tablex/angular depends on "@tablex/core": "0.1.0"; this points that
+// @nexgrid/angular depends on "@nexgrid/core": "0.1.0"; this points that
 // transitive dependency at the local folder too.
 "overrides": {
-  "@tablex/core": "file:../../packages/core"
+  "@nexgrid/core": "file:../../packages/core"
 }
 ```
 
@@ -45,7 +45,7 @@ real path and can end up loading a second copy of `@angular/core` (`NG0203`).
 In your own app you install from a registry and none of this applies:
 
 ```bash
-npm install @tablex/angular
+npm install @nexgrid/angular
 ```
 
 ## Registering the stylesheet
@@ -57,14 +57,14 @@ your own styles:
 ```jsonc
 // angular.json → projects → … → architect → build → options
 "styles": [
-  "node_modules/@tablex/angular/styles.css",
+  "node_modules/@nexgrid/angular/styles.css",
   "src/styles.css"
 ]
 ```
 
 It must be **global**. Putting it in a component's `styles` does nothing —
 Angular's emulated encapsulation rewrites the selectors and they never match the
-grid's markup. (`@import "@tablex/core/styles.css";` from a global CSS file
+grid's markup. (`@import "@nexgrid/core/styles.css";` from a global CSS file
 works too; it is the same sheet.)
 
 ## What is where
@@ -119,7 +119,7 @@ the outer stream survives a failure and the retry button still works.
 
 Column filters are the host's job: the grid renders no filter UI, it only
 carries `filter[status]=…` inside the query. Build that with `withFilter` from
-`@tablex/core` rather than spreading the object by hand — the reducers are what
+`@nexgrid/core` rather than spreading the object by hand — the reducers are what
 guarantee a filter change resets to page 1 and that the sort cycle stays
 `asc → desc → cleared` on every platform.
 
@@ -129,7 +129,7 @@ guarantee a filter change resets to page 1 and that the sort cycle stays
 
 ```ts
 import { HttpClient } from "@angular/common/http";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
 
 private readonly http = inject(HttpClient);
 

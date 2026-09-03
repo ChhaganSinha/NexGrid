@@ -115,7 +115,7 @@ thing on the client and on the server.
 initial sort, a "newest first" button, a saved view — use `withSort`:
 
 ```ts
-import { defaultQuery, withSort, type QueryState } from "@tablex/core";
+import { defaultQuery, withSort, type QueryState } from "@nexgrid/core";
 
 // Newest first on first paint.
 const initial: QueryState = withSort(defaultQuery(), "createdAt", "desc");
@@ -126,7 +126,7 @@ const initial: QueryState = withSort(defaultQuery(), "createdAt", "desc");
 "use client";
 
 import { useState } from "react";
-import { TableX, defaultQuery, withSort, type QueryState } from "@tablex/react";
+import { TableX, defaultQuery, withSort, type QueryState } from "@nexgrid/react";
 
 export function StudentsGrid() {
   const [query, setQuery] = useState<QueryState>(() =>
@@ -156,7 +156,7 @@ In the ASP.NET Core Tag Helper the initial sort is one attribute:
 Reading the primary sort back, for a "sorted by" label or an analytics event:
 
 ```ts
-import { primarySort } from "@tablex/core";
+import { primarySort } from "@nexgrid/core";
 
 const sort = primarySort(query);   // SortSpec | undefined
 const label = sort ? `${sort.field} (${sort.dir})` : "default order";
@@ -172,7 +172,7 @@ The **header UI** drives a single sort: `withToggledSort` replaces the array.
 Multi-sort is therefore something you compose yourself and hand in:
 
 ```ts
-import { type QueryState } from "@tablex/core";
+import { type QueryState } from "@nexgrid/core";
 
 const query: QueryState = {
   page: 1,
@@ -215,7 +215,7 @@ Resolve the field through a map you wrote. Never index a data structure with the
 raw string:
 
 ```ts
-import { parseQuery } from "@tablex/core";
+import { parseQuery } from "@nexgrid/core";
 
 const SORTABLE = {
   name: "name",
@@ -244,4 +244,4 @@ Full worked endpoints: [Server integration](../server-integration.md).
 
 - [Columns](../columns.md) — `enableSorting`, ids, structural columns
 - [Pagination](pagination.md) — why a sort change resets to page 1
-- [`@tablex/core` API](../api/core.md) — `withToggledSort`, `withSort`, `primarySort`
+- [`@nexgrid/core` API](../api/core.md) — `withToggledSort`, `withSort`, `primarySort`

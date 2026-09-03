@@ -60,7 +60,7 @@ import {
   type PagedResponse,
   type QueryState,
   type TableXLocale,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 import { append, el, replaceChildren, type ElementChild } from "./dom.js";
 import {

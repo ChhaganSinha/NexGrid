@@ -46,7 +46,7 @@ The consequences are worth stating plainly:
 
 ```mermaid
 graph TD
-    subgraph engine["@tablex/core — the engine"]
+    subgraph engine["@nexgrid/core — the engine"]
         T["types.ts<br/>QueryState · PagedResponse · PAGE_SIZES"]
         Q["query.ts<br/>withToggledSort · withSearch · withPage<br/>withPageSize · withFilter"]
         C["column.ts<br/>TableXColumn · isSortable · visibleColumns"]
@@ -58,9 +58,9 @@ graph TD
     end
 
     subgraph adapters["Renderers — thin by design"]
-        R["@tablex/react<br/>&lt;TableX /&gt;"]
-        A["@tablex/angular<br/>&lt;table-x&gt;"]
-        V["@tablex/vanilla<br/>createTableX()"]
+        R["@nexgrid/react<br/>&lt;TableX /&gt;"]
+        A["@nexgrid/angular<br/>&lt;table-x&gt;"]
+        V["@nexgrid/vanilla<br/>createTableX()"]
     end
 
     N["TableX.AspNetCore<br/>&lt;table-x&gt; Tag Helper + IQueryable extensions"]
@@ -87,7 +87,7 @@ These two types are the entire integration surface. Implement them and any
 TableX adapter works against your API with no glue code.
 
 ```ts
-// From @tablex/core
+// From @nexgrid/core
 export const PAGE_SIZES = [10, 25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
@@ -150,7 +150,7 @@ sequenceDiagram
     autonumber
     actor User
     participant Grid as TableX adapter
-    participant Core as "@tablex/core"
+    participant Core as "@nexgrid/core"
     participant Host as Your component
     participant API as Your endpoint
 
@@ -212,7 +212,7 @@ actually match.
 ## The reducers are the API
 
 `QueryState` is a plain object, so nothing stops you writing
-`{ ...query, page: 4 }`. Do not. The reducers in `@tablex/core` are where the
+`{ ...query, page: 4 }`. Do not. The reducers in `@nexgrid/core` are where the
 cross-platform behavior lives:
 
 ```ts
@@ -225,7 +225,7 @@ import {
   withFilter,
   totalPagesFor,
   type QueryState,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 let query: QueryState = defaultQuery();
 // { page: 1, pageSize: 10, sort: [] }
@@ -256,7 +256,7 @@ Three invariants they enforce, on every platform:
    not an error state anyone should have to handle.
 3. Page numbers clamp to `[1, totalPages]`.
 
-Full signatures: [`@tablex/core` API reference](api/core.md).
+Full signatures: [`@nexgrid/core` API reference](api/core.md).
 
 ## Controlled vs. endpoint mode
 
@@ -272,8 +272,8 @@ Endpoint mode still emits `onQueryChange`, so you can mirror the query into the
 address bar without taking over fetching:
 
 ```js
-import { createTableX, parseQuery, serializeQuery } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, parseQuery, serializeQuery } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",

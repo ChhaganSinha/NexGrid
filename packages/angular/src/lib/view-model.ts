@@ -10,7 +10,7 @@
 // plain property reads, and gives every `@for` a stable `track` key.
 
 import type { TemplateRef } from "@angular/core";
-import { getCellText, getColumnId, type TableXColumn } from "@tablex/core";
+import { getCellText, getColumnId, type TableXColumn } from "@nexgrid/core";
 
 import type { TableXCellTemplateContext } from "./types";
 

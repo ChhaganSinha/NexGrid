@@ -20,7 +20,7 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [],
             "styles": [
-              "node_modules/@tablex/angular/styles.css",
+              "node_modules/@nexgrid/angular/styles.css",
               "src/styles.css"
             ],
             "scripts": [],

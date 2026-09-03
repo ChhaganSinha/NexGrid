@@ -13,7 +13,7 @@
 // Swapping this for a real API is a one-method change — see the README.
 
 import { Injectable } from "@angular/core";
-import type { PagedResponse, QueryState } from "@tablex/angular";
+import type { PagedResponse, QueryState } from "@nexgrid/angular";
 import { Observable, delay, of } from "rxjs";
 
 /** The row type this example pages through. */

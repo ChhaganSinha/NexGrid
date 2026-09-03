@@ -11,7 +11,7 @@ const nextConfig = {
   // it works out which files a build needs, and silences the "inferred your
   // workspace root" warning.
   //
-  // Delete this once you install `@tablex/react` from a registry — a normal
+  // Delete this once you install `@nexgrid/react` from a registry — a normal
   // Next.js app needs no configuration at all to use TableX.
   outputFileTracingRoot: join(here, "..", ".."),
 };

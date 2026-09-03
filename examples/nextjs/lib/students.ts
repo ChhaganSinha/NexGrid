@@ -12,7 +12,7 @@
 // worth copying: search and filter decide WHICH rows match, so they run before
 // the count that draws the pager; sort decides what the page window slices.
 
-import type { PagedResponse, QueryState } from "@tablex/core";
+import type { PagedResponse, QueryState } from "@nexgrid/core";
 
 import { DEPARTMENTS, STATUSES, type Student } from "./student-types";
 

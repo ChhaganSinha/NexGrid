@@ -16,7 +16,7 @@ usually work unchanged — see [Migrating from TanStack](migration-from-tanstack
 ## The column type
 
 ```ts
-// From @tablex/core
+// From @nexgrid/core
 export interface TableXCellContext<TData> {
   row: { original: TData };
   getValue: () => unknown;
@@ -149,7 +149,7 @@ can never drift apart. See [Responsive](features/responsive.md).
 ### React — return any `ReactNode`
 
 ```tsx
-import type { TableXReactColumn } from "@tablex/react";
+import type { TableXReactColumn } from "@nexgrid/react";
 
 interface Student {
   id: number;
@@ -224,7 +224,7 @@ import {
   defaultQuery,
   type TableXAngularColumn,
   type QueryState,
-} from "@tablex/angular";
+} from "@nexgrid/angular";
 
 export interface Student {
   id: number;
@@ -312,8 +312,8 @@ same array you pass to `[data]` and the context becomes fully typed under
 ### Vanilla — return a string or a `Node`
 
 ```js
-import { createTableX, el } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, el } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const columns = [
   { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
@@ -398,7 +398,7 @@ grid yourself:
 ```
 
 The configuration block's id is always `<container id>-config`. Everything
-`@tablex/vanilla` accepts is available on that object: `onNotify`,
+`@nexgrid/vanilla` accepts is available on that object: `onNotify`,
 `onRowClick`, `onSelectionChange`, `locale`, `badgeRules`, `fetchOptions`.
 
 ## Alignment and width
@@ -478,4 +478,4 @@ More: [Export](features/export.md).
 - [Sorting](features/sorting.md) — `enableSorting` and the server allowlist
 - [Responsive](features/responsive.md) — how columns become card rows
 - [Theming](theming.md) — styling cells with tokens
-- [`@tablex/core` API](api/core.md) — every column helper
+- [`@nexgrid/core` API](api/core.md) — every column helper

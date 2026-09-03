@@ -1,4 +1,4 @@
-# `@tablex/vanilla` API reference
+# `@nexgrid/vanilla` API reference
 
 > The canonical option tables, with prose for every option, live in the package
 > README: **[`packages/vanilla/README.md`](../../packages/vanilla/README.md)**.
@@ -6,20 +6,20 @@
 > only matter once you are wiring it up.
 
 ```bash
-npm install @tablex/vanilla
+npm install @nexgrid/vanilla
 ```
 
 ```js
-import { createTableX } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 ```
 
-Or from a script tag — the browser bundle inlines `@tablex/core` and exposes
+Or from a script tag — the browser bundle inlines `@nexgrid/core` and exposes
 everything on a global called `TableX`:
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.css" />
-<script src="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.global.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.css" />
+<script src="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.global.js"></script>
 ```
 
 This bundle is also what `TableX.AspNetCore` embeds.
@@ -30,7 +30,7 @@ This bundle is also what `TableX.AspNetCore` embeds.
 - [Types](#types)
 - [DOM helpers](#dom-helpers)
 - [Icons](#icons)
-- [Re-exported from `@tablex/core`](#re-exported-from-tablexcore)
+- [Re-exported from `@nexgrid/core`](#re-exported-from-tablexcore)
 - [Packaging](#packaging)
 
 ## `createTableX`
@@ -164,8 +164,8 @@ export interface TableXHandle<TData> {
 | `destroy()` | Detaches the grid, aborts any in-flight request, clears the search timer, removes every `document` listener it registered (outside-click, Escape). **Safe to call twice.** |
 
 ```js
-import { createTableX, buildQueryUrl, defaultQuery } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, buildQueryUrl, defaultQuery } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 let query = defaultQuery();
 
@@ -271,8 +271,8 @@ export function replaceChildren(parent: Element, children: readonly ElementChild
 | `svgEl` | Uses `createElementNS`. An `<svg>` built with `createElement` lands in the HTML namespace and renders as nothing. |
 
 ```js
-import { createTableX, el } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, el } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
@@ -310,7 +310,7 @@ import {
   chevronLeftIcon, chevronRightIcon, downloadIcon,
   fileSpreadsheetIcon, fileTextIcon, filterIcon,
   searchIcon, slidersIcon, xIcon,
-} from "@tablex/vanilla";
+} from "@nexgrid/vanilla";
 ```
 
 All of them use `viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -321,7 +321,7 @@ one the grid itself uses (`tbx-icon`, `tbx-search-icon`, `tbx-check`,
 [`adapter-spec.md` §7](../adapter-spec.md).
 
 ```js
-import { el, downloadIcon } from "@tablex/vanilla";
+import { el, downloadIcon } from "@nexgrid/vanilla";
 
 const button = el("button", { class: "tbx-btn", attrs: { type: "button" } }, [
   downloadIcon(),
@@ -329,7 +329,7 @@ const button = el("button", { class: "tbx-btn", attrs: { type: "button" } }, [
 ]);
 ```
 
-## Re-exported from `@tablex/core`
+## Re-exported from `@nexgrid/core`
 
 The browser bundle has no module system to reach the engine through, so a
 curated slice of core is re-exported here. Under the script tag these are
@@ -346,7 +346,7 @@ import {
   primarySort, resolveLocale, serialNumber, serializeQuery, timestampedFilename,
   toSearchParams, totalPagesFor, withFilter, withPage, withPageSize, withSearch,
   withSort, withToggledSort,
-} from "@tablex/vanilla";
+} from "@nexgrid/vanilla";
 ```
 
 **Types**
@@ -356,14 +356,14 @@ import type {
   Density, ExcelBadgeRule, TableXCellContext, TableXColumn, TableXColumnMeta,
   TableXLocale, PageItem, PageSize, PagedResponse, QueryState, RecordRange,
   SortDir, SortSpec,
-} from "@tablex/vanilla";
+} from "@nexgrid/vanilla";
 ```
 
 Mirroring the grid into the address bar is therefore three lines:
 
 ```js
-import { createTableX, parseQuery, serializeQuery } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX, parseQuery, serializeQuery } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 
 const grid = createTableX(document.getElementById("grid"), {
   caption: "Students",
@@ -382,7 +382,7 @@ const grid = createTableX(document.getElementById("grid"), {
 | Browser bundle | `dist/tablex.global.js` — IIFE, global `TableX`, core inlined, minified |
 | Stylesheet | `dist/tablex.css` — a copy of the core sheet |
 | `unpkg` / `jsdelivr` | `dist/tablex.global.js` |
-| Runtime dependencies | `@tablex/core` only (inlined in the browser bundle) |
+| Runtime dependencies | `@nexgrid/core` only (inlined in the browser bundle) |
 | Node | `>= 18` |
 | License | MIT |
 
@@ -394,4 +394,4 @@ ships as static web assets.
 
 - [Package README](../../packages/vanilla/README.md) — the canonical option tables
 - [`TableX.AspNetCore` API](aspnet.md) — the Razor front end over this bundle
-- [`@tablex/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md)
+- [`@nexgrid/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md)

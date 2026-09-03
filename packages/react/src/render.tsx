@@ -12,7 +12,7 @@ import {
   getColumnId,
   type TableXColumn,
   type NexGridColumn,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 /** Default width, in px, for a column that declares neither `width` nor `minWidth`. */
 export const DEFAULT_MIN_WIDTH = 120;

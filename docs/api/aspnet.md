@@ -13,7 +13,7 @@ dotnet add package TableX.AspNetCore
 A Razor Class Library targeting `net8.0`, with a `FrameworkReference` on
 `Microsoft.AspNetCore.App` and **zero package dependencies**. It gives you three
 things: a query binder, `IQueryable` paging extensions, and Tag Helpers over the
-`@tablex/vanilla` browser bundle, which ships inside the package as a static
+`@nexgrid/vanilla` browser bundle, which ships inside the package as a static
 web asset.
 
 - [Setup](#setup)
@@ -72,7 +72,7 @@ styles.
 | `Default` | `static TableXQuery` | Page 1, default size, no sort/search/filter. |
 | `PageKey`, `PageSizeKey`, `SortKey`, `SearchKey`, `FilterKeyPrefix` | `const string` | `"page"`, `"pageSize"`, `"sort"`, `"q"`, `"filter["`. |
 
-Binding never fails — parsing mirrors `@tablex/core`'s `parseQuery` exactly,
+Binding never fails — parsing mirrors `@nexgrid/core`'s `parseQuery` exactly,
 including how it degrades. A hand-edited URL produces a usable grid, not a 400.
 The full degradation table is in the
 [README](../../dotnet/TableX.AspNetCore/README.md#binding-never-fails) and in
@@ -153,7 +153,7 @@ public static class PageSizes
 }
 ```
 
-The same allowlist as `@tablex/core`'s `PAGE_SIZES`.
+The same allowlist as `@nexgrid/core`'s `PAGE_SIZES`.
 
 ### `TableXQueryModelBinder`
 
@@ -347,9 +347,9 @@ A cell renderer is a function, and functions do not survive JSON. Use
 }
 ```
 
-Everything `@tablex/vanilla` accepts is available on that object: `onNotify`,
+Everything `@nexgrid/vanilla` accepts is available on that object: `onNotify`,
 `onRowClick`, `onSelectionChange`, `locale`, `badgeRules`, `fetchOptions`, and
-the rest — see [`@tablex/vanilla` API](vanilla.md#tablexoptionstdata).
+the rest — see [`@nexgrid/vanilla` API](vanilla.md#tablexoptionstdata).
 
 ### Enums
 
@@ -430,5 +430,5 @@ dotnet build dotnet/TableX.sln -c Release
 ## Related
 
 - [Package README](../../dotnet/TableX.AspNetCore/README.md) — the canonical attribute tables
-- [`@tablex/vanilla` API](vanilla.md) — the bundle this package embeds
+- [`@nexgrid/vanilla` API](vanilla.md) — the bundle this package embeds
 - [Server integration](../server-integration.md) · [Getting started › ASP.NET Core](../getting-started.md#aspnet-core-8)

@@ -30,7 +30,7 @@ public sealed class HomeController : Controller
     /// <para>
     /// <b><c>TableXQuery query</c></b> binds itself off the query string. There
     /// is no <c>[FromQuery]</c>, no startup registration, and no validation to
-    /// write: parsing mirrors <c>@tablex/core</c>'s <c>parseQuery</c> exactly,
+    /// write: parsing mirrors <c>@nexgrid/core</c>'s <c>parseQuery</c> exactly,
     /// including how it degrades. <c>?page=0</c> becomes page 1,
     /// <c>?pageSize=99999</c> becomes 10, <c>?sort=:desc</c> is dropped. A
     /// hand-edited URL produces a usable grid rather than a 400 in the middle of

@@ -15,7 +15,7 @@
 //      and are untrusted — `TableX.AspNetCore` makes the same rule structural
 //      with `.Sortable(...)` / `.Filterable(...)`.
 
-import type { PagedResponse, QueryState } from "@tablex/core";
+import type { PagedResponse, QueryState } from "@nexgrid/core";
 
 /** The row type this example pages through. */
 export interface Student {

@@ -2,10 +2,10 @@
 // EventEmitters.
 //
 // Everything about the data contract itself — `QueryState`, `TableXColumn`,
-// the locale, the export options — lives in `@tablex/core` and is re-exported
+// the locale, the export options — lives in `@nexgrid/core` and is re-exported
 // from this package's public API. Nothing here reimplements engine behavior.
 
-import type { TableXColumn } from "@tablex/core";
+import type { TableXColumn } from "@nexgrid/core";
 
 /**
  * A NexGrid column as the Angular adapter binds it.

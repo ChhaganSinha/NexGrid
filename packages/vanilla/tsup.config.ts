@@ -19,6 +19,6 @@ export default defineConfig([
     minify: true,
     sourcemap: true,
     target: "es2018",
-    noExternal: [/@tablex\/core/],
+    noExternal: [/@nexgrid\/core/],
   },
 ]);

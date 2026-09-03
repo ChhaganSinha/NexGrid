@@ -14,7 +14,7 @@ import {
   type TableXTheme,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
+} from "@nexgrid/react";
 
 import { studentColumns } from "./columns";
 import { STATUSES, fetchStudents, scheduleFailure, type Student } from "./mock-api";

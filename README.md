@@ -7,7 +7,7 @@
 One Engine · One Stylesheet · One Server Contract · Four Frameworks
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![npm version](https://img.shields.io/npm/v/@tablex/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@tablex/react)
+[![npm version](https://img.shields.io/npm/v/@nexgrid/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@nexgrid/react)
 [![NuGet version](https://img.shields.io/nuget/v/TableX.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/TableX.AspNetCore)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen?style=flat-square)](packages/core/test)
@@ -72,10 +72,10 @@ sequenceDiagram
 
 | Package | Target Platform | Installation |
 | :--- | :--- | :--- |
-| [`@tablex/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @tablex/core` |
-| [`@tablex/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @tablex/react` |
-| [`@tablex/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @tablex/angular` |
-| [`@tablex/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @tablex/vanilla` |
+| [`@nexgrid/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @nexgrid/core` |
+| [`@nexgrid/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @nexgrid/react` |
+| [`@nexgrid/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @nexgrid/angular` |
+| [`@nexgrid/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @nexgrid/vanilla` |
 | [`TableX.AspNetCore`](dotnet/TableX.AspNetCore) | ASP.NET Core 8+ Razor Class Library & TagHelpers | `dotnet add package TableX.AspNetCore` |
 
 ---
@@ -119,22 +119,22 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 ### 1. React / Next.js (App Router Safe)
 
 ```bash
-npm install @tablex/react @tablex/core
+npm install @nexgrid/react @nexgrid/core
 ```
 
 ```tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { TableX } from "@tablex/react";
+import { TableX } from "@nexgrid/react";
 import {
   defaultQuery,
   buildQueryUrl,
   type QueryState,
   type PagedResponse,
   type TableXColumn,
-} from "@tablex/core";
-import "@tablex/react/styles.css";
+} from "@nexgrid/core";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: string;
@@ -187,13 +187,13 @@ export function StudentsGrid() {
 ### 2. Angular (17+ Standalone)
 
 ```bash
-npm install @tablex/angular @tablex/core
+npm install @nexgrid/angular @nexgrid/core
 ```
 
 ```typescript
 import { Component, signal } from '@angular/core';
-import { TableXComponent, type TableXColumn } from '@tablex/angular';
-import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from '@tablex/core';
+import { TableXComponent, type TableXColumn } from '@nexgrid/angular';
+import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from '@nexgrid/core';
 
 @Component({
   selector: 'app-students-grid',
@@ -282,8 +282,8 @@ public async Task<PagedResponse<Student>> Get([FromQuery] TableXQuery query, App
 ### 4. Vanilla JavaScript / Plain HTML
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tablex/vanilla/dist/tablex.css" />
-<script src="https://cdn.jsdelivr.net/npm/@tablex/vanilla/dist/tablex.global.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/tablex.css" />
+<script src="https://cdn.jsdelivr.net/npm/@nexgrid/vanilla/dist/tablex.global.js"></script>
 
 <div id="grid"></div>
 

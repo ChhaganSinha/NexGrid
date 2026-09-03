@@ -1,4 +1,4 @@
-# `@tablex/react` API reference
+# `@nexgrid/react` API reference
 
 > The canonical prop table, with prose for every prop, lives in the package
 > README: **[`packages/react/README.md`](../../packages/react/README.md)**.
@@ -6,18 +6,18 @@
 > only matter once you are wiring it up.
 
 ```bash
-npm install @tablex/react
+npm install @nexgrid/react
 ```
 
 ```ts
-import { TableX } from "@tablex/react";
-import "@tablex/react/styles.css";
+import { TableX } from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 ```
 
 - [Exports](#exports)
 - [`TableXProps<TData>`](#tablexpropstdata)
 - [Types](#types)
-- [Re-exported from `@tablex/core`](#re-exported-from-tablexcore)
+- [Re-exported from `@nexgrid/core`](#re-exported-from-tablexcore)
 - [Next.js notes](#nextjs-notes)
 - [Packaging](#packaging)
 
@@ -33,7 +33,7 @@ import "@tablex/react/styles.css";
 | `TableXTheme` | type | `"light" \| "dark" \| "auto"`. |
 
 Plus the core types and helpers listed under
-[Re-exported from `@tablex/core`](#re-exported-from-tablexcore).
+[Re-exported from `@nexgrid/core`](#re-exported-from-tablexcore).
 
 `TableXProps` lives in its own module inside the package, so importing the prop
 type does **not** pull the component (and its `"use client"` boundary) into a
@@ -142,7 +142,7 @@ A cell renderer receives core's `TableXCellContext<TData>` and returns any
 `ReactNode`:
 
 ```tsx
-import type { TableXReactColumn } from "@tablex/react";
+import type { TableXReactColumn } from "@nexgrid/react";
 
 interface Student {
   id: number;
@@ -168,7 +168,7 @@ export const columns: TableXReactColumn<Student>[] = [
 The same renderer runs for the table row and for the mobile card, so it must be
 side-effect free. See [Columns](../columns.md#custom-cells-per-framework).
 
-## Re-exported from `@tablex/core`
+## Re-exported from `@nexgrid/core`
 
 So most apps never need a second import.
 
@@ -180,7 +180,7 @@ import {
   withToggledSort, withSort, withSearch, withPage, withPageSize, withFilter,
   totalPagesFor, isPageSize, PAGE_SIZES, DEFAULT_PAGE_SIZE,
   DEFAULT_LOCALE, resolveLocale,
-} from "@tablex/react";
+} from "@nexgrid/react";
 ```
 
 **Types**
@@ -189,18 +189,18 @@ import {
 import type {
   TableXColumn, TableXColumnMeta, TableXCellContext, TableXLocale,
   QueryState, SortSpec, SortDir, PageSize, PagedResponse, Density, ExcelBadgeRule,
-} from "@tablex/react";
+} from "@nexgrid/react";
 ```
 
 Anything else — `fetchAllPages`, `toExportColumns`, `downloadCsv`,
 `downloadExcel`, `getCellText`, `getPageNumbers`, `DENSITY_ROW_HEIGHT`,
-`DEFAULT_BADGE_RULES` — comes from `@tablex/core` directly. It is already
+`DEFAULT_BADGE_RULES` — comes from `@nexgrid/core` directly. It is already
 installed as a dependency of this package.
 
 Always mutate a `QueryState` through the reducers rather than spreading it by
 hand: they are what guarantee that a search or page-size change resets to page
 one and that the sort cycle stays `asc → desc → cleared`. See
-[`@tablex/core` API](core.md#query-reducers).
+[`@nexgrid/core` API](core.md#query-reducers).
 
 ## Next.js notes
 
@@ -210,7 +210,7 @@ render that component.
 
 - `columns` contains `cell` functions, and functions do not cross the
   server/client boundary. Define the column array in a `"use client"` file.
-- Import `@tablex/react/styles.css` from the root layout, or from the client
+- Import `@nexgrid/react/styles.css` from the root layout, or from the client
   component if your setup supports component-level CSS imports.
 - The list endpoint must be a route handler (a `GET`), not a Server Action, and
   should opt out of static caching — see
@@ -223,7 +223,7 @@ Worked example: [Getting started › Next.js](../getting-started.md#nextjs-app-r
 | | |
 | --- | --- |
 | Entry points | `.` (ESM + CJS + types), `./styles.css`, `./package.json` |
-| Runtime dependencies | `@tablex/core` only |
+| Runtime dependencies | `@nexgrid/core` only |
 | Peer dependency | `react >= 18` |
 | Node | `>= 18` |
 | Side effects | none declared |
@@ -232,5 +232,5 @@ Worked example: [Getting started › Next.js](../getting-started.md#nextjs-app-r
 ## Related
 
 - [Package README](../../packages/react/README.md) — the canonical prop table
-- [`@tablex/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
+- [`@nexgrid/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
 - [Features](../README.md#features)

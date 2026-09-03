@@ -1,4 +1,4 @@
-// @tablex/core — the framework-agnostic engine behind every TableX adapter.
+// @nexgrid/core — the framework-agnostic engine behind every TableX adapter.
 
 // Server contract
 export {

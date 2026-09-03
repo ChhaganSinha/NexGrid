@@ -1,6 +1,6 @@
 // Ship the shared stylesheet inside the built package so Angular consumers can
-// add "node_modules/@tablex/angular/styles.css" to their styles array or
-// `import "@tablex/angular/styles.css"`.
+// add "node_modules/@nexgrid/angular/styles.css" to their styles array or
+// `import "@nexgrid/angular/styles.css"`.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

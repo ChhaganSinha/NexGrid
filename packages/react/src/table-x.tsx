@@ -55,7 +55,7 @@ import {
   type Density,
   type PagedResponse,
   type TableXColumn,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 import {
   ArrowDownIcon,

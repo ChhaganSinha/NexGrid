@@ -31,14 +31,14 @@ runs against your local build:
 
 ```jsonc
 "dependencies": {
-  "@tablex/core": "file:../../packages/core",
-  "@tablex/react": "file:../../packages/react"
+  "@nexgrid/core": "file:../../packages/core",
+  "@nexgrid/react": "file:../../packages/react"
 },
-// @tablex/react itself depends on "@tablex/core": "0.1.0"; this points that
+// @nexgrid/react itself depends on "@nexgrid/core": "0.1.0"; this points that
 // transitive dependency at the local folder too, so nothing is fetched from
 // a registry.
 "overrides": {
-  "@tablex/core": "file:../../packages/core"
+  "@nexgrid/core": "file:../../packages/core"
 }
 ```
 
@@ -46,7 +46,7 @@ In your own app both lines are simply `"0.1.0"` (or whatever version you are
 installing) and the `overrides` block disappears:
 
 ```bash
-npm install @tablex/react @tablex/core
+npm install @nexgrid/react @nexgrid/core
 ```
 
 ## What is where
@@ -56,7 +56,7 @@ npm install @tablex/react @tablex/core
 | `src/mock-api.ts` | The server half of the contract: 200 deterministic rows, and a `queryStudents(query)` that applies search → filter → sort → count → page, returning a `PagedResponse<Student>`. Sorting and filtering are **allowlisted**, the same rule `TableX.AspNetCore` enforces with `.Sortable(...)`. |
 | `src/columns.tsx` | Custom cell renderers: a two-line student cell, a status badge, a formatted `<time>` date, a numeric score, a boolean rendered by the locale's yes/no labels, and an `actions` column with `stopPropagation()` so buttons do not also fire the row click. |
 | `src/App.tsx` | The integration: `query` in state, fetch on change, `data`/`total` back in. Also selection, a toolbar status filter built with `withFilter`, a theme toggle, a retry path, and `onNotify` wired to the page. |
-| `src/index.css` | Page chrome and the classes the custom cells use. The grid itself is styled by `@tablex/react/styles.css`, imported once in `src/main.tsx`. |
+| `src/index.css` | Page chrome and the classes the custom cells use. The grid itself is styled by `@nexgrid/react/styles.css`, imported once in `src/main.tsx`. |
 
 ## The parts worth copying
 
@@ -90,7 +90,7 @@ silently collapses the grid to a single page.
 `fetchStudents` is the only function that would change:
 
 ```ts
-import { serializeQuery, type PagedResponse, type QueryState } from "@tablex/react";
+import { serializeQuery, type PagedResponse, type QueryState } from "@nexgrid/react";
 
 export async function fetchStudents(query: QueryState): Promise<PagedResponse<Student>> {
   const response = await fetch(`/api/students?${serializeQuery(query)}`);

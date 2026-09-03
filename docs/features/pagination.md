@@ -2,7 +2,7 @@
 
 The footer holds three things: a record range, a rows-per-page select, and a
 pager with numbered buttons and a page-jump box. All three read from
-`@tablex/core`, so they behave identically on every platform.
+`@nexgrid/core`, so they behave identically on every platform.
 
 - [The footer](#the-footer)
 - [Page sizes](#page-sizes)
@@ -53,7 +53,7 @@ type means an out-of-range size cannot be constructed in TypeScript at all.
 `withPageSize` silently ignores anything outside the set:
 
 ```ts
-import { defaultQuery, withPageSize } from "@tablex/core";
+import { defaultQuery, withPageSize } from "@nexgrid/core";
 
 let query = defaultQuery();        // pageSize: 10
 query = withPageSize(query, 50);   // pageSize: 50, page -> 1
@@ -67,7 +67,7 @@ the server, so client and server agree about what a hand-edited URL means.
 Starting at a different size:
 
 ```ts
-import { defaultQuery, withPageSize, type QueryState } from "@tablex/core";
+import { defaultQuery, withPageSize, type QueryState } from "@nexgrid/core";
 
 const initial: QueryState = withPageSize(defaultQuery(), 25);
 ```
@@ -94,7 +94,7 @@ input accepts any integer, and the grid must not ask the server for page 900 of
 52. Compute it with `totalPagesFor`:
 
 ```ts
-import { totalPagesFor, withPage, type QueryState } from "@tablex/core";
+import { totalPagesFor, withPage, type QueryState } from "@nexgrid/core";
 
 function goToLastPage(query: QueryState, total: number): QueryState {
   const totalPages = totalPagesFor(total, query.pageSize);
@@ -117,8 +117,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: number;
@@ -273,7 +273,7 @@ db.Students.AsNoTracking().ToPagedResponseAsync(query, options => options
 
 ```ts
 // Anywhere else
-import { parseQuery, type PagedResponse } from "@tablex/core";
+import { parseQuery, type PagedResponse } from "@nexgrid/core";
 
 const query = parseQuery(new URL(request.url).searchParams);
 const skip = (query.page - 1) * query.pageSize;
@@ -302,7 +302,7 @@ When you already have a full in-memory dataset in the browser (e.g. 500 items fe
 
 ### React (`useClientTableX`)
 ```tsx
-import { TableX, useClientTableX } from "@tablex/react";
+import { TableX, useClientTableX } from "@nexgrid/react";
 
 export function ClientTable({ allStudents }: { allStudents: Student[] }) {
   // Handles in-memory pagination, search, sort, and filters automatically
@@ -320,7 +320,7 @@ export function ClientTable({ allStudents }: { allStudents: Student[] }) {
 
 ### Vanilla JS / Angular / Core (`queryClientData`)
 ```ts
-import { defaultQuery, queryClientData, type QueryState } from "@tablex/core";
+import { defaultQuery, queryClientData, type QueryState } from "@nexgrid/core";
 
 let query: QueryState = defaultQuery();
 
@@ -339,6 +339,6 @@ console.log(page.totalPages); // 50 pages
 
 - [Search](search.md) · [Sorting](sorting.md) · [Selection](selection.md)
 - [Server integration](../server-integration.md)
-- [`@tablex/core` API](../api/core.md) — `queryClientData`, `getPageNumbers`, `getRecordRange`, `serialNumber`
-- [`@tablex/react` API](../api/react.md) — `useClientTableX`
+- [`@nexgrid/core` API](../api/core.md) — `queryClientData`, `getPageNumbers`, `getRecordRange`, `serialNumber`
+- [`@nexgrid/react` API](../api/react.md) — `useClientTableX`
 

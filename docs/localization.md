@@ -15,7 +15,7 @@ subset; anything you leave out falls back to English.
 ## How it works
 
 ```ts
-import { DEFAULT_LOCALE, resolveLocale, formatMessage, type TableXLocale } from "@tablex/core";
+import { DEFAULT_LOCALE, resolveLocale, formatMessage, type TableXLocale } from "@nexgrid/core";
 
 /** Merge a partial locale over the defaults. */
 export function resolveLocale(partial?: Partial<TableXLocale>): TableXLocale;
@@ -185,7 +185,7 @@ A complete locale, defined once and shared by every grid in the app.
 
 ```ts
 // locales/fr.ts
-import type { TableXLocale } from "@tablex/core";
+import type { TableXLocale } from "@nexgrid/core";
 
 export const fr: TableXLocale = {
   // Toolbar
@@ -252,8 +252,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 import { fr } from "./locales/fr";
 
@@ -328,8 +328,8 @@ readonly locale: TableXLocale = fr;
 
 ```js
 // Vanilla
-import { createTableX } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 import { fr } from "./locales/fr.js";
 
 const grid = createTableX(document.getElementById("grid"), {
@@ -351,7 +351,7 @@ The locale is an ordinary prop, so a language switch is a re-render:
 "use client";
 
 import { useState } from "react";
-import type { TableXLocale } from "@tablex/react";
+import type { TableXLocale } from "@nexgrid/react";
 
 import { de } from "./locales/de";
 import { fr } from "./locales/fr";
@@ -387,7 +387,7 @@ function setLocale(locale) {
 an existing catalogue is a map:
 
 ```ts
-import type { TableXLocale } from "@tablex/core";
+import type { TableXLocale } from "@nexgrid/core";
 
 // `t` is any translate function: i18next, @angular/localize, vue-i18n, …
 export function gridLocale(t: (key: string) => string): TableXLocale {
@@ -438,7 +438,7 @@ them itself; it does not know about ICU message format, `%s`, or `$t()`.
 To seed a catalogue, spread the defaults:
 
 ```ts
-import { DEFAULT_LOCALE } from "@tablex/core";
+import { DEFAULT_LOCALE } from "@nexgrid/core";
 
 console.log(JSON.stringify(DEFAULT_LOCALE, null, 2));
 ```
@@ -474,4 +474,4 @@ values. And a date column is not localized until you say so:
 
 - [Theming](theming.md) — the other half of "make it ours"
 - [Export](features/export.md) — every export string, and `serialHeader` in the workbook
-- [`@tablex/core` API](api/core.md) — `DEFAULT_LOCALE`, `resolveLocale`, `formatMessage`
+- [`@nexgrid/core` API](api/core.md) — `DEFAULT_LOCALE`, `resolveLocale`, `formatMessage`

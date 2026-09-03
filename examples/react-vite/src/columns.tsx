@@ -16,7 +16,7 @@
 //   * With `onRowClick` set, interactive content inside a cell must call
 //     `event.stopPropagation()` or a button press also opens the row.
 
-import type { TableXReactColumn } from "@tablex/react";
+import type { TableXReactColumn } from "@nexgrid/react";
 
 import type { Student } from "./mock-api";
 

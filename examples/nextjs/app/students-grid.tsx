@@ -16,7 +16,7 @@ import {
   type TableXNotice,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
+} from "@nexgrid/react";
 
 // Imported from the shared types module, NOT from lib/students.ts — that one
 // builds the dataset at import time and belongs on the server only.

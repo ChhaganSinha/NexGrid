@@ -169,8 +169,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: number;
@@ -260,7 +260,7 @@ The Angular equivalent is a `tableXToolbar` template:
 In vanilla, `toolbarActions` takes a `Node` or a string:
 
 ```js
-import { createTableX, el } from "@tablex/vanilla";
+import { createTableX, el } from "@nexgrid/vanilla";
 
 const archiveButton = el("button", {
   class: "tbx-btn",

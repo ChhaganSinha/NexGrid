@@ -17,7 +17,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    exclude: ["@tablex/react", "@tablex/core"],
+    exclude: ["@nexgrid/react", "@nexgrid/core"],
   },
   server: {
     port: 5173,

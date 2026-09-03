@@ -1,5 +1,5 @@
 // Re-export the shared stylesheet at this package's root so consumers can
-// `import "@tablex/react/styles.css"` without also installing knowledge of
+// `import "@nexgrid/react/styles.css"` without also installing knowledge of
 // the core package layout.
 import { copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";

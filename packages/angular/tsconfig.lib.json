@@ -9,6 +9,9 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "inlineSources": true,
+    "paths": {
+      "@nexgrid/core": ["../core/dist/index.d.ts"]
+    },
     "types": []
   },
   "angularCompilerOptions": {

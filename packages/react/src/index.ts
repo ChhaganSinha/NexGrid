@@ -1,11 +1,11 @@
-// @tablex/react — public surface.
+// @nexgrid/react — public surface.
 //
-// The engine lives in `@tablex/core`. The handful of core exports re-exported
+// The engine lives in `@nexgrid/core`. The handful of core exports re-exported
 // below are the ones a HOST needs in order to drive a controlled grid — build a
 // starting query, read it out of a URL, move a page — so an app can integrate
 // TableX without a second install and without learning the package split. The
 // rest of core (export writers, column helpers, locale internals) stays where
-// it is; import `@tablex/core` directly if you need it.
+// it is; import `@nexgrid/core` directly if you need it.
 
 export { TableX, NexGrid } from "./table-x.js";
 
@@ -39,7 +39,7 @@ export type {
   PagedResponse,
   Density,
   ExcelBadgeRule,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 export { useClientTableX, useClientNexGrid } from "./use-client-table-x.js";
 export type { UseClientTableXOptions, UseClientNexGridOptions } from "./use-client-table-x.js";
@@ -73,5 +73,5 @@ export {
   // Localization
   DEFAULT_LOCALE,
   resolveLocale,
-} from "@tablex/core";
-export type { ClientQueryOptions } from "@tablex/core";
+} from "@nexgrid/core";
+export type { ClientQueryOptions } from "@nexgrid/core";

@@ -1,4 +1,4 @@
-// The public surface of @tablex/vanilla.
+// The public surface of @nexgrid/vanilla.
 //
 // These options mirror the React adapter's props one-for-one (adapter spec
 // §4.3) with callbacks in place of props, so a team moving a grid between the
@@ -15,7 +15,7 @@ import type {
   QueryState,
   NexGridColumn,
   NexGridLocale,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 /**
  * What a vanilla `header` / `cell` renderer may return.

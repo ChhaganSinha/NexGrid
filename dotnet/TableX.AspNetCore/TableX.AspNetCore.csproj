@@ -22,20 +22,21 @@
 
   <PropertyGroup Label="NuGet">
     <IsPackable>true</IsPackable>
-    <PackageId>TableX.AspNetCore</PackageId>
-    <Version>0.1.0</Version>
-    <Title>TableX for ASP.NET Core</Title>
+    <PackageId>NexGrid.AspNetCore</PackageId>
+    <Version>0.2.0</Version>
+    <Title>NexGrid for ASP.NET Core</Title>
     <Authors>Chhagan Sinha</Authors>
-    <Company>TableX</Company>
-    <Product>TableX</Product>
-    <Description>Server-driven data grid for ASP.NET Core: Tag Helpers that render the TableX browser bundle, a query-string binder for TableX's wire format, and allowlisted IQueryable extensions that turn a page/sort/search/filter request into an EF Core-translatable query and a PagedResponse.</Description>
-    <PackageTags>datagrid;data-grid;table;aspnetcore;taghelper;razor;pagination;sorting;filtering;export;iqueryable;efcore;server-side</PackageTags>
+    <Company>NexGrid</Company>
+    <Product>NexGrid</Product>
+    <Description>Server-driven data grid for ASP.NET Core: Tag Helpers that render the NexGrid browser bundle, a query-string binder for NexGrid's wire format, and allowlisted IQueryable extensions that turn a page/sort/search/filter request into an EF Core-translatable query and a PagedResponse.</Description>
+    <PackageTags>nexgrid;datagrid;data-grid;table;aspnetcore;taghelper;razor;pagination;sorting;filtering;export;iqueryable;efcore;server-side</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageProjectUrl>https://github.com/ChhaganSinha/NexGrid</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ChhaganSinha/NexGrid.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <Copyright>Copyright (c) Chhagan Sinha</Copyright>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -53,11 +54,12 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" Visible="true" />
+    <None Include="icon.png" Pack="true" PackagePath="\" Visible="true" />
   </ItemGroup>
 
   <PropertyGroup Label="Browser assets">
     <!--
-      The renderer is @tablex/vanilla's IIFE bundle. It is built by the JS
+      The renderer is @nexgrid/vanilla's IIFE bundle. It is built by the JS
       toolchain, so it is a build INPUT here, not a checked-in file.
     -->
     <TableXVanillaDist>$(MSBuildThisFileDirectory)..\..\packages\vanilla\dist\</TableXVanillaDist>

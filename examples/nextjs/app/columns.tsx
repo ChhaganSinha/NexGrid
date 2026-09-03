@@ -10,7 +10,7 @@
 // Keeping the columns in their own client module (rather than inline in the
 // grid component) is just tidiness — the directive is what matters.
 
-import type { TableXReactColumn } from "@tablex/react";
+import type { TableXReactColumn } from "@nexgrid/react";
 
 import type { Student } from "@/lib/student-types";
 

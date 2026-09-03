@@ -27,10 +27,10 @@ import {
   type TableXAngularColumn,
   type TableXNotice,
   type QueryState,
-} from "@tablex/angular";
-// Reducers live in the engine package. `@tablex/angular` re-exports the few a
-// host needs on day one; everything else comes from `@tablex/core` directly.
-import { withFilter } from "@tablex/core";
+} from "@nexgrid/angular";
+// Reducers live in the engine package. `@nexgrid/angular` re-exports the few a
+// host needs on day one; everything else comes from `@nexgrid/core` directly.
+import { withFilter } from "@nexgrid/core";
 import { EMPTY, Subject, catchError, switchMap, tap } from "rxjs";
 
 import { STATUSES, StudentsService, type Student } from "./students.service";

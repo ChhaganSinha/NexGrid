@@ -6,10 +6,10 @@ project and we welcome issues, discussions, and pull requests.
 ## Repository layout
 
 ```
-packages/core       @tablex/core       Framework-agnostic engine (types, state, export, theme CSS)
-packages/vanilla    @tablex/vanilla    Zero-dependency DOM renderer (also powers ASP.NET)
-packages/react      @tablex/react      React / Next.js component
-packages/angular    @tablex/angular    Angular standalone component
+packages/core       @nexgrid/core       Framework-agnostic engine (types, state, export, theme CSS)
+packages/vanilla    @nexgrid/vanilla    Zero-dependency DOM renderer (also powers ASP.NET)
+packages/react      @nexgrid/react      React / Next.js component
+packages/angular    @nexgrid/angular    Angular standalone component
 dotnet/             TableX.AspNetCore  ASP.NET Core Tag Helper + IQueryable server extensions
 examples/           Runnable sample apps for every platform
 docs/               Documentation (guides + API reference)
@@ -37,7 +37,7 @@ dotnet build
 
 ## Development guidelines
 
-1. **`@tablex/core` is the contract.** Query/response types, pagination math,
+1. **`@nexgrid/core` is the contract.** Query/response types, pagination math,
    export logic, and the CSS theme live there. Framework adapters must not fork
    this logic — import it.
 2. **Feature parity across adapters.** A feature added to one adapter (React,
@@ -62,7 +62,7 @@ dotnet build
 ## Reporting bugs
 
 Open an issue with:
-- the package and version (`@tablex/react 0.1.0`, `TableX.AspNetCore 0.1.0`, ...)
+- the package and version (`@nexgrid/react 0.1.0`, `TableX.AspNetCore 0.1.0`, ...)
 - a minimal reproduction (StackBlitz / repo / code snippet)
 - expected vs actual behavior
 

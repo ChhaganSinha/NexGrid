@@ -11,7 +11,7 @@ import type {
   TableXColumn as TableXCoreColumn,
   TableXLocale,
   QueryState,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 /** A column definition bound to React's render type. */
 export type TableXReactColumn<TData> = TableXCoreColumn<TData, ReactNode>;

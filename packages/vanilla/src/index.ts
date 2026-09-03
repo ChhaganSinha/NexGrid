@@ -1,8 +1,8 @@
-// @tablex/vanilla — the zero-dependency DOM renderer for TableX.
+// @nexgrid/vanilla — the zero-dependency DOM renderer for TableX.
 //
 // This barrel is also the surface of the IIFE browser bundle (global
 // `TableX`), where a consumer has no module system and therefore no other way
-// to reach the engine. That is why a curated slice of `@tablex/core` is
+// to reach the engine. That is why a curated slice of `@nexgrid/core` is
 // re-exported here rather than left to a second import: a `<script>`-tag or
 // ASP.NET page needs `defaultQuery()`, `parseQuery()` and `PAGE_SIZES` just to
 // wire the grid to its address bar, and asking it to load core separately would
@@ -90,7 +90,7 @@ export {
   withSort,
   withToggledSort,
   withToggledMultiSort,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 export type {
   ClientQueryOptions,
@@ -111,4 +111,4 @@ export type {
   RecordRange,
   SortDir,
   SortSpec,
-} from "@tablex/core";
+} from "@nexgrid/core";

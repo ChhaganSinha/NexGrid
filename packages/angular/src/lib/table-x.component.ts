@@ -2,7 +2,7 @@
 //
 // The grid is SERVER-DRIVEN: it holds exactly one page of rows and never
 // sorts, filters or paginates locally. Every piece of user intent becomes a
-// `QueryState` produced by a `@tablex/core` reducer and emitted through
+// `QueryState` produced by a `@nexgrid/core` reducer and emitted through
 // `queryChange`; the host fetches and hands back the next page. That is why
 // this component is fully controlled — nothing it emits is applied to its own
 // inputs.
@@ -86,7 +86,7 @@ import {
   type PagedResponse,
   type QueryState,
   type RecordRange,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 import { TableXCellDirective } from "./table-x-cell.directive";
 import { TableXToolbarDirective } from "./table-x-toolbar.directive";

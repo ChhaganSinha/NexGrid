@@ -1,7 +1,7 @@
-# @tablex/angular
+# @nexgrid/angular
 
 A professional, **server-driven** data grid for Angular 17+ — standalone, zero
-runtime dependencies beyond [`@tablex/core`](../core), and no NgModule.
+runtime dependencies beyond [`@nexgrid/core`](../core), and no NgModule.
 
 The grid never holds your dataset. It holds one page, turns every user action
 into a `QueryState`, and hands that back to you; you fetch and feed the next
@@ -29,7 +29,7 @@ page in. Search, sorting, paging and filtering happen where the data lives.
 ## Install
 
 ```bash
-npm install @tablex/angular
+npm install @nexgrid/angular
 ```
 
 `@angular/core`, `@angular/common` (>= 17) and `rxjs` (>= 7) are peer
@@ -48,7 +48,7 @@ build target in `angular.json`:
         "build": {
           "options": {
             "styles": [
-              "node_modules/@tablex/angular/styles.css",
+              "node_modules/@nexgrid/angular/styles.css",
               "src/styles.css"
             ]
           }
@@ -63,7 +63,7 @@ Prefer to import it from CSS instead? The identical sheet is published by the
 engine package with a proper export map:
 
 ```css
-@import "@tablex/core/styles.css";
+@import "@nexgrid/core/styles.css";
 ```
 
 Either way it must be **global**. Component styles are scoped by Angular's
@@ -82,7 +82,7 @@ which is also what `TableX.AspNetCore` binds on the server.
 ```ts
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { buildQueryUrl, type PagedResponse, type QueryState } from "@tablex/angular";
+import { buildQueryUrl, type PagedResponse, type QueryState } from "@nexgrid/angular";
 
 export interface Student {
   id: number;
@@ -117,7 +117,7 @@ import {
   type TableXAngularColumn,
   type TableXNotice,
   type QueryState,
-} from "@tablex/angular";
+} from "@nexgrid/angular";
 
 import { StudentsService, type Student } from "./students.service";
 
@@ -421,7 +421,7 @@ Every string is overridable; anything you leave out falls back to English.
 ```
 
 Placeholders in braces are substituted by the grid. See `TableXLocale` in
-`@tablex/core` for the full list.
+`@nexgrid/core` for the full list.
 
 ---
 
@@ -486,7 +486,7 @@ The query format is stable and documented, and
 ?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 ```
 
-Use `parseQuery` / `serializeQuery` from `@tablex/core` (re-exported here) to
+Use `parseQuery` / `serializeQuery` from `@nexgrid/core` (re-exported here) to
 round-trip it through the URL and make grid state shareable.
 
 ## Author & Maintainer

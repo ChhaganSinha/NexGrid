@@ -1,6 +1,6 @@
 // The JSON handed to TableX.createTableX.
 //
-// Shaped to mirror TableXOptions in @tablex/vanilla exactly, with every
+// Shaped to mirror TableXOptions in @nexgrid/vanilla exactly, with every
 // optional value nullable so an unset Tag Helper attribute is OMITTED rather than
 // written as a default. That matters: writing `"enableSearch": true` would pin the
 // value even if the JS default later changes, and the two would drift.

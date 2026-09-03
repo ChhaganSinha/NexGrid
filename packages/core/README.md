@@ -1,10 +1,10 @@
-# @tablex/core
+# @nexgrid/core
 
 The framework-agnostic engine behind [TableX](https://github.com/ChhaganSinha/NexGrid) —
 a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.
 
-You normally install a framework adapter (`@tablex/react`, `@tablex/angular`,
-`@tablex/vanilla`) which depends on this package. Install `@tablex/core`
+You normally install a framework adapter (`@nexgrid/react`, `@nexgrid/angular`,
+`@nexgrid/vanilla`) which depends on this package. Install `@nexgrid/core`
 directly when you only need the contract types, the query reducers, or the
 export engine (e.g. in server code or tests).
 
@@ -20,7 +20,7 @@ export engine (e.g. in server code or tests).
 | **Export engine** | RFC 4180 CSV (BOM + formula-injection defense) and formatted Excel (.xls) with value-based badge styling |
 | **Full-dataset collection** | `fetchAllPages` — walks a paginated endpoint at the max allowlisted page size, with a hard row cap |
 | **Locale** | `TableXLocale`, `DEFAULT_LOCALE`, `formatMessage` |
-| **Theme** | `@tablex/core/styles.css` — the shared stylesheet, themed entirely via `--tbx-*` CSS custom properties |
+| **Theme** | `@nexgrid/core/styles.css` — the shared stylesheet, themed entirely via `--tbx-*` CSS custom properties |
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX Core Engine & Data Grid Preview" width="100%" />
@@ -29,13 +29,13 @@ export engine (e.g. in server code or tests).
 ## Install
 
 ```bash
-npm install @tablex/core
+npm install @nexgrid/core
 ```
 
 ## The server contract
 
 ```ts
-import type { QueryState, PagedResponse } from "@tablex/core";
+import type { QueryState, PagedResponse } from "@nexgrid/core";
 
 // Client -> server (querystring): ?page=2&pageSize=25&sort=name:asc&q=smith&filter[status]=Active
 // Server -> client (JSON):

@@ -4,7 +4,7 @@ import {
   queryClientData,
   type ClientQueryOptions,
   type QueryState,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 /** Options for {@link useClientTableX}. */
 export interface UseClientTableXOptions<TData> extends ClientQueryOptions<TData> {

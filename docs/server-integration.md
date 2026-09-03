@@ -40,7 +40,7 @@ export function buildQueryUrl(endpoint: string, query: QueryState): string;
 keeps working:
 
 ```ts
-import { buildQueryUrl, defaultQuery, withSearch } from "@tablex/core";
+import { buildQueryUrl, defaultQuery, withSearch } from "@nexgrid/core";
 
 const query = withSearch(defaultQuery(), "smith");
 buildQueryUrl("/api/students?cohort=2026", query);
@@ -331,7 +331,7 @@ instead:
 ```ts
 // server.ts
 import express from "express";
-import { parseQuery, type PagedResponse, type QueryState } from "@tablex/core";
+import { parseQuery, type PagedResponse, type QueryState } from "@nexgrid/core";
 
 import { pool } from "./db.js";   // a `pg` Pool
 
@@ -434,7 +434,7 @@ Three details that matter:
 Prefer a query builder? The same shape, with Kysely:
 
 ```ts
-import { parseQuery, type PagedResponse } from "@tablex/core";
+import { parseQuery, type PagedResponse } from "@nexgrid/core";
 import { db } from "./db.js";   // Kysely<Database>
 
 export async function listStudents(rawQueryString: string, tenantId: number) {
@@ -487,7 +487,7 @@ accepts directly — and it preserves `filter[status]` verbatim.
 ```ts
 // app/api/students/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { parseQuery, type PagedResponse, type QueryState } from "@tablex/core";
+import { parseQuery, type PagedResponse, type QueryState } from "@nexgrid/core";
 import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -568,7 +568,7 @@ Notes for the App Router specifically:
 ```ts
 // pages/api/students.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { parseQuery, type PagedResponse } from "@tablex/core";
+import { parseQuery, type PagedResponse } from "@nexgrid/core";
 
 import { listStudents } from "@/lib/students";
 
@@ -594,14 +594,14 @@ TableX includes built-in adapters for **OData v4** (`toODataParams`, `buildOData
 
 ```tsx
 import { useEffect, useState } from "react";
-import { TableX } from "@tablex/react";
+import { TableX } from "@nexgrid/react";
 import {
   defaultQuery,
   buildODataUrl,
   fromODataResponse,
   type QueryState,
   type PagedResponse,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 export function ODataGrid() {
   const [query, setQuery] = useState<QueryState>(defaultQuery());
@@ -693,8 +693,8 @@ service StudentService {
 
 ```tsx
 import { useEffect, useState } from "react";
-import { TableX } from "@tablex/react";
-import { defaultQuery, type QueryState, type PagedResponse } from "@tablex/core";
+import { TableX } from "@nexgrid/react";
+import { defaultQuery, type QueryState, type PagedResponse } from "@nexgrid/core";
 import { createPromiseClient } from "@connectrpc/connect";
 import { StudentService } from "./gen/students_connect";
 
@@ -750,8 +750,8 @@ Connecting TableX to GraphQL APIs (Apollo, Relay, Hot Chocolate):
 ```tsx
 import { gql, useQuery } from "@apollo/client";
 import { useState } from "react";
-import { TableX } from "@tablex/react";
-import { defaultQuery, type QueryState } from "@tablex/core";
+import { TableX } from "@nexgrid/react";
+import { defaultQuery, type QueryState } from "@nexgrid/core";
 
 const GET_STUDENTS = gql`
   query GetStudents($page: Int!, $pageSize: Int!, $sort: [String!], $q: String, $status: String) {
@@ -817,5 +817,5 @@ export function GraphQLGrid() {
 
 - [Concepts](concepts.md) — why the contract looks like this
 - [Sorting](features/sorting.md) · [Search](features/search.md) · [Pagination](features/pagination.md)
-- [`TableX.AspNetCore` API](api/aspnet.md) · [`@tablex/core` API](api/core.md)
+- [`TableX.AspNetCore` API](api/aspnet.md) · [`@nexgrid/core` API](api/core.md)
 

@@ -46,7 +46,7 @@ const columns = [
 
 ### TableX
 ```tsx
-import type { TableXColumn } from "@tablex/core";
+import type { TableXColumn } from "@nexgrid/core";
 
 const columns: TableXColumn<Student, React.ReactNode>[] = [
   {
@@ -132,9 +132,9 @@ return (
 
 ```tsx
 import { useState, useEffect } from "react";
-import { TableX } from "@tablex/react";
-import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from "@tablex/core";
-import "@tablex/react/styles.css";
+import { TableX } from "@nexgrid/react";
+import { defaultQuery, buildQueryUrl, type QueryState, type PagedResponse } from "@nexgrid/core";
+import "@nexgrid/react/styles.css";
 
 export function StudentsTable() {
   const [query, setQuery] = useState<QueryState>(defaultQuery());
@@ -169,16 +169,16 @@ export function StudentsTable() {
 
 ## Summary of Migration Steps
 
-1. **Install `@tablex/react` and `@tablex/core`**:
+1. **Install `@nexgrid/react` and `@nexgrid/core`**:
    ```bash
-   npm install @tablex/react @tablex/core
+   npm install @nexgrid/react @nexgrid/core
    ```
 2. **Import the stylesheet**:
    ```tsx
-   import "@tablex/react/styles.css";
+   import "@nexgrid/react/styles.css";
    ```
 3. **Copy your `columns` array**:
-   Replace `@tanstack/react-table` imports with `TableXColumn<T>` from `@tablex/core`.
+   Replace `@tanstack/react-table` imports with `TableXColumn<T>` from `@nexgrid/core`.
 4. **Replace the table rendering**:
    Replace the `useReactTable` hook and manual JSX with `<TableX />`.
 5. **Connect your endpoint**:

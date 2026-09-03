@@ -1,15 +1,15 @@
-# `@tablex/core` API reference
+# `@nexgrid/core` API reference
 
 The framework-agnostic engine behind every TableX adapter: the server contract,
 the column model, the query reducers, pagination math, the wire format, the
 export pipeline, and the locale.
 
 ```bash
-npm install @tablex/core
+npm install @nexgrid/core
 ```
 
 ```ts
-import { defaultQuery, serializeQuery, type QueryState } from "@tablex/core";
+import { defaultQuery, serializeQuery, type QueryState } from "@nexgrid/core";
 ```
 
 Every adapter already depends on core and re-exports the parts a host normally
@@ -20,7 +20,7 @@ something the adapter does not re-export — `fetchAllPages`, `toExportColumns`,
 The stylesheet ships here too:
 
 ```css
-@import "@tablex/core/styles.css";
+@import "@nexgrid/core/styles.css";
 ```
 
 - [Server contract](#server-contract)
@@ -151,7 +151,7 @@ import {
   initialHiddenColumns,
   visibleColumns,
   type TableXColumn,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 interface Student {
   id: number;
@@ -214,7 +214,7 @@ import {
   withSearch,
   withToggledSort,
   type QueryState,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 let query: QueryState = defaultQuery();
 query = withSearch(query, "smith");                     // q: "smith", page: 1
@@ -249,7 +249,7 @@ page, the last page, and a window of one page either side of the current page,
 with `"..."` in the gaps.
 
 ```ts
-import { getPageNumbers, getRecordRange, serialNumber } from "@tablex/core";
+import { getPageNumbers, getRecordRange, serialNumber } from "@nexgrid/core";
 
 getPageNumbers(1, 5);      // [1, 2, 3, 4, 5]
 getPageNumbers(5, 20);     // [1, "...", 4, 5, 6, "...", 20]
@@ -283,7 +283,7 @@ filter entry.
 `buildQueryUrl` preserves parameters already present on the endpoint.
 
 ```ts
-import { buildQueryUrl, parseQuery, serializeQuery, withSearch, defaultQuery } from "@tablex/core";
+import { buildQueryUrl, parseQuery, serializeQuery, withSearch, defaultQuery } from "@nexgrid/core";
 
 const query = withSearch(defaultQuery(), "smith");
 serializeQuery(query);
@@ -324,7 +324,7 @@ returns a default-sized page, and an export would end up with 10 rows labelled
 "all".
 
 ```ts
-import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@tablex/core";
+import { buildQueryUrl, fetchAllPages, type PagedResponse, type QueryState } from "@nexgrid/core";
 
 interface Student {
   id: number;
@@ -443,7 +443,7 @@ import {
   timestampedFilename,
   toExportColumns,
   type TableXColumn,
-} from "@tablex/core";
+} from "@nexgrid/core";
 
 interface Student {
   id: number;
@@ -483,7 +483,7 @@ export function formatMessage(
 substitutes `{name}` tokens and leaves unknown tokens untouched.
 
 ```ts
-import { formatMessage, resolveLocale } from "@tablex/core";
+import { formatMessage, resolveLocale } from "@nexgrid/core";
 
 const locale = resolveLocale({ showingRange: "Affichage de {start} à {end} sur {total}" });
 formatMessage(locale.showingRange, { start: 21, end: 40, total: "1 284" });
@@ -542,5 +542,5 @@ Package entry points: `.` (ESM + CJS + types), `./styles.css`,
 
 ## Related
 
-- [`@tablex/react`](react.md) · [`@tablex/angular`](angular.md) · [`@tablex/vanilla`](vanilla.md) · [`TableX.AspNetCore`](aspnet.md)
+- [`@nexgrid/react`](react.md) · [`@nexgrid/angular`](angular.md) · [`@nexgrid/vanilla`](vanilla.md) · [`TableX.AspNetCore`](aspnet.md)
 - [Concepts](../concepts.md) · [Columns](../columns.md) · [Server integration](../server-integration.md)

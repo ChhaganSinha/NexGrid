@@ -10,7 +10,7 @@
 //   { items, page, pageSize, total, totalPages }
 // where `total` is the FULL filtered count. That is what draws the pager.
 
-import { parseQuery } from "@tablex/core";
+import { parseQuery } from "@nexgrid/core";
 
 import { delay, queryStudents } from "@/lib/students";
 

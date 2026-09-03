@@ -1,7 +1,7 @@
-# @tablex/vanilla
+# @nexgrid/vanilla
 
 A professional, **server-driven** data grid for plain JavaScript — no framework, no
-build step required, and zero runtime dependencies beyond [`@tablex/core`](../core).
+build step required, and zero runtime dependencies beyond [`@nexgrid/core`](../core).
 
 The grid never holds your dataset. Every user action (search, sort, page, page
 size) becomes a `QueryState`; you answer with one page of rows and a total, or
@@ -29,22 +29,22 @@ This is also the bundle that powers `TableX.AspNetCore`.
 ### npm
 
 ```bash
-npm install @tablex/vanilla
+npm install @nexgrid/vanilla
 ```
 
 ```js
-import { createTableX } from "@tablex/vanilla";
-import "@tablex/vanilla/styles.css";
+import { createTableX } from "@nexgrid/vanilla";
+import "@nexgrid/vanilla/styles.css";
 ```
 
 ### Script tag / CDN
 
-The browser bundle inlines `@tablex/core` and exposes everything on a global
+The browser bundle inlines `@nexgrid/core` and exposes everything on a global
 called `TableX`.
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.css" />
-<script src="https://unpkg.com/@tablex/vanilla@0.1.0/dist/tablex.global.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.css" />
+<script src="https://unpkg.com/@nexgrid/vanilla@0.1.0/dist/tablex.global.js"></script>
 <script>
   const grid = TableX.createTableX(document.getElementById("grid"), {
     caption: "Students",
@@ -344,7 +344,7 @@ root, so it can be styled or observed from outside the grid.
 ## Also exported
 
 Because the browser bundle has no module system to reach the engine through,
-this package re-exports the parts of `@tablex/core` a page actually needs —
+this package re-exports the parts of `@nexgrid/core` a page actually needs —
 `defaultQuery`, `parseQuery`, `serializeQuery`, `buildQueryUrl`, `withPage`,
 `withSearch`, `withToggledSort`, `withSort`, `withPageSize`, `withFilter`,
 `getPageNumbers`, `getRecordRange`, `serialNumber`, `totalPagesFor`,

@@ -70,8 +70,8 @@ TableX interactive components require client-side state hooks (`useState`, event
 // app/students/students-grid.tsx
 "use client";
 
-import { TableX } from "@tablex/react";
-import "@tablex/react/styles.css";
+import { TableX } from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 export function StudentsGrid({ initialData, initialTotal }) {
   // ... state & grid render

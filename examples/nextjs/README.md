@@ -7,7 +7,7 @@ A Next.js 15 App Router app showing the three pieces a real integration needs:
 2. **A Client Component grid** (`app/students-grid.tsx`) that owns the
    `QueryState` and fetches every page after the first.
 3. **A route handler** (`app/api/students/route.ts`) that parses the incoming
-   query with `parseQuery` from `@tablex/core` and answers with a
+   query with `parseQuery` from `@nexgrid/core` and answers with a
    `PagedResponse`.
 
 ## Run it
@@ -26,8 +26,8 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-`package.json` resolves `@tablex/react` and `@tablex/core` with `file:`
-specifiers plus an `overrides` block (so the transitive `@tablex/core` also
+`package.json` resolves `@nexgrid/react` and `@nexgrid/core` with `file:`
+specifiers plus an `overrides` block (so the transitive `@nexgrid/core` also
 resolves locally). In your own app those are just `"0.1.0"`, and
 `next.config.mjs` needs nothing at all — the `outputFileTracingRoot` line only
 exists because of the local symlinks.
@@ -40,7 +40,7 @@ This is where most Next.js grid integrations go wrong, so it is worth being
 precise about which file needs the directive and why.
 
 ```text
-app/layout.tsx        server   imports @tablex/react/styles.css  (build-time, fine)
+app/layout.tsx        server   imports @nexgrid/react/styles.css  (build-time, fine)
 app/page.tsx          server   queries the data, renders <StudentsGrid initial={…} />
 app/students-grid.tsx CLIENT   holds QueryState, fetches, passes render functions
 app/columns.tsx       CLIENT   cell renderers — functions, so they cannot cross
@@ -83,7 +83,7 @@ tripwire if you want that mistake to fail the build.)
 The entire server-side parse is one call:
 
 ```ts
-import { parseQuery } from "@tablex/core";
+import { parseQuery } from "@nexgrid/core";
 
 export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url);
@@ -127,7 +127,7 @@ and back-button-friendly is a swap of the state hook:
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { parseQuery, serializeQuery } from "@tablex/react";
+import { parseQuery, serializeQuery } from "@nexgrid/react";
 
 const searchParams = useSearchParams();
 const router = useRouter();

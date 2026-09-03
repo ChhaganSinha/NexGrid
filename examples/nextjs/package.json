@@ -1,6 +1,6 @@
 {
   "name": "tablex-example-nextjs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "TableX in the Next.js App Router: a server page, a client grid, and a route handler that parses QueryState with parseQuery.",
   "scripts": {
@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tablex/core": "file:../../packages/core",
-    "@tablex/react": "file:../../packages/react",
+    "@nexgrid/core": "file:../../packages/core",
+    "@nexgrid/react": "file:../../packages/react",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -23,6 +23,6 @@
     "typescript": "^5.6.3"
   },
   "overrides": {
-    "@tablex/core": "file:../../packages/core"
+    "@nexgrid/core": "file:../../packages/core"
   }
 }

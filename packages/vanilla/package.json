@@ -1,6 +1,6 @@
 {
-  "name": "@tablex/vanilla",
-  "version": "0.1.0",
+  "name": "@nexgrid/vanilla",
+  "version": "0.2.0",
   "description": "Zero-dependency vanilla JS/DOM renderer for TableX — the professional, server-driven data grid. Also powers TableX.AspNetCore.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
@@ -51,7 +51,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@tablex/core": "0.1.0"
+    "@nexgrid/core": "^0.2.0"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

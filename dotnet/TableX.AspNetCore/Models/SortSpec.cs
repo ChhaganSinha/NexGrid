@@ -39,7 +39,7 @@ public sealed record SortSpec(string Field, SortDirection Direction)
     public const string DescendingToken = "desc";
 
     /// <summary>
-    /// Parse one <c>field:dir</c> token exactly the way <c>@tablex/core</c> does.
+    /// Parse one <c>field:dir</c> token exactly the way <c>@nexgrid/core</c> does.
     /// </summary>
     /// <param name="token">A raw <c>sort</c> query-string value, e.g. <c>createdAt:desc</c>.</param>
     /// <param name="spec">The parsed sort intent, or <see langword="null"/> when the token has no field.</param>

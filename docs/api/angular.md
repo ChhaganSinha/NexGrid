@@ -1,4 +1,4 @@
-# `@tablex/angular` API reference
+# `@nexgrid/angular` API reference
 
 > The canonical input/output tables, with prose for every member, live in the
 > package README:
@@ -7,11 +7,11 @@
 > details that catch people out.
 
 ```bash
-npm install @tablex/angular
+npm install @nexgrid/angular
 ```
 
 ```ts
-import { TableXCellDirective, TableXComponent, TableXToolbarDirective } from "@tablex/angular";
+import { TableXCellDirective, TableXComponent, TableXToolbarDirective } from "@nexgrid/angular";
 ```
 
 - [Exports](#exports)
@@ -19,7 +19,7 @@ import { TableXCellDirective, TableXComponent, TableXToolbarDirective } from "@t
 - [Directives](#directives)
 - [Types](#types)
 - [View-model types](#view-model-types)
-- [Re-exported from `@tablex/core`](#re-exported-from-tablexcore)
+- [Re-exported from `@nexgrid/core`](#re-exported-from-tablexcore)
 - [Gotchas](#gotchas)
 - [Packaging](#packaging)
 
@@ -210,7 +210,7 @@ import type {
   TableXPagerItem,
   TableXRangePart,
   TableXRowView,
-} from "@tablex/angular";
+} from "@nexgrid/angular";
 ```
 
 | Type | Models |
@@ -223,32 +223,32 @@ import type {
 | `TableXPagerItem` | One pager control: `key`, `gap`, `page`, `current`, `label`. |
 | `TableXRangePart` | One fragment of the "Showing X to Y of Z" line: `key`, `strong`, `total`, `value`. |
 
-## Re-exported from `@tablex/core`
+## Re-exported from `@nexgrid/core`
 
 A deliberately small set — the symbols a host touches on day one:
 
 ```ts
-import { PAGE_SIZES, buildQueryUrl, defaultQuery, parseQuery, serializeQuery } from "@tablex/angular";
+import { PAGE_SIZES, buildQueryUrl, defaultQuery, parseQuery, serializeQuery } from "@nexgrid/angular";
 
 import type {
   Density, ExcelBadgeRule, TableXColumn, TableXColumnMeta, TableXLocale,
   PageSize, PagedResponse, QueryState, SortDir, SortSpec,
-} from "@tablex/angular";
+} from "@nexgrid/angular";
 ```
 
 Everything else — the reducers (`withToggledSort`, `withSearch`, `withPage`,
 `withPageSize`, `withFilter`), `totalPagesFor`, `primarySort`, the export
-helpers, `DEFAULT_LOCALE`, `resolveLocale` — comes from `@tablex/core`
+helpers, `DEFAULT_LOCALE`, `resolveLocale` — comes from `@nexgrid/core`
 directly. It is already installed as a dependency of this package:
 
 ```ts
-import { withSort, totalPagesFor, DEFAULT_LOCALE } from "@tablex/core";
+import { withSort, totalPagesFor, DEFAULT_LOCALE } from "@nexgrid/core";
 ```
 
 ## Gotchas
 
 **The stylesheet must be global.** Add
-`node_modules/@tablex/angular/styles.css` to the `styles` array of your build
+`node_modules/@nexgrid/angular/styles.css` to the `styles` array of your build
 target in `angular.json`. Component styles are scoped by emulated view
 encapsulation and will not reach the grid's markup, so a `styleUrls` entry
 silently does nothing.
@@ -282,8 +282,8 @@ load) are the idiomatic answer.
 | | |
 | --- | --- |
 | Build | ng-packagr; FESM2022 + `index.d.ts` |
-| Stylesheet | `node_modules/@tablex/angular/styles.css` (a copy of the core sheet) |
-| Runtime dependencies | `@tablex/core`, `tslib` |
+| Stylesheet | `node_modules/@nexgrid/angular/styles.css` (a copy of the core sheet) |
+| Runtime dependencies | `@nexgrid/core`, `tslib` |
 | Peer dependencies | `@angular/common >= 17`, `@angular/core >= 17`, `rxjs >= 7` |
 | Node | `>= 18` |
 | License | MIT |
@@ -291,5 +291,5 @@ load) are the idiomatic answer.
 ## Related
 
 - [Package README](../../packages/angular/README.md) — the canonical input/output tables
-- [`@tablex/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
+- [`@nexgrid/core` API](core.md) · [Columns](../columns.md) · [Theming](../theming.md) · [Localization](../localization.md)
 - [Getting started › Angular](../getting-started.md#angular-17)

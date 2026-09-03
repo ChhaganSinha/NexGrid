@@ -1,4 +1,4 @@
-// The rows-per-page allowlist, mirrored from @tablex/core's PAGE_SIZES.
+// The rows-per-page allowlist, mirrored from @nexgrid/core's PAGE_SIZES.
 //
 // It lives on the server as well as in the browser because the client-side value
 // is only a suggestion: a hand-edited `?pageSize=100000` must not be allowed to
@@ -12,7 +12,7 @@ namespace TableX.AspNetCore;
 
 /// <summary>
 /// The rows-per-page values TableX accepts, shared verbatim with
-/// <c>@tablex/core</c>'s <c>PAGE_SIZES</c>.
+/// <c>@nexgrid/core</c>'s <c>PAGE_SIZES</c>.
 /// </summary>
 public static class PageSizes
 {

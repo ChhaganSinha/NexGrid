@@ -109,7 +109,7 @@ public PagedResponse<Student> Students(TableXQuery query) =>
 ```
 
 **`TableXQuery` binds itself.** No `[FromQuery]`, no startup registration, no
-validation to write. Parsing mirrors `@tablex/core`'s `parseQuery` exactly,
+validation to write. Parsing mirrors `@nexgrid/core`'s `parseQuery` exactly,
 including how it degrades: `?page=0` → page 1, `?pageSize=99999` → 10,
 `?sort=:desc` → dropped. A hand-edited URL produces a usable grid, not a 400 in
 the middle of a paginated table.

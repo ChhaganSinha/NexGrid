@@ -1,4 +1,4 @@
-# @tablex/react
+# @nexgrid/react
 
 A server-driven data grid for React and Next.js.
 
@@ -16,7 +16,7 @@ loading / empty / error states, and a card layout for phones — all styled by o
 stylesheet shared with the Angular and vanilla adapters, so the same grid looks
 identical on every platform.
 
-- Zero runtime dependencies beyond `@tablex/core`. React is a peer dependency.
+- Zero runtime dependencies beyond `@nexgrid/core`. React is a peer dependency.
 - Written for strict TypeScript, generic over your row type.
 - Ships ESM and CJS, with a `"use client"` banner so it drops straight into the
   Next.js App Router.
@@ -28,13 +28,13 @@ identical on every platform.
 ## Installation
 
 ```bash
-npm install @tablex/react @tablex/core
+npm install @nexgrid/react @nexgrid/core
 ```
 
 Import the stylesheet once, anywhere in your app:
 
 ```ts
-import "@tablex/react/styles.css";
+import "@nexgrid/react/styles.css";
 ```
 
 ## Quick start
@@ -53,8 +53,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: number;
@@ -179,7 +179,7 @@ Two notes:
 - Anything you pass through props still crosses the server/client boundary, so
   `columns` (which contains `cell` functions) must be defined in a file marked
   `"use client"`, not in the server page.
-- Import `@tablex/react/styles.css` from your root layout, or from the client
+- Import `@nexgrid/react/styles.css` from your root layout, or from the client
   component itself if your setup supports component-level CSS imports.
 
 ## Props
@@ -409,10 +409,10 @@ Templates keep their `{placeholder}` tokens so word order stays yours. Import
   Enter. Keep genuinely interactive content in a cell rather than relying on the
   row handler alone.
 
-## Re-exported from `@tablex/core`
+## Re-exported from `@nexgrid/core`
 
 For convenience, the pieces a host needs to drive a controlled grid are
-re-exported from this package, so most apps never import `@tablex/core`
+re-exported from this package, so most apps never import `@nexgrid/core`
 directly:
 
 `defaultQuery`, `parseQuery`, `serializeQuery`, `buildQueryUrl`, `primarySort`,

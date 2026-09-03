@@ -112,8 +112,8 @@ import {
   type TableXReactColumn,
   type PagedResponse,
   type QueryState,
-} from "@tablex/react";
-import "@tablex/react/styles.css";
+} from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
 
 interface Student {
   id: number;
@@ -183,7 +183,7 @@ the reducer is what resets `page` to 1 and what turns `""` into `undefined`.
 the query:
 
 ```ts
-import { withFilter, type QueryState } from "@tablex/core";
+import { withFilter, type QueryState } from "@nexgrid/core";
 
 let query: QueryState = defaultQuery();
 query = withFilter(query, "status", "Active");    // filter[status]=Active

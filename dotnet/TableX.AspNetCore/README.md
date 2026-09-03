@@ -169,7 +169,7 @@ leading `?`), which is convenient in tests.
 
 ### Binding never fails
 
-Parsing mirrors `@tablex/core`'s `parseQuery` exactly, including how it
+Parsing mirrors `@nexgrid/core`'s `parseQuery` exactly, including how it
 degrades. A hand-edited URL produces a usable grid, not a `400`:
 
 | Query string | Result |
@@ -446,9 +446,9 @@ script, then start the grid yourself:
 </script>
 ```
 
-Everything `@tablex/vanilla` accepts is available on that object: `onNotify`,
+Everything `@nexgrid/vanilla` accepts is available on that object: `onNotify`,
 `onRowClick`, `onSelectionChange`, `locale`, `badgeRules`, `fetchOptions`, and
-the rest. See the [`@tablex/vanilla` README](https://github.com/ChhaganSinha/TableX/tree/main/packages/vanilla).
+the rest. See the [`@nexgrid/vanilla` README](https://github.com/ChhaganSinha/TableX/tree/main/packages/vanilla).
 
 ---
 
@@ -490,7 +490,7 @@ adapter — React, Angular, vanilla — works against your endpoint with no glue
 | `PagedResponse<T>(items, page, pageSize, total)` | The response contract. `TotalPages` is derived. |
 | `SortSpec(Field, Direction)` · `.ToToken()` · `.TryParse(token, out spec)` | One sort intent and its `field:dir` token. |
 | `SortDirection.Ascending` / `.Descending` | Sort direction. |
-| `PageSizes.All` / `.Default` / `.IsAllowed(n)` / `.Coerce(n)` | The rows-per-page allowlist, shared with `@tablex/core`. |
+| `PageSizes.All` / `.Default` / `.IsAllowed(n)` / `.Coerce(n)` | The rows-per-page allowlist, shared with `@nexgrid/core`. |
 | `TableXQueryModelBinder` | MVC binder. Attached automatically; you never register it. |
 
 ### Query
@@ -521,7 +521,7 @@ adapter — React, Angular, vanilla — works against your endpoint with no glue
 
 ## Building from source
 
-The package embeds `@tablex/vanilla`'s browser bundle, so build the JavaScript
+The package embeds `@nexgrid/vanilla`'s browser bundle, so build the JavaScript
 first:
 
 ```bash
