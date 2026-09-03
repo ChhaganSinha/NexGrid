@@ -38,3 +38,28 @@ test("React package re-exports queryClientData for in-memory grid datasets", () 
   assert.equal(response.items[0].name, "Alice");
   assert.equal(response.items[1].name, "Bob");
 });
+
+test("queryClientData slices pages and returns all matching when paginate is false", () => {
+  const items = Array.from({ length: 45 }, (_, i) => ({
+    id: String(i + 1),
+    name: `User ${i + 1}`,
+  }));
+
+  // Page 1 of 10
+  const page1 = queryClientData(items, { page: 1, pageSize: 10, sort: [] });
+  assert.equal(page1.items.length, 10);
+  assert.equal(page1.total, 45);
+  assert.equal(page1.totalPages, 5);
+  assert.equal(page1.items[0].id, "1");
+
+  // Page 5 of 10 (remaining 5)
+  const page5 = queryClientData(items, { page: 5, pageSize: 10, sort: [] });
+  assert.equal(page5.items.length, 5);
+  assert.equal(page5.items[0].id, "41");
+
+  // Export mode (paginate: false)
+  const all = queryClientData(items, { page: 1, pageSize: 10, sort: [] }, { paginate: false });
+  assert.equal(all.items.length, 45);
+  assert.equal(all.total, 45);
+});
+

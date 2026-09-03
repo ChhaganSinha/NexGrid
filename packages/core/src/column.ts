@@ -73,6 +73,8 @@ export interface TableXColumn<TData, TRender = unknown> {
   header?: string | ((ctx: Record<string, never>) => TRender);
   /** Custom cell renderer. When omitted the raw row value is rendered as text. */
   cell?: (ctx: TableXCellContext<TData>) => TRender;
+  /** Sub-columns for multi-level / stacked header grouping. */
+  columns?: TableXColumn<TData, TRender>[];
   /** Sorting is ON by default; structural columns opt out with `false`. */
   enableSorting?: boolean;
   /** Filtering can be enabled/disabled per column with boolean. */
@@ -248,3 +250,146 @@ export function computeAggregation<TData, TRender>(
 
   return null;
 }
+
+/**
+ * Recursively flattens a hierarchy of columns (with potential `columns` child arrays)
+ * into an array of leaf columns that hold actual cell values and data mappings.
+ */
+export function flattenColumns<TData, TRender = unknown>(
+  columns: readonly TableXColumn<TData, TRender>[],
+): TableXColumn<TData, TRender>[] {
+  const result: TableXColumn<TData, TRender>[] = [];
+  for (const col of columns) {
+    if (col.columns && col.columns.length > 0) {
+      result.push(...flattenColumns(col.columns));
+    } else {
+      result.push(col);
+    }
+  }
+  return result;
+}
+
+/**
+ * Checks if any column in the array defines a nested `columns` group.
+ */
+export function hasHeaderGroups<TData, TRender = unknown>(
+  columns: readonly TableXColumn<TData, TRender>[],
+): boolean {
+  return columns.some((col) => Array.isArray(col.columns) && col.columns.length > 0);
+}
+
+/** A single rendered header cell for multi-level `<thead>` rendering. */
+export interface HeaderCell<TData, TRender = unknown> {
+  column: TableXColumn<TData, TRender>;
+  id: string;
+  title: string;
+  isGroup: boolean;
+  colSpan: number;
+  rowSpan: number;
+  leafColumn?: TableXColumn<TData, TRender>;
+}
+
+/** Multi-tier header rows representation. */
+export interface HeaderRows<TData, TRender = unknown> {
+  hasGroups: boolean;
+  /** Top row: parent groups with colSpan, and standalone columns with rowSpan 2 */
+  topRow: HeaderCell<TData, TRender>[];
+  /** Bottom row: leaf columns that sit underneath parent groups */
+  bottomRow: HeaderCell<TData, TRender>[];
+  /** All visible leaf columns in display order */
+  visibleLeafColumns: TableXColumn<TData, TRender>[];
+}
+
+/**
+ * Builds the 2-tier header row cells for rendering `<thead>`, calculating
+ * colSpan for parent groups and rowSpan for ungrouped / structural columns.
+ */
+export function buildHeaderRows<TData, TRender = unknown>(
+  columns: readonly TableXColumn<TData, TRender>[],
+  hiddenCols: Record<string, boolean> = {},
+): HeaderRows<TData, TRender> {
+  const hasGroups = hasHeaderGroups(columns);
+
+  if (!hasGroups) {
+    const visibleLeaf = columns.filter((col) => {
+      const id = getColumnId(col);
+      return !id || hiddenCols[id] !== true;
+    });
+    const topRow: HeaderCell<TData, TRender>[] = visibleLeaf.map((col) => ({
+      column: col,
+      id: getColumnId(col),
+      title: getColumnTitle(col),
+      isGroup: false,
+      colSpan: 1,
+      rowSpan: 1,
+      leafColumn: col,
+    }));
+    return {
+      hasGroups: false,
+      topRow,
+      bottomRow: [],
+      visibleLeafColumns: visibleLeaf,
+    };
+  }
+
+  const topRow: HeaderCell<TData, TRender>[] = [];
+  const bottomRow: HeaderCell<TData, TRender>[] = [];
+  const visibleLeafColumns: TableXColumn<TData, TRender>[] = [];
+
+  for (const col of columns) {
+    if (col.columns && col.columns.length > 0) {
+      // Parent group
+      const childLeaves = flattenColumns(col.columns).filter((c) => {
+        const id = getColumnId(c);
+        return !id || hiddenCols[id] !== true;
+      });
+
+      if (childLeaves.length > 0) {
+        topRow.push({
+          column: col,
+          id: col.id || getColumnTitle(col) || "group",
+          title: getColumnTitle(col),
+          isGroup: true,
+          colSpan: childLeaves.length,
+          rowSpan: 1,
+        });
+
+        for (const child of childLeaves) {
+          bottomRow.push({
+            column: child,
+            id: getColumnId(child),
+            title: getColumnTitle(child),
+            isGroup: false,
+            colSpan: 1,
+            rowSpan: 1,
+            leafColumn: child,
+          });
+          visibleLeafColumns.push(child);
+        }
+      }
+    } else {
+      // Standalone leaf column
+      const id = getColumnId(col);
+      if (!id || hiddenCols[id] !== true) {
+        topRow.push({
+          column: col,
+          id,
+          title: getColumnTitle(col),
+          isGroup: false,
+          colSpan: 1,
+          rowSpan: 2, // Spans down both header tiers
+          leafColumn: col,
+        });
+        visibleLeafColumns.push(col);
+      }
+    }
+  }
+
+  return {
+    hasGroups: true,
+    topRow,
+    bottomRow,
+    visibleLeafColumns,
+  };
+}
+

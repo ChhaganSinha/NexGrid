@@ -52,9 +52,21 @@ import {
   withToggledSort,
   withToggledMultiSort,
   copyToClipboard,
+  clearGridState,
+  loadGridState,
+  saveGridState,
+  getCellValue,
+  getCellText,
+  queryClientData,
+  defaultQuery,
+  flattenColumns,
+  hasHeaderGroups,
+  buildHeaderRows,
   type Density,
   type PagedResponse,
   type TableXColumn,
+  type QueryState,
+  type SortSpec,
 } from "@nexgrid/core";
 
 import {
@@ -93,7 +105,7 @@ import {
 } from "./render.js";
 import { useDebouncedSearch } from "./use-debounced-search.js";
 import { useDropdown } from "./use-dropdown.js";
-import type { TableXNoticeType, TableXProps } from "./types.js";
+import type { TableXNoticeType, TableXProps, TableXReactColumn } from "./types.js";
 
 /** Fallback row identity: the `id` property, else the row's own string form. */
 function defaultRowId<TData>(row: TData): string {
@@ -135,9 +147,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const {
     columns,
     data,
-    total,
-    query,
-    onQueryChange,
+    total: totalProp,
+    query: queryProp,
+    onQueryChange: onQueryChangeProp,
+    clientSidePagination,
+    paginationMode,
     caption,
     density: initialDensity = "default",
     isLoading = false,
@@ -172,6 +186,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableColumnReorder = false,
     onColumnOrderChange,
     onCellEdit,
+    storageKey,
+    showFilterPills = true,
     toolbarActions,
     onRowClick,
     getRowId = defaultRowId,
@@ -185,6 +201,30 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     onNotify,
     theme = "light",
   } = props;
+
+  const isClientSide =
+    clientSidePagination === true ||
+    paginationMode === "client" ||
+    (onQueryChangeProp === undefined && queryProp === undefined);
+
+  const [internalQuery, setInternalQuery] = React.useState<QueryState>(() => queryProp ?? defaultQuery());
+  const query = queryProp ?? internalQuery;
+
+  const onQueryChange = React.useCallback(
+    (next: QueryState) => {
+      setInternalQuery(next);
+      onQueryChangeProp?.(next);
+    },
+    [onQueryChangeProp],
+  );
+
+  const clientPaged = React.useMemo(() => {
+    if (!isClientSide) return null;
+    return queryClientData(data, query);
+  }, [isClientSide, data, query]);
+
+  const rows = isClientSide ? (clientPaged?.items ?? data) : data;
+  const total = isClientSide ? (clientPaged?.total ?? data.length) : (totalProp ?? data.length);
   const locale = resolveLocale(localeOverrides);
   const boolLabels = { yes: locale.booleanYes, no: locale.booleanNo };
 
@@ -202,7 +242,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   const [density, setDensity] = React.useState<Density>(initialDensity);
   const [hiddenCols, setHiddenCols] = React.useState<Record<string, boolean>>(() =>
-    initialHiddenColumns(columns),
+    initialHiddenColumns(flattenColumns(columns)),
   );
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -216,9 +256,94 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
 
+  // Restore persisted state on mount
+  React.useEffect(() => {
+    if (!storageKey) return;
+    const persisted = loadGridState(storageKey);
+    if (persisted) {
+      if (persisted.density) setDensity(persisted.density);
+      if (persisted.columnWidths) setColWidths(persisted.columnWidths);
+      if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
+        const hiddenMap: Record<string, boolean> = {};
+        for (const col of columns) {
+          const id = getColumnId(col);
+          if (id) hiddenMap[id] = persisted.hiddenColumns.includes(id);
+        }
+        setHiddenCols(hiddenMap);
+      }
+      if (persisted.columnOrder && Array.isArray(persisted.columnOrder)) {
+        const colMap = new Map<string, TableXReactColumn<TData>>(columns.map((c) => [getColumnId(c), c]));
+        const reordered: TableXReactColumn<TData>[] = [];
+        for (const id of persisted.columnOrder) {
+          const col = colMap.get(id);
+          if (col) {
+            reordered.push(col);
+            colMap.delete(id);
+          }
+        }
+        for (const remaining of colMap.values()) {
+          reordered.push(remaining);
+        }
+        if (reordered.length === columns.length) {
+          setColList(reordered);
+        }
+      }
+    }
+  }, [storageKey, columns]);
+
+  // Persist state changes
+  React.useEffect(() => {
+    if (!storageKey) return;
+    const hiddenList = Object.entries(hiddenCols)
+      .filter(([_, isHidden]) => isHidden)
+      .map(([id]) => id);
+    saveGridState(storageKey, {
+      density,
+      columnWidths: colWidths,
+      columnOrder: colList.map(getColumnId).filter(Boolean) as string[],
+      hiddenColumns: hiddenList,
+    });
+  }, [storageKey, density, hiddenCols, colList, colWidths]);
+
   const columnsMenu = useDropdown();
   const densityMenu = useDropdown();
   const exportMenu = useDropdown();
+
+  const handleResetView = React.useCallback(() => {
+    if (storageKey) {
+      clearGridState(storageKey);
+    }
+    setDensity(initialDensity);
+    setColWidths({});
+    setColList(columns);
+    setHiddenCols(initialHiddenColumns(flattenColumns(columns)));
+    columnsMenu.close();
+  }, [storageKey, initialDensity, columns, columnsMenu]);
+
+  const leafCols = React.useMemo(() => flattenColumns(colList), [colList]);
+
+  const autoFitColumn = React.useCallback((id: string) => {
+    const col = leafCols.find((c) => getColumnId(c) === id);
+    if (!col) return;
+    const meta = col.meta ?? {};
+    let maxContentWidth = 0;
+    const headerTitle = getColumnTitle(col) || id;
+    maxContentWidth = Math.max(maxContentWidth, headerTitle.length * 8.5 + 50);
+
+    for (const row of rows) {
+      const rawVal = getCellValue(col, row);
+      const val = getCellText(rawVal);
+      if (val) {
+        maxContentWidth = Math.max(maxContentWidth, String(val).length * 8 + 26);
+      }
+    }
+
+    const minW = meta.minWidth ?? 60;
+    const maxW = 550;
+    const finalWidth = Math.min(maxW, Math.max(minW, Math.round(maxContentWidth)));
+
+    setColWidths((prev) => ({ ...prev, [id]: finalWidth }));
+  }, [leafCols, rows]);
 
   const instanceId = React.useId();
   const columnsButtonId = `${instanceId}-columns`;
@@ -239,16 +364,20 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const range = getRecordRange(currentPage, pageSize, total);
   const sort = primarySort(query);
 
-  const visible = React.useMemo(
-    () => visibleColumns(colList, hiddenCols),
+  const headerRows = React.useMemo(
+    () => buildHeaderRows(colList, hiddenCols),
     [colList, hiddenCols],
   );
-  const hideable = React.useMemo(() => colList.filter(isHideable), [colList]);
+  const visible = React.useMemo(
+    () => visibleColumns(leafCols, hiddenCols),
+    [leafCols, hiddenCols],
+  );
+  const hideable = React.useMemo(() => leafCols.filter(isHideable), [leafCols]);
   const pageItems = React.useMemo(
     () => getPageNumbers(currentPage, totalPages),
     [currentPage, totalPages],
   );
-  const pageRowIds = React.useMemo(() => data.map((row) => getRowId(row)), [data, getRowId]);
+  const pageRowIds = React.useMemo(() => rows.map((row) => getRowId(row)), [rows, getRowId]);
 
   const columnCount =
     visible.length +
@@ -416,7 +545,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     setIsExporting(true);
     notify("info", "Exporting...");
     try {
-      let exportRows: readonly TData[] = data;
+      let exportRows: readonly TData[] = rows;
       if (fetchEndpoint) {
         const full = await fetchAllPages<TData>(async (page, size) => {
           const url = buildQueryUrl(fetchEndpoint, {
@@ -428,6 +557,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           return (await response.json()) as PagedResponse<TData>;
         });
+        exportRows = full.items;
+      } else if (isClientSide) {
+        const full = queryClientData(data, query, { paginate: false });
         exportRows = full.items;
       }
 
@@ -501,6 +633,251 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableSummaryRow === true ||
     visible.some((col) => col.meta?.aggregation !== undefined);
 
+  const renderLeafTh = (
+    col: TableXColumn<TData, React.ReactNode>,
+    rowSpan = 1,
+    isGroupChild = false,
+  ) => {
+    const id = getColumnId(col);
+    const sortable = isSortable(col) && enableSorting !== false;
+    const sortIndex = query.sort.findIndex((s: SortSpec) => s.field === id);
+    const sortItem = sortIndex >= 0 ? query.sort[sortIndex] : undefined;
+    const sorted = sortable && sortItem !== undefined;
+    const title = getColumnTitle(col) || id;
+    const meta = col.meta;
+    const activeFilter = query.filter?.[id];
+    const isFilterActive = activeFilter !== undefined && activeFilter !== "";
+
+    const customWidth = colWidths[id];
+    const baseStyle = headerCellStyle(col);
+    const thStyle: React.CSSProperties = {
+      ...baseStyle,
+      ...(customWidth !== undefined ? { width: `${customWidth}px` } : {}),
+      ...(leftOffsets.has(id) ? { left: leftOffsets.get(id) } : {}),
+      ...(rightOffsets.has(id) ? { right: rightOffsets.get(id) } : {}),
+    };
+
+    const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const targetTh = (e.currentTarget.parentElement as HTMLElement) || null;
+      const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (customWidth ?? meta?.width ?? 120);
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const nextW = Math.max(meta?.minWidth ?? 60, Math.round(startWidth + (moveEvent.clientX - startX)));
+        setColWidths((prev) => ({ ...prev, [id]: nextW }));
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.body?.classList.remove("tbx-resizing");
+      };
+      document.body?.classList.add("tbx-resizing");
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    };
+
+    return (
+      <th
+        key={id}
+        scope="col"
+        rowSpan={rowSpan > 1 ? rowSpan : undefined}
+        aria-sort={
+          !sortable
+            ? undefined
+            : sorted
+              ? sortItem?.dir === "asc"
+                ? "ascending"
+                : "descending"
+              : "none"
+        }
+        tabIndex={sortable ? 0 : undefined}
+        data-column-id={id}
+        data-tbx-focus={sortable ? `sort:${id}` : undefined}
+        draggable={enableColumnReorder && !isGroupChild}
+        onDragStart={
+          enableColumnReorder && !isGroupChild
+            ? (e) => {
+                setDraggedColId(id);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", id);
+              }
+            : undefined
+        }
+        onDragOver={
+          enableColumnReorder && !isGroupChild
+            ? (e) => {
+                e.preventDefault();
+              }
+            : undefined
+        }
+        onDrop={
+          enableColumnReorder && !isGroupChild
+            ? (e) => {
+                e.preventDefault();
+                if (!draggedColId || draggedColId === id) return;
+                const fromIdx = colList.findIndex((c) => getColumnId(c) === draggedColId);
+                const toIdx = colList.findIndex((c) => getColumnId(c) === id);
+                if (fromIdx >= 0 && toIdx >= 0) {
+                  const nextCols = [...colList];
+                  const moved = nextCols[fromIdx];
+                  if (!moved) return;
+                  nextCols.splice(fromIdx, 1);
+                  nextCols.splice(toIdx, 0, moved);
+                  setColList(nextCols);
+                  onColumnOrderChange?.(nextCols.map(getColumnId));
+                }
+              }
+            : undefined
+        }
+        onDragEnd={
+          enableColumnReorder && !isGroupChild
+            ? () => {
+                setDraggedColId(null);
+              }
+            : undefined
+        }
+        className={[
+          "tbx-th",
+          sortable ? "tbx-th--sortable" : undefined,
+          isGroupChild ? "tbx-th--grouped-child" : undefined,
+          enableColumnReorder && !isGroupChild ? "tbx-th--draggable" : undefined,
+          draggedColId === id ? "tbx-th--dragging" : undefined,
+          isPinned(col) === "left" ? "tbx-th--pinned-left" : undefined,
+          isPinned(col) === "right" ? "tbx-th--pinned-right" : undefined,
+          lastLeftPinnedId === id ? "tbx-pinned-border-left" : undefined,
+          firstRightPinnedId === id ? "tbx-pinned-border-right" : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={thStyle}
+        onClick={
+          sortable
+            ? (event) => {
+                const t = event.target as HTMLElement | null;
+                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) return;
+                toggleSort(id, event.shiftKey);
+              }
+            : undefined
+        }
+        onKeyDown={
+          sortable
+            ? (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                const t = event.target as HTMLElement | null;
+                if (t?.closest(".tbx-col-filter-wrap")) return;
+                event.preventDefault();
+                toggleSort(id, event.shiftKey);
+              }
+            : undefined
+        }
+      >
+        <div className={headerInnerClass(col)}>
+          <span>{renderColumnHeader(col)}</span>
+          {sortable ? (
+            <span className="tbx-sort-icon-wrap">
+              {sorted ? (
+                sortItem?.dir === "asc" ? (
+                  <ArrowUpIcon className="tbx-sort-icon" />
+                ) : (
+                  <ArrowDownIcon className="tbx-sort-icon" />
+                )
+              ) : (
+                <ArrowUpDownIcon className="tbx-sort-icon tbx-sort-icon--idle" />
+              )}
+              {query.sort.length > 1 && sortIndex >= 0 ? (
+                <span className="tbx-sort-order">{sortIndex + 1}</span>
+              ) : null}
+            </span>
+          ) : null}
+
+          {isFilterable(col, enableColumnFilters) ? (
+            <div className="tbx-col-filter-wrap">
+              <button
+                type="button"
+                className={
+                  isFilterActive
+                    ? "tbx-col-filter-btn tbx-col-filter-btn--active"
+                    : "tbx-col-filter-btn"
+                }
+                aria-label={`Filter ${title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenFilterCol(openFilterCol === id ? null : id);
+                }}
+              >
+                <DotsVerticalIcon className="tbx-icon" />
+              </button>
+
+              {openFilterCol === id ? (
+                <div
+                  className="tbx-filter-popover"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    autoFocus
+                    type="text"
+                    className="tbx-filter-popover-input"
+                    defaultValue={activeFilter ?? ""}
+                    placeholder={`Filter by ${title}...`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const val = (e.currentTarget as HTMLInputElement).value.trim();
+                        setOpenFilterCol(null);
+                        onQueryChange(withFilter(query, id, val || undefined));
+                      } else if (e.key === "Escape") {
+                        setOpenFilterCol(null);
+                      }
+                    }}
+                  />
+                  <div className="tbx-filter-popover-actions">
+                    <button
+                      type="button"
+                      className="tbx-filter-popover-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenFilterCol(null);
+                        onQueryChange(withFilter(query, id, undefined));
+                      }}
+                    >
+                      <RotateCcwIcon className="tbx-icon" />
+                      <span>{locale.clearFilter}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
+                        const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
+                        const val = inputEl?.value.trim();
+                        setOpenFilterCol(null);
+                        onQueryChange(withFilter(query, id, val || undefined));
+                      }}
+                    >
+                      <CheckIcon className="tbx-icon" />
+                      <span>{locale.applyFilter}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {enableColumnResize ? (
+          <div
+            className="tbx-resize-handle"
+            onPointerDown={startResize}
+            onDoubleClick={() => autoFitColumn(id)}
+          />
+        ) : null}
+      </th>
+    );
+  };
+
   return (
     <div className={rootClasses.join(" ")} data-density={density} ref={rootRef}>
       {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
@@ -569,6 +946,19 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                     </button>
                   );
                 })}
+                {storageKey ? (
+                  <>
+                    <div className="tbx-menu-separator" />
+                    <button
+                      type="button"
+                      className="tbx-menu-item tbx-menu-item--reset"
+                      role="menuitem"
+                      onClick={handleResetView}
+                    >
+                      <span>Reset to default view</span>
+                    </button>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -679,6 +1069,57 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       </div>
       ) : null}
 
+      {/* ── ACTIVE FILTER PILLS BAR ────────────────────────────────────────── */}
+      {showFilterPills !== false && (Boolean(query.q?.trim()) || Object.keys(query.filter ?? {}).some((k) => query.filter?.[k])) ? (
+        <div className="tbx-filter-pills-bar">
+          <span className="tbx-filter-pills-title">Active filters:</span>
+          {query.q?.trim() ? (
+            <div className="tbx-filter-pill">
+              <span className="tbx-filter-pill-label">
+                {searchPlaceholder || locale.searchPlaceholder || "Search"}:
+              </span>
+              <span className="tbx-filter-pill-val">"{query.q}"</span>
+              <button
+                type="button"
+                className="tbx-filter-pill-remove"
+                title="Clear search"
+                aria-label="Clear search"
+                onClick={() => onQueryChange(withSearch(query, ""))}
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+          {Object.entries(query.filter ?? {}).map(([key, val]) => {
+            if (val === undefined || val === "") return null;
+            const col = leafCols.find((c) => getColumnId(c) === key);
+            const title = col ? getColumnTitle(col) || key : key;
+            return (
+              <div key={key} className="tbx-filter-pill">
+                <span className="tbx-filter-pill-label">{title}:</span>
+                <span className="tbx-filter-pill-val">{String(val)}</span>
+                <button
+                  type="button"
+                  className="tbx-filter-pill-remove"
+                  title={`Remove ${title} filter`}
+                  aria-label={`Remove filter for ${title}`}
+                  onClick={() => onQueryChange(withFilter(query, key, undefined))}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            className="tbx-filter-pill-clear-all"
+            onClick={() => onQueryChange({ ...query, page: 1, q: undefined, filter: {} })}
+          >
+            Clear all
+          </button>
+        </div>
+      ) : null}
+
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
       <div className="tbx-table-wrap">
         <table className="tbx-table" aria-label={caption}>
@@ -686,6 +1127,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             <tr>
               {renderExpandedRow ? (
                 <th
+                  rowSpan={headerRows.hasGroups ? 2 : undefined}
                   className={[
                     "tbx-th tbx-th--expand",
                     leftOffsets.has("__expand") ? "tbx-th--pinned-left" : undefined,
@@ -703,6 +1145,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
               {enableSelection ? (
                 <th
+                  rowSpan={headerRows.hasGroups ? 2 : undefined}
                   className={[
                     "tbx-th tbx-th--select",
                     leftOffsets.has("__select") ? "tbx-th--pinned-left" : undefined,
@@ -732,6 +1175,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
               {showSerialNumber ? (
                 <th
+                  rowSpan={headerRows.hasGroups ? 2 : undefined}
                   className={[
                     "tbx-th tbx-th--serial",
                     leftOffsets.has("__serial") ? "tbx-th--pinned-left" : undefined,
@@ -748,279 +1192,37 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 </th>
               ) : null}
 
-              {visible.map((col, index) => {
-                const id = getColumnId(col);
-                const sortable = isSortable(col) && enableSorting !== false;
-                const sortIndex = query.sort.findIndex((s) => s.field === id);
-                const sortItem = sortIndex >= 0 ? query.sort[sortIndex] : undefined;
-                const sorted = sortable && sortItem !== undefined;
-                const title = getColumnTitle(col) || id;
-                const meta = col.meta;
-                const activeFilter = query.filter?.[id];
-                const isFilterActive = activeFilter !== undefined && activeFilter !== "";
-
-                const customWidth = colWidths[id];
-                const baseStyle = headerCellStyle(col);
-                const thStyle: React.CSSProperties = {
-                  ...baseStyle,
-                  ...(customWidth !== undefined ? { width: `${customWidth}px` } : {}),
-                  ...(leftOffsets.has(id) ? { left: leftOffsets.get(id) } : {}),
-                  ...(rightOffsets.has(id) ? { right: rightOffsets.get(id) } : {}),
-                };
-
-                const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const startX = e.clientX;
-                  const targetTh = (e.currentTarget.parentElement as HTMLElement) || null;
-                  const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (customWidth ?? meta?.width ?? 120);
-
-                  const onMove = (moveEvent: PointerEvent) => {
-                    const nextW = Math.max(meta?.minWidth ?? 60, Math.round(startWidth + (moveEvent.clientX - startX)));
-                    setColWidths((prev) => ({ ...prev, [id]: nextW }));
-                  };
-                  const onUp = () => {
-                    document.removeEventListener("pointermove", onMove);
-                    document.removeEventListener("pointerup", onUp);
-                    document.body?.classList.remove("tbx-resizing");
-                  };
-                  document.body?.classList.add("tbx-resizing");
-                  document.addEventListener("pointermove", onMove);
-                  document.addEventListener("pointerup", onUp);
-                };
-
-                const isPinnedLeft = leftOffsets.has(id);
-                const isPinnedRight = rightOffsets.has(id);
-                const isLastLeft = lastLeftPinnedId === id;
-                const isFirstRight = firstRightPinnedId === id;
-
-                return (
-                  <th
-                    key={id || `col-${index}`}
-                    scope="col"
-                    className={[
-                      "tbx-th",
-                      sortable ? "tbx-th--sortable" : undefined,
-                      enableColumnReorder ? "tbx-th--draggable" : undefined,
-                      isPinnedLeft ? "tbx-th--pinned-left" : undefined,
-                      isPinnedRight ? "tbx-th--pinned-right" : undefined,
-                      isLastLeft ? "tbx-pinned-border-left" : undefined,
-                      isFirstRight ? "tbx-pinned-border-right" : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={thStyle}
-                    aria-sort={
-                      sorted
-                        ? sortItem?.dir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : sortable
-                          ? "none"
-                          : undefined
+              {!headerRows.hasGroups
+                ? visible.map((col) => renderLeafTh(col, 1, false))
+                : headerRows.topRow.map((cell, idx) => {
+                    if (cell.isGroup) {
+                      return (
+                        <th
+                          key={`grp-${cell.id}-${idx}`}
+                          colSpan={cell.colSpan}
+                          className="tbx-th tbx-th--group"
+                          scope="colgroup"
+                        >
+                          <span className="tbx-th-group-title">{cell.title}</span>
+                        </th>
+                      );
                     }
-                    aria-label={title || undefined}
-                    tabIndex={sortable ? 0 : undefined}
-                    draggable={enableColumnReorder}
-                    onDragStart={
-                      enableColumnReorder
-                        ? (e) => {
-                            setDraggedColId(id);
-                            e.dataTransfer.setData("text/plain", id);
-                          }
-                        : undefined
+                    if (cell.leafColumn) {
+                      return renderLeafTh(cell.leafColumn, cell.rowSpan, false);
                     }
-                    onDragOver={
-                      enableColumnReorder
-                        ? (e) => {
-                            e.preventDefault();
-                          }
-                        : undefined
-                    }
-                    onDrop={
-                      enableColumnReorder
-                        ? (e) => {
-                            e.preventDefault();
-                            if (!draggedColId || draggedColId === id) return;
-                            const fromIdx = colList.findIndex((c) => getColumnId(c) === draggedColId);
-                            const toIdx = colList.findIndex((c) => getColumnId(c) === id);
-                            if (fromIdx >= 0 && toIdx >= 0) {
-                              const nextCols = [...colList];
-                              const moved = nextCols[fromIdx];
-                              if (!moved) return;
-                              nextCols.splice(fromIdx, 1);
-                              nextCols.splice(toIdx, 0, moved);
-                              setColList(nextCols);
-                              onColumnOrderChange?.(nextCols.map(getColumnId));
-                            }
-                            setDraggedColId(null);
-                          }
-                        : undefined
-                    }
-                    onClick={sortable ? (event) => {
-                      const t = event.target as HTMLElement | null;
-                      if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) return;
-                      toggleSort(id, event.shiftKey);
-                    } : undefined}
-                    onKeyDown={
-                      sortable
-                        ? (event) => {
-                            if (event.key !== "Enter" && event.key !== " ") return;
-                            const t = event.target as HTMLElement | null;
-                            if (t?.closest(".tbx-col-filter-wrap")) return;
-                            event.preventDefault();
-                            toggleSort(id, event.shiftKey);
-                          }
-                        : undefined
-                    }
-                  >
-                    <div className={headerInnerClass(col)}>
-                      <span>{renderColumnHeader(col)}</span>
-                      {sortable ? (
-                        <span className="tbx-sort-icon-wrap">
-                          {sorted ? (
-                            sortItem?.dir === "asc" ? (
-                              <ArrowUpIcon className="tbx-sort-icon" />
-                            ) : (
-                              <ArrowDownIcon className="tbx-sort-icon" />
-                            )
-                          ) : (
-                            <ArrowUpDownIcon className="tbx-sort-icon tbx-sort-icon--idle" />
-                          )}
-                          {query.sort.length > 1 && sortIndex >= 0 ? (
-                            <span className="tbx-sort-order">{sortIndex + 1}</span>
-                          ) : null}
-                        </span>
-                      ) : null}
-
-                      {isFilterable(col, enableColumnFilters) ? (
-                        <div className="tbx-col-filter-wrap">
-                          <button
-                            type="button"
-                            className={
-                              isFilterActive
-                                ? "tbx-col-filter-btn tbx-col-filter-btn--active"
-                                : "tbx-col-filter-btn"
-                            }
-                            aria-label={`Filter ${title}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenFilterCol(openFilterCol === id ? null : id);
-                            }}
-                          >
-                            <DotsVerticalIcon className="tbx-icon" />
-                          </button>
-
-                          {openFilterCol === id ? (
-                            <div
-                              className="tbx-filter-popover"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                autoFocus
-                                type="text"
-                                className="tbx-filter-popover-input"
-                                defaultValue={activeFilter ?? ""}
-                                placeholder={meta?.filterPlaceholder || formatMessage(locale.filterColumnPlaceholder, { column: title })}
-                                aria-label={`Filter ${title}`}
-                                onChange={(e) => {
-                                  const val = e.currentTarget.value.toLowerCase().trim();
-                                  const pop = e.currentTarget.closest(".tbx-filter-popover");
-                                  const opts = pop?.querySelectorAll<HTMLElement>(".tbx-filter-option:not(:first-child)");
-                                  opts?.forEach((opt) => {
-                                    const text = opt.textContent?.toLowerCase() ?? "";
-                                    opt.style.display = !val || text.includes(val) ? "" : "none";
-                                  });
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const val = (e.currentTarget as HTMLInputElement).value.trim();
-                                    setOpenFilterCol(null);
-                                    onQueryChange(withFilter(query, id, val || undefined));
-                                  } else if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    setOpenFilterCol(null);
-                                  }
-                                }}
-                              />
-
-                              {meta?.filterOptions && meta.filterOptions.length > 0 ? (
-                                <div className="tbx-filter-popover-options">
-                                  <div
-                                    className={
-                                      !activeFilter
-                                        ? "tbx-filter-option tbx-filter-option--selected"
-                                        : "tbx-filter-option"
-                                    }
-                                    onClick={() => {
-                                      setOpenFilterCol(null);
-                                      onQueryChange(withFilter(query, id, undefined));
-                                    }}
-                                  >
-                                    {locale.filterAll}
-                                  </div>
-                                  {meta.filterOptions.map((opt) => (
-                                    <div
-                                      key={opt}
-                                      className={
-                                        activeFilter === opt
-                                          ? "tbx-filter-option tbx-filter-option--selected"
-                                          : "tbx-filter-option"
-                                      }
-                                      onClick={() => {
-                                        setOpenFilterCol(null);
-                                        onQueryChange(withFilter(query, id, opt));
-                                      }}
-                                    >
-                                      {opt}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : null}
-
-                              <div className="tbx-filter-popover-actions">
-                                <button
-                                  type="button"
-                                  className="tbx-filter-popover-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenFilterCol(null);
-                                    onQueryChange(withFilter(query, id, undefined));
-                                  }}
-                                >
-                                  <RotateCcwIcon className="tbx-icon" />
-                                  <span>{locale.clearFilter}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
-                                    const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
-                                    const val = inputEl?.value.trim();
-                                    setOpenFilterCol(null);
-                                    onQueryChange(withFilter(query, id, val || undefined));
-                                  }}
-                                >
-                                  <CheckIcon className="tbx-icon" />
-                                  <span>{locale.applyFilter}</span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {enableColumnResize ? (
-                      <div className="tbx-resize-handle" onPointerDown={startResize} />
-                    ) : null}
-                  </th>
-                );
-              })}
+                    return null;
+                  })}
             </tr>
+            {headerRows.hasGroups ? (
+              <tr>
+                {headerRows.bottomRow.map((cell) => {
+                  if (cell.leafColumn) {
+                    return renderLeafTh(cell.leafColumn, 1, true);
+                  }
+                  return null;
+                })}
+              </tr>
+            ) : null}
           </thead>
 
           <tbody>
@@ -1036,14 +1238,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   <div className="tbx-loading-text" aria-live="polite">{locale.loadingText}</div>
                 </td>
               </tr>
-            ) : data.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td className="tbx-state" colSpan={Math.max(1, columnCount)}>
                   {locale.emptyText}
                 </td>
               </tr>
             ) : (
-              data.map((row, index) => {
+              rows.map((row, index) => {
                 const id = pageRowIds[index] ?? String(index);
                 const isSelected = selectedIds.has(id);
                 const isExpanded = expandedRows.has(id);
@@ -1288,12 +1490,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               <div className="tbx-loading-text" aria-live="polite">{locale.loadingText}</div>
             </div>
           </div>
-        ) : data.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="tbx-card">
             <div className="tbx-state">{locale.emptyText}</div>
           </div>
         ) : (
-          data.map((row, index) => {
+          rows.map((row, index) => {
             const id = pageRowIds[index] ?? String(index);
             const isSelected = selectedIds.has(id);
 

@@ -7,6 +7,9 @@ export {
   DENSITY_ROW_HEIGHT,
   DENSITIES,
   isPageSize,
+  saveGridState,
+  loadGridState,
+  clearGridState,
 } from "./types.js";
 export type {
   PageSize,
@@ -16,6 +19,7 @@ export type {
   PagedResponse,
   Density,
   SelectionMode,
+  GridStateSnapshot,
 } from "./types.js";
 
 // Column model
@@ -35,6 +39,9 @@ export {
   isStructuralColumn,
   initialHiddenColumns,
   visibleColumns,
+  flattenColumns,
+  hasHeaderGroups,
+  buildHeaderRows,
 } from "./column.js";
 export type {
   TableXColumn,
@@ -43,6 +50,8 @@ export type {
   NexGridColumn,
   NexGridColumnMeta,
   NexGridCellContext,
+  HeaderCell,
+  HeaderRows,
 } from "./column.js";
 
 // Query reducers and client-side dataset querying

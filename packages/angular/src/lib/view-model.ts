@@ -22,24 +22,32 @@ export interface TableXHeaderView {
   id: string;
   /** Resolved header text. */
   title: string;
-  sortable: boolean;
+  sortable?: boolean;
   /** Which sort icon to draw. */
-  sortState: "asc" | "desc" | "none";
+  sortState?: "asc" | "desc" | "none";
   /** Sort order priority number for multi-column sorting (1, 2, ...), or null. */
-  sortOrder: number | null;
+  sortOrder?: number | null;
   /** `aria-sort` value, or `null` when the column cannot be sorted. */
-  ariaSort: "ascending" | "descending" | "none" | null;
-  align: "left" | "center" | "right";
+  ariaSort?: "ascending" | "descending" | "none" | null;
+  align?: "left" | "center" | "right";
   /** Fixed pixel width, or `null` for natural layout. */
-  width: number | null;
+  width?: number | null;
   /** Minimum pixel width, or `null` when a fixed width is set. */
-  minWidth: number | null;
+  minWidth?: number | null;
   /** Whether the column has a server-filterable menu. */
-  serverFilterable: boolean;
+  serverFilterable?: boolean;
   /** Preset options if defined on column metadata. */
   filterOptions?: readonly string[];
   /** The current filter value applied to this column, if any. */
   activeFilter?: string;
+  /** Whether this header cell represents a column group. */
+  isGroup?: boolean;
+  /** Column span for group headers. */
+  colSpan?: number;
+  /** Row span for multi-tier headers. */
+  rowSpan?: number;
+  /** Whether this cell is a grouped child under a group header. */
+  isGroupChild?: boolean;
 }
 
 /** One rendered data cell, in the table and in the mobile card list. */

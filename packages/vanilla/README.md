@@ -7,14 +7,18 @@ The grid never holds your dataset. Every user action (search, sort, page, page
 size) becomes a `QueryState`; you answer with one page of rows and a total, or
 you point the grid at an endpoint and let it fetch for itself.
 
-- Global search (350 ms debounce) · column visibility menu · density menu
-- Server sorting with the `asc → desc → cleared` cycle
-- Row selection, automatic `S.No.` column, row click
-- Excel (`.xls`, styled) and CSV export, including whole-dataset export
-- Responsive: a table at ≥ 768 px, a card list below — same renderers in both
-- Fully localizable, light/dark/auto theming, keyboard and screen-reader ready
-- **Safe by construction:** cell values are written as text nodes. There is no
-  `innerHTML` path for row data anywhere in this package.
+- 🗂️ **Column Header Grouping (Multi-Level / Stacked Headers)** — Group sub-columns beneath parent categories with automatic `colSpan` and `rowSpan`.
+- 🚀 **Client-Side Pagination & In-Memory Engine** (`clientSidePagination`) — Zero-config in-memory paging, sorting, search, filtering, and export over local arrays with reactive `setData()`.
+- 💾 **Grid State Persistence (`storageKey`)** — Automatically saves column widths, drag order, hidden columns, and density to `localStorage` + 1-click Reset View.
+- ↔️ **Interactive Column Resizing & Double-Click Auto-Fit** — Drag handles to adjust column widths, double-click to measure and auto-fit to content.
+- 🏷️ **Active Filter Pills Bar** — Interactive chip badges beneath the toolbar for active search & column filters with one-click `✕` removal and "Clear all".
+- 🔍 **Global search** (350 ms debounce) · 3-dot column filters · column visibility menu · density menu
+- 🔄 **Server sorting** with the `asc → desc → cleared` cycle and multi-column sorting
+- ☑️ **Row selection**, automatic `S.No.` column, row click
+- 📊 **Excel (`.xls`, styled) and CSV export**, including whole-dataset export
+- 📱 **Responsive:** a table at ≥ 768 px, a card list below — same renderers in both
+- 🎨 **Fully localizable, light/dark/auto theming**, keyboard and screen-reader ready
+- 🛡️ **Safe by construction:** cell values are written as text nodes. There is no `innerHTML` path for row data anywhere in this package.
 
 This is also the bundle that powers `TableX.AspNetCore`.
 
@@ -143,15 +147,16 @@ appends one `div.tbx-root` to it.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `columns` | `TableXColumn<TData, string \| Node>[]` | Column definitions, in display order. |
+| `columns` | `TableXColumn<TData, string \| Node>[]` | Column definitions, in display order (supports nested `columns` for multi-level stacked headers). |
 | `caption` | `string` | Accessible name for the table; also the default export file prefix. |
 
 ### Data source — pick one mode
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `data` | `TData[]` | `[]` | The **current page** of rows only, never the full dataset. |
-| `total` | `number` | `0` | Total filtered row count. Drives the pager. |
+| `clientSidePagination` | `boolean` | `false` | Zero-config in-memory mode: slices data, sorts, filters, searches, and exports locally. |
+| `data` | `TData[]` | `[]` | The current page of rows (or full dataset if `clientSidePagination` is true). |
+| `total` | `number` | `0` | Total filtered row count. Drives the pager (computed automatically in client mode). |
 | `query` | `QueryState` | `defaultQuery()` | Initial page / size / sort / search / filters. |
 | `onQueryChange` | `(next: QueryState) => void` | — | Fires on every query change, in **both** modes. |
 | `endpoint` | `string` | — | Enables endpoint mode: the grid fetches `buildQueryUrl(endpoint, query)` itself and manages loading/error. |
@@ -172,11 +177,18 @@ appends one `div.tbx-root` to it.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
+| `storageKey` | `string` | — | Persists custom column widths, column order, hidden columns, and density to `localStorage`. |
+| `enableColumnResize` | `boolean` | `true` | Interactive drag resize handles and double-click auto-fit measuring. |
+| `enableColumnFilters` | `boolean` | `true` | 3-dot column filter popovers (⋮) with search, select, and range filtering. |
+| `enableSummaryRow` | `boolean` | `false` | Bottom aggregation / summary row (`sum`, `avg`, `min`, `max`, `count`). |
+| `enableRowExpansion` | `boolean` | `false` | Master-detail accordion expandable sub-rows with rotating chevrons. |
+| `enableBulkActions` | `boolean` | `false` | Contextual floating bottom pill bar for batch operations. |
 | `showSerialNumber` | `boolean` | `true` | The automatic `S.No.` column, numbered across the whole result set. |
 | `enableSearch` | `boolean` | `true` | Global search field, debounced 350 ms. |
 | `searchPlaceholder` | `string` | `locale.searchPlaceholder` | Placeholder text override. |
 | `enableSelection` | `boolean` | `false` | Row checkboxes and a header select-all for the current page. |
-| `onSelectionChange` | `(ids: string[], allAcrossSelected: boolean) => void` | — | The running selection. `allAcrossSelected` is always `false` today (reserved). |
+| `selectionMode` | `"multi" \| "single"` | `"multi"` | Single or multi-row selection mode. |
+| `onSelectionChange` | `(ids: string[]) => void` | — | The running selection. |
 | `onRowClick` | `(row: TData) => void` | — | Row/card click. Adds a pointer cursor. Checkbox clicks never trigger it. |
 | `getRowId` | `(row: TData) => string` | `row.id ?? String(row)` | Stable row identity for selection. |
 | `toolbarActions` | `Node \| string` | — | Rendered at the end of the toolbar. |

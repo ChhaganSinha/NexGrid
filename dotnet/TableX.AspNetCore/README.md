@@ -1,7 +1,7 @@
 # TableX.AspNetCore
 
-A professional, **server-driven** data grid for ASP.NET Core — the Razor half of
-[TableX](https://github.com/ChhaganSinha/TableX).
+A professional, **server-driven** data grid for ASP.NET Core — the Razor & Blazor half of
+[NexGrid](https://github.com/ChhaganSinha/NexGrid).
 
 The grid never holds your dataset. Every user action (search, sort, page, page
 size, column filter) becomes a query string; your endpoint answers with exactly
@@ -14,15 +14,17 @@ This package gives you three things and nothing you have to glue together:
 | --- | --- |
 | **`TableXQuery`** | Binds TableX's wire format straight off the query string. No configuration, no `[FromQuery]` gymnastics. |
 | **`ToPagedResponseAsync`** | Applies search, filters, sorting and paging to an `IQueryable<T>` through an **explicit allowlist**, and returns a `PagedResponse<T>`. On EF Core it leaves as two SQL statements. |
-| **Tag Helpers** | `<table-x>` and `<table-x-column>` render the grid, with the browser bundle shipped inside the package as a static web asset. |
+| **Tag Helpers & Blazor** | `<table-x>` / `<table-x-column>` and `<TableX>` components render the grid, with the browser bundle shipped inside the package as a static web asset. |
 
 - ASP.NET Core 8.0+ · zero package dependencies · MIT
-- Excel (`.xls`, styled badges) and CSV export, including the **whole filtered
-  dataset** across pages
-- Global search (350 ms debounce), column visibility, density, row selection,
-  automatic `S.No.`, numbered pagination with a page-jump box
-- Responsive: a table at ≥ 768 px, a card per record below
-- Light / dark / auto theming, fully localizable, accessible by construction
+- 🗂️ **Column Header Grouping** — Multi-level stacked headers with automatic `colSpan` and `rowSpan`
+- 💾 **Grid State Persistence** (`storage-key`) — Saves custom column widths, order, hidden columns to `localStorage`
+- ↔️ **Column Resizing & Auto-Fit** — Drag resize handles and double-click auto-fit measuring
+- 🏷️ **Active Filter Pills Bar** — Interactive chips for active search & column filters with 1-click removal
+- 📊 **Excel (`.xls`, styled badges) and CSV export**, including the **whole filtered dataset** across pages
+- 🔍 **Global search** (350 ms debounce), column visibility, density, row selection, automatic `S.No.`, numbered pagination with page-jump
+- 📱 **Responsive:** a table at ≥ 768 px, a card per record below
+- 🎨 **Light / dark / auto theming**, fully localizable, accessible by construction
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX ASP.NET Core Data Grid Preview" width="100%" />

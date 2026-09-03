@@ -1,0 +1,22 @@
+{
+  "name": "tablex-example-react-javascript",
+  "version": "0.2.0",
+  "private": true,
+  "description": "NexGrid + React in pure JavaScript (JSX) with no TypeScript required.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@nexgrid/core": "file:../../packages/core",
+    "@nexgrid/react": "file:../../packages/react",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.0"
+  }
+}

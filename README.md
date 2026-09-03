@@ -84,6 +84,11 @@ sequenceDiagram
 
 Every feature works identically across React, Angular, Vanilla JS, and ASP.NET Core:
 
+- 🗂️ **Column Header Grouping (Multi-Level / Stacked Headers)** — Group related sub-columns beneath parent category headers with automatic `colSpan` & `rowSpan` calculation, responsive layouts, and full sorting/filter support.
+- 💾 **Grid State Persistence (`storageKey`)** — Automatically saves custom column widths, drag-and-drop column order, hidden columns, and row density to `localStorage`, with a 1-click "Reset to default view" option.
+- 🚀 **Client-Side Pagination & In-Memory Data** — Zero-configuration in-memory data querying (page windows, search, sorting, filtering, and export) over local arrays with full framework parity.
+- ↔️ **Column Resizing & Double-Click Auto-Fit** — Drag column borders to resize, or double-click the resize handle to automatically measure and fit column width to content (Excel / AG Grid style).
+- 🏷️ **Active Filter Pills Bar** — Interactive chips bar beneath the toolbar displaying active search and column filters with one-click `✕` removal and "Clear all".
 - ⚡ **Server-Driven Query Engine** — Pagination, sorting, global search, and filters are server requests, never client-side array mutations.
 - 🔍 **Debounced Global Search** — 350 ms debounced search with automatic clear button.
 - 🔄 **Three-State Sorting** — Familiar cycle: `Ascending → Descending → Cleared`. Multi-column sorting supported.
@@ -121,6 +126,9 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 ```bash
 npm install @nexgrid/react @nexgrid/core
 ```
+
+<details open>
+<summary><b>TypeScript (TSX)</b></summary>
 
 ```tsx
 "use client";
@@ -181,6 +189,63 @@ export function StudentsGrid() {
   );
 }
 ```
+
+</details>
+
+<details>
+<summary><b>JavaScript (JSX)</b></summary>
+
+```jsx
+// Plain JavaScript / JSX with optional JSDoc autocomplete
+import { useEffect, useState } from "react";
+import { TableX, defaultQuery, buildQueryUrl } from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
+
+/** @type {import('@nexgrid/react').TableXColumn[]} */
+const columns = [
+  { accessorKey: "name", header: "Name", sortable: true },
+  { accessorKey: "email", header: "Email" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ getValue }) => <span className="badge">{String(getValue())}</span>,
+  },
+];
+
+export function StudentsGrid() {
+  const [query, setQuery] = useState(defaultQuery());
+  const [page, setPage] = useState({ items: [], total: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(buildQueryUrl("/api/students", query))
+      .then((r) => r.json())
+      .then(setPage)
+      .finally(() => setLoading(false));
+  }, [query]);
+
+  return (
+    <TableX
+      caption="Students Directory"
+      columns={columns}
+      data={page.items}
+      total={page.total}
+      query={query}
+      onQueryChange={setQuery}
+      isLoading={loading}
+      enableSelection
+    />
+  );
+}
+
+// Or zero-config with in-memory local data:
+export function LocalGrid({ students }) {
+  return <TableX caption="Students" columns={columns} data={students} clientSidePagination />;
+}
+```
+
+</details>
 
 ---
 

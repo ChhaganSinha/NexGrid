@@ -56,6 +56,13 @@ import {
   withSearch,
   withToggledMultiSort,
   withToggledSort,
+  clearGridState,
+  loadGridState,
+  saveGridState,
+  queryClientData,
+  flattenColumns,
+  hasHeaderGroups,
+  buildHeaderRows,
   type Density,
   type PagedResponse,
   type QueryState,
@@ -150,6 +157,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // ---- State ---------------------------------------------------------------
   private columns: TableXVanillaColumn<TData>[];
   private data: TData[];
+  private rawClientData: TData[] = [];
+  private isClientSide: boolean;
   private total: number;
   private query: QueryState;
   private density: Density;
@@ -191,6 +200,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private readonly pager: HTMLDivElement;
   private readonly rowsSelect: HTMLSelectElement | null = null;
   private readonly jumpInput: HTMLInputElement | null = null;
+  private readonly filterPillsBar: HTMLDivElement;
   private expandedRows = new Set<string>();
   private editingCell: { rowId: string; columnId: string } | null = null;
   private draggedColumnId: string | null = null;
@@ -203,13 +213,61 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.uid = `tbx-${++instanceCounter}`;
 
     this.columns = options.columns;
-    this.data = options.data ?? [];
-    this.total = options.total ?? 0;
     this.query = options.query ?? defaultQuery();
     this.density = options.density ?? "default";
-    this.hidden = initialHiddenColumns(this.columns);
+    this.hidden = initialHiddenColumns(flattenColumns(this.columns));
     this.isLoading = options.isLoading ?? false;
     this.isError = options.error ?? false;
+
+    this.isClientSide =
+      options.clientSidePagination === true ||
+      options.paginationMode === "client" ||
+      (options.endpoint === undefined && options.onQueryChange === undefined);
+    this.rawClientData = options.data ? [...options.data] : [];
+
+    if (this.isClientSide && this.rawClientData.length > 0) {
+      const paged = queryClientData(this.rawClientData, this.query);
+      this.data = paged.items;
+      this.total = paged.total;
+    } else {
+      this.data = options.data ?? [];
+      this.total = options.total ?? 0;
+    }
+
+    if (options.storageKey) {
+      const persisted = loadGridState(options.storageKey);
+      if (persisted) {
+        if (persisted.density) this.density = persisted.density;
+        if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
+        if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
+          const hiddenMap: Record<string, boolean> = {};
+          for (const col of this.columns) {
+            const id = getColumnId(col);
+            if (id) hiddenMap[id] = persisted.hiddenColumns.includes(id);
+          }
+          this.hidden = hiddenMap;
+        }
+        if (persisted.columnOrder && Array.isArray(persisted.columnOrder)) {
+          const colMap = new Map(this.columns.map((c) => [getColumnId(c), c]));
+          const reordered: TableXVanillaColumn<TData>[] = [];
+          for (const id of persisted.columnOrder) {
+            const col = colMap.get(id);
+            if (col) {
+              reordered.push(col);
+              colMap.delete(id);
+            }
+          }
+          for (const remaining of colMap.values()) {
+            reordered.push(remaining);
+          }
+          if (reordered.length === this.columns.length) {
+            this.columns = reordered;
+          }
+        }
+      }
+    }
+
+    this.filterPillsBar = el("div", { class: "tbx-filter-pills-bar", style: { display: "none" } });
 
     // ---- Root -------------------------------------------------------------
     const rootClasses = ["tbx-root"];
@@ -368,11 +426,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (this.destroyed) return;
 
     let queryChanged = false;
-    if (patch.data !== undefined) this.data = patch.data;
-    if (patch.total !== undefined) this.total = patch.total;
+    if (patch.data !== undefined) {
+      this.rawClientData = [...patch.data];
+      if (this.isClientSide) {
+        const paged = queryClientData(this.rawClientData, patch.query ?? this.query);
+        this.data = paged.items;
+        this.total = paged.total;
+      } else {
+        this.data = patch.data;
+      }
+    }
+    if (patch.total !== undefined && !this.isClientSide) this.total = patch.total;
     if (patch.query !== undefined) {
       queryChanged = !queryEquals(patch.query, this.query);
       this.query = patch.query;
+      if (this.isClientSide && patch.data === undefined) {
+        const paged = queryClientData(this.rawClientData, this.query);
+        this.data = paged.items;
+        this.total = paged.total;
+      }
     }
     if (patch.isLoading !== undefined) this.isLoading = patch.isLoading;
     if (patch.error !== undefined) this.isError = patch.error;
@@ -380,6 +452,19 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (queryChanged && this.options.endpoint !== undefined) {
       void this.fetchFromEndpoint();
       return;
+    }
+    this.render();
+  }
+
+  setData(data: TData[]): void {
+    if (this.destroyed) return;
+    this.rawClientData = [...data];
+    if (this.isClientSide) {
+      const paged = queryClientData(this.rawClientData, this.query);
+      this.data = paged.items;
+      this.total = paged.total;
+    } else {
+      this.data = data;
     }
     this.render();
   }
@@ -535,6 +620,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (this.options.endpoint !== undefined) {
       this.options.onQueryChange?.(next);
       void this.fetchFromEndpoint();
+      return;
+    }
+    if (this.isClientSide) {
+      const paged = queryClientData(this.rawClientData, this.query);
+      this.data = paged.items;
+      this.total = paged.total;
+      this.options.onQueryChange?.(next);
+      this.render();
       return;
     }
     // Controlled mode: emit to host and re-render with updated state
@@ -712,8 +805,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // Derived state
   // =========================================================================
 
+  private leafCols(): TableXVanillaColumn<TData>[] {
+    return flattenColumns(this.columns);
+  }
+
   private visibleCols(): TableXVanillaColumn<TData>[] {
-    return visibleColumns(this.columns, this.hidden);
+    return visibleColumns(this.leafCols(), this.hidden);
   }
 
   private currentPage(): number {
@@ -789,6 +886,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     this.mount("grid");
     this.renderToolbar();
+    this.renderFilterPills();
     this.renderHead();
     this.renderBody();
     this.renderSummary();
@@ -822,10 +920,143 @@ class NexGridController<TData> implements TableXHandle<TData> {
     } else {
       const children: HTMLElement[] = [];
       if (this.options.showToolbar !== false) children.push(this.toolbar);
+      if (this.options.showFilterPills !== false) children.push(this.filterPillsBar);
       children.push(this.tableWrap, this.cards);
       if (this.options.showFooter !== false) children.push(this.footer);
       replaceChildren(this.root, children);
     }
+  }
+
+  private saveState(): void {
+    if (!this.options.storageKey) return;
+    const hiddenList: string[] = [];
+    for (const [id, isHidden] of Object.entries(this.hidden)) {
+      if (isHidden) hiddenList.push(id);
+    }
+    saveGridState(this.options.storageKey, {
+      density: this.density,
+      columnWidths: { ...this.columnWidths },
+      columnOrder: this.columns.map(getColumnId).filter(Boolean) as string[],
+      hiddenColumns: hiddenList,
+    });
+  }
+
+  private resetState(): void {
+    if (this.options.storageKey) {
+      clearGridState(this.options.storageKey);
+    }
+    this.density = this.options.density ?? "default";
+    for (const key of Object.keys(this.columnWidths)) {
+      delete this.columnWidths[key];
+    }
+    this.columns = [...this.options.columns];
+    this.hidden = initialHiddenColumns(this.leafCols());
+    this.render();
+  }
+
+  private autoFitColumn(id: string): void {
+    const col = this.leafCols().find((c) => getColumnId(c) === id);
+    if (!col) return;
+    const meta = col.meta ?? {};
+
+    let maxContentWidth = 0;
+    const headerTitle = getColumnTitle(col) || id;
+    maxContentWidth = Math.max(maxContentWidth, headerTitle.length * 8.5 + 50);
+
+    for (const row of this.data) {
+      const rawVal = getCellValue(col, row);
+      const val = getCellText(rawVal);
+      if (val) {
+        maxContentWidth = Math.max(maxContentWidth, String(val).length * 8 + 26);
+      }
+    }
+
+    const minW = meta.minWidth ?? 60;
+    const maxW = 550;
+    const finalWidth = Math.min(maxW, Math.max(minW, Math.round(maxContentWidth)));
+
+    this.columnWidths[id] = finalWidth;
+    this.saveState();
+    this.render();
+  }
+
+  private renderFilterPills(): void {
+    if (this.options.showFilterPills === false) {
+      this.filterPillsBar.style.display = "none";
+      return;
+    }
+
+    const pills: HTMLElement[] = [];
+    const q = this.query.q?.trim();
+    if (q) {
+      const pill = el("div", { class: "tbx-filter-pill" }, [
+        el("span", { class: "tbx-filter-pill-label", text: `${this.locale.searchPlaceholder || "Search"}:` }),
+        el("span", { class: "tbx-filter-pill-val", text: `"${q}"` }),
+      ]);
+      const removeBtn = el("button", {
+        class: "tbx-filter-pill-remove",
+        attrs: { type: "button", "aria-label": "Clear search filter", title: "Clear search" },
+        text: "✕",
+      });
+      removeBtn.addEventListener("click", () => {
+        if (this.searchInput) this.searchInput.value = "";
+        this.syncSearchClear();
+        this.applyQuery(withSearch(this.query, ""));
+      });
+      pill.appendChild(removeBtn);
+      pills.push(pill);
+    }
+
+    const filters = this.query.filter ?? {};
+    for (const [key, val] of Object.entries(filters)) {
+      if (val === undefined || val === "") continue;
+      const col = this.leafCols().find((c) => getColumnId(c) === key);
+      const title = col ? (getColumnTitle(col) || key) : key;
+      const pill = el("div", { class: "tbx-filter-pill" }, [
+        el("span", { class: "tbx-filter-pill-label", text: `${title}:` }),
+        el("span", { class: "tbx-filter-pill-val", text: String(val) }),
+      ]);
+      const removeBtn = el("button", {
+        class: "tbx-filter-pill-remove",
+        attrs: { type: "button", "aria-label": `Remove filter for ${title}`, title: `Remove ${title} filter` },
+        text: "✕",
+      });
+      removeBtn.addEventListener("click", () => {
+        this.applyQuery(withFilter(this.query, key, undefined));
+      });
+      pill.appendChild(removeBtn);
+      pills.push(pill);
+    }
+
+    if (pills.length === 0) {
+      this.filterPillsBar.style.display = "none";
+      replaceChildren(this.filterPillsBar, []);
+      return;
+    }
+
+    const clearAllBtn = el("button", {
+      class: "tbx-filter-pill-clear-all",
+      attrs: { type: "button" },
+      text: "Clear all",
+    });
+    clearAllBtn.addEventListener("click", () => {
+      if (this.searchInput) this.searchInput.value = "";
+      this.syncSearchClear();
+      this.applyQuery({
+        ...this.query,
+        page: 1,
+        q: undefined,
+        filter: {},
+      });
+    });
+
+    const children: HTMLElement[] = [
+      el("span", { class: "tbx-filter-pills-title", text: "Active filters:" }),
+      ...pills,
+      clearAllBtn,
+    ];
+    this.filterPillsBar.style.display = "";
+    replaceChildren(this.filterPillsBar, children);
   }
 
   private buildErrorCard(): HTMLElement {
@@ -1013,7 +1244,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       el("div", { class: "tbx-menu-separator" }),
     ];
 
-    for (const column of this.columns) {
+    for (const column of this.leafCols()) {
       if (!isHideable(column)) continue;
       const id = getColumnId(column);
       const visible = this.hidden[id] !== true;
@@ -1026,9 +1257,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
             // The menu deliberately stays open: hiding four columns should be
             // four clicks, not four round trips through the trigger button.
             this.hidden = { ...this.hidden, [id]: visible };
+            this.saveState();
             this.render();
           },
           visible,
+        ),
+      );
+    }
+
+    if (this.options.storageKey) {
+      items.push(
+        el("div", { class: "tbx-menu-separator" }),
+        this.menuItem(
+          "menuitem",
+          "menu:columns:reset",
+          [el("span", { class: "tbx-menu-item--reset", text: "Reset to default view" })],
+          () => {
+            this.resetState();
+            this.setOpenMenu(null);
+          },
         ),
       );
     }
@@ -1050,6 +1297,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         [checkIcon(), el("span", { text: labels[value] })],
         () => {
           this.density = value;
+          this.saveState();
           this.setOpenMenu(null, { returnFocusTo: "density" });
         },
         this.density === value,
@@ -1159,19 +1407,26 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // ---- Table head ----------------------------------------------------------
 
   private renderHead(): void {
-    const cells: ElementChild[] = [];
     const visibleCols = this.visibleCols();
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
       this.getPinnedOffsets(visibleCols);
+    const headerRows = buildHeaderRows(this.columns, this.hidden);
+    const rowSpan = headerRows.hasGroups ? 2 : 1;
+
+    const row1Cells: ElementChild[] = [];
 
     if (this.options.renderExpandedRow) {
-      const th = el("th", { class: "tbx-th tbx-th--expand", style: { width: "40px" } });
+      const th = el("th", {
+        class: "tbx-th tbx-th--expand",
+        style: { width: "40px" },
+        attrs: rowSpan > 1 ? { rowspan: rowSpan } : {},
+      });
       if (leftOffsets.has("__expand")) {
         th.classList.add("tbx-th--pinned-left");
         th.style.left = `${leftOffsets.get("__expand")}px`;
         if (lastLeftPinnedId === "__expand") th.classList.add("tbx-pinned-border-left");
       }
-      cells.push(th);
+      row1Cells.push(th);
     }
 
     if (this.selectionEnabled()) {
@@ -1183,8 +1438,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (lastLeftPinnedId === "__select") thClasses.push("tbx-pinned-border-left");
       }
 
+      const attrs: Record<string, string | number | boolean | null | undefined> =
+        rowSpan > 1 ? { rowspan: rowSpan } : {};
+
       if (this.isSingleSelection()) {
-        cells.push(el("th", { class: thClasses.join(" "), style: thStyle }));
+        row1Cells.push(el("th", { class: thClasses.join(" "), style: thStyle, attrs }));
       } else {
         const ids = this.pageRowIds();
         const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
@@ -1200,7 +1458,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         checkbox.checked = allSelected;
         checkbox.indeterminate = !allSelected && someSelected;
         checkbox.addEventListener("change", () => this.toggleSelectAll());
-        cells.push(el("th", { class: thClasses.join(" "), style: thStyle }, [checkbox]));
+        row1Cells.push(el("th", { class: thClasses.join(" "), style: thStyle, attrs }, [checkbox]));
       }
     }
 
@@ -1212,215 +1470,270 @@ class NexGridController<TData> implements TableXHandle<TData> {
         thStyle.left = `${leftOffsets.get("__serial")}px`;
         if (lastLeftPinnedId === "__serial") thClasses.push("tbx-pinned-border-left");
       }
-      cells.push(el("th", { class: thClasses.join(" "), style: thStyle, text: this.locale.serialHeader }));
+      const attrs: Record<string, string | number | boolean | null | undefined> =
+        rowSpan > 1 ? { rowspan: rowSpan } : {};
+      row1Cells.push(el("th", { class: thClasses.join(" "), style: thStyle, attrs, text: this.locale.serialHeader }));
     }
 
-    const sorts = this.query.sort;
-
-    for (let colIdx = 0; colIdx < visibleCols.length; colIdx++) {
-      const column = visibleCols[colIdx];
-      if (!column) continue;
-      const id = getColumnId(column);
-      const sortable = isSortable(column) && this.options.enableSorting !== false;
-      const filterable = isFilterable(column, this.options.enableColumnFilters !== false);
-      const sortIndex = sorts.findIndex((s) => s.field === id);
-      const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
-      const sorted = sortable && sortItem ? sortItem.dir : null;
-      const meta = column.meta ?? {};
-      const align = meta.align ?? "left";
-
-      const inner = el("div", {
-        class:
-          align === "center"
-            ? "tbx-th-inner tbx-th-inner--center"
-            : align === "right"
-              ? "tbx-th-inner tbx-th-inner--right"
-              : "tbx-th-inner",
-      });
-      inner.appendChild(this.buildHeaderLabel(column));
-
-      if (sortable) {
-        const glyph =
-          sorted === "asc" ? arrowUpIcon() : sorted === "desc" ? arrowDownIcon() : arrowUpDownIcon();
-        const iconWrap = el("span", { class: "tbx-sort-icon-wrap" }, [glyph]);
-        if (sorts.length > 1 && sortIndex >= 0) {
-          iconWrap.appendChild(
-            el("span", { class: "tbx-sort-order", text: String(sortIndex + 1) }),
-          );
-        }
-        inner.appendChild(iconWrap);
-      }
-
-      if (filterable) {
-        const activeFilter = this.query.filter?.[id];
-        const isFilterActive = activeFilter !== undefined && activeFilter !== "";
-        const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
-        const filterBtn = el(
-          "button",
-          {
-            class: isFilterActive
-              ? "tbx-col-filter-btn tbx-col-filter-btn--active"
-              : "tbx-col-filter-btn",
-            attrs: {
-              type: "button",
-              "aria-label": `Options and filter for ${getColumnTitle(column) || id}`,
-            },
-          },
-          [dotsVerticalIcon("tbx-icon")],
+    if (!headerRows.hasGroups) {
+      for (const col of visibleCols) {
+        row1Cells.push(
+          this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
         );
-        filterBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.openFilterColumn = this.openFilterColumn === id ? null : id;
-          this.render();
-        });
-        filterWrap.appendChild(filterBtn);
-
-        if (this.openFilterColumn === id) {
-          filterWrap.appendChild(this.buildColumnFilterPopover(id, column, meta, activeFilter));
-        }
-        inner.appendChild(filterWrap);
       }
-
-      const ariaSort =
-        sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
-
-      const customWidth = this.columnWidths[id];
-      const effectiveWidth =
-        customWidth !== undefined
-          ? `${customWidth}px`
-          : meta.width === undefined
-            ? undefined
-            : `${meta.width}px`;
-
-      const thClasses = ["tbx-th"];
-      if (sortable) thClasses.push("tbx-th--sortable");
-      if (this.options.enableColumnReorder !== false) thClasses.push("tbx-th--draggable");
-
-      const thStyle: Record<string, string | undefined> = {
-        width: effectiveWidth,
-        minWidth: meta.width === undefined ? `${meta.minWidth ?? 120}px` : undefined,
-        textAlign: align,
-      };
-
-      if (leftOffsets.has(id)) {
-        thClasses.push("tbx-th--pinned-left");
-        thStyle.left = `${leftOffsets.get(id)}px`;
-        if (lastLeftPinnedId === id) thClasses.push("tbx-pinned-border-left");
-      } else if (rightOffsets.has(id)) {
-        thClasses.push("tbx-th--pinned-right");
-        thStyle.right = `${rightOffsets.get(id)}px`;
-        if (firstRightPinnedId === id) thClasses.push("tbx-pinned-border-right");
-      }
-
-      const th = el(
-        "th",
-        {
-          class: thClasses.join(" "),
-          attrs: {
-            scope: "col",
-            "aria-sort": sortable ? ariaSort : undefined,
-            tabindex: sortable ? "0" : undefined,
-            "data-tbx-focus": sortable ? `sort:${id}` : undefined,
-            draggable: this.options.enableColumnReorder !== false ? "true" : undefined,
-          },
-          style: thStyle,
-        },
-        [inner],
-      );
-
-      // Column drag-and-drop reorder
-      if (this.options.enableColumnReorder !== false) {
-        th.addEventListener("dragstart", (e: DragEvent) => {
-          this.draggedColumnId = id;
-          th.classList.add("tbx-th--dragging");
-          e.dataTransfer?.setData("text/plain", id);
-        });
-        th.addEventListener("dragover", (e: DragEvent) => {
-          e.preventDefault();
-          if (this.draggedColumnId && this.draggedColumnId !== id) {
-            th.classList.add("tbx-th--drag-over-left");
-          }
-        });
-        th.addEventListener("dragleave", () => {
-          th.classList.remove("tbx-th--drag-over-left");
-        });
-        th.addEventListener("drop", (e: DragEvent) => {
-          e.preventDefault();
-          th.classList.remove("tbx-th--drag-over-left");
-          if (!this.draggedColumnId || this.draggedColumnId === id) return;
-
-          const fromIdx = this.columns.findIndex((c) => getColumnId(c) === this.draggedColumnId);
-          const toIdx = this.columns.findIndex((c) => getColumnId(c) === id);
-          if (fromIdx >= 0 && toIdx >= 0) {
-            const nextCols = [...this.columns];
-            const moved = nextCols[fromIdx];
-            if (!moved) return;
-            nextCols.splice(fromIdx, 1);
-            nextCols.splice(toIdx, 0, moved);
-            this.columns = nextCols;
-            this.options.onColumnOrderChange?.(nextCols.map(getColumnId));
-            this.render();
-          }
-        });
-        th.addEventListener("dragend", () => {
-          this.draggedColumnId = null;
-          th.classList.remove("tbx-th--dragging");
-          th.classList.remove("tbx-th--drag-over-left");
-        });
-      }
-
-      if (sortable) {
-        th.addEventListener("click", (event: MouseEvent) => {
-          const target = event.target as HTMLElement | null;
-          if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
-            return;
-          }
-          const next = event.shiftKey
-            ? withToggledMultiSort(this.query, id)
-            : withToggledSort(this.query, id);
-          this.applyQuery(next);
-        });
-        th.addEventListener("keydown", (event: KeyboardEvent) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          const target = event.target as HTMLElement | null;
-          if (target?.closest(".tbx-col-filter-wrap")) return;
-          event.preventDefault();
-          const next = event.shiftKey
-            ? withToggledMultiSort(this.query, id)
-            : withToggledSort(this.query, id);
-          this.applyQuery(next);
-        });
-      }
-
-      if (this.options.enableColumnResize !== false) {
-        const handle = el("div", { class: "tbx-resize-handle" });
-        handle.addEventListener("pointerdown", (event: PointerEvent) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const startX = event.clientX;
-          const startWidth = th.getBoundingClientRect ? th.getBoundingClientRect().width : (customWidth ?? meta.width ?? 120);
-          const onMove = (e: PointerEvent) => {
-            const nextWidth = Math.max(meta.minWidth ?? 60, Math.round(startWidth + (e.clientX - startX)));
-            this.columnWidths[id] = nextWidth;
-            th.style.width = `${nextWidth}px`;
-          };
-          const onUp = () => {
-            document.removeEventListener("pointermove", onMove);
-            document.removeEventListener("pointerup", onUp);
-            document.body?.classList.remove("tbx-resizing");
-            this.render();
-          };
-          document.body?.classList.add("tbx-resizing");
-          document.addEventListener("pointermove", onMove);
-          document.addEventListener("pointerup", onUp);
-        });
-        th.appendChild(handle);
-      }
-
-      cells.push(th);
+      replaceChildren(this.thead, [el("tr", {}, row1Cells)]);
+      return;
     }
 
-    replaceChildren(this.thead, [el("tr", {}, cells)]);
+    for (const cell of headerRows.topRow) {
+      if (cell.isGroup) {
+        const th = el(
+          "th",
+          {
+            class: "tbx-th tbx-th--group",
+            attrs: { colspan: cell.colSpan },
+          },
+          [el("span", { class: "tbx-th-group-title", text: cell.title })],
+        );
+        row1Cells.push(th);
+      } else if (cell.leafColumn) {
+        row1Cells.push(
+          this.buildLeafTh(cell.leafColumn, cell.rowSpan, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+        );
+      }
+    }
+
+    const row2Cells: ElementChild[] = [];
+    for (const cell of headerRows.bottomRow) {
+      if (cell.leafColumn) {
+        row2Cells.push(
+          this.buildLeafTh(cell.leafColumn, 1, true, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+        );
+      }
+    }
+
+    replaceChildren(this.thead, [el("tr", {}, row1Cells), el("tr", {}, row2Cells)]);
+  }
+
+  private buildLeafTh(
+    column: TableXVanillaColumn<TData>,
+    rowSpan: number,
+    isGroupChild: boolean,
+    leftOffsets: Map<string, number>,
+    rightOffsets: Map<string, number>,
+    lastLeftPinnedId: string | null,
+    firstRightPinnedId: string | null,
+  ): HTMLElement {
+    const id = getColumnId(column);
+    const sortable = isSortable(column) && this.options.enableSorting !== false;
+    const filterable = isFilterable(column, this.options.enableColumnFilters !== false);
+    const sorts = this.query.sort;
+    const sortIndex = sorts.findIndex((s) => s.field === id);
+    const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
+    const sorted = sortable && sortItem ? sortItem.dir : null;
+    const meta = column.meta ?? {};
+    const align = meta.align ?? "left";
+
+    const inner = el("div", {
+      class:
+        align === "center"
+          ? "tbx-th-inner tbx-th-inner--center"
+          : align === "right"
+            ? "tbx-th-inner tbx-th-inner--right"
+            : "tbx-th-inner",
+    });
+    inner.appendChild(this.buildHeaderLabel(column));
+
+    if (sortable) {
+      const glyph =
+        sorted === "asc" ? arrowUpIcon() : sorted === "desc" ? arrowDownIcon() : arrowUpDownIcon();
+      const iconWrap = el("span", { class: "tbx-sort-icon-wrap" }, [glyph]);
+      if (sorts.length > 1 && sortIndex >= 0) {
+        iconWrap.appendChild(
+          el("span", { class: "tbx-sort-order", text: String(sortIndex + 1) }),
+        );
+      }
+      inner.appendChild(iconWrap);
+    }
+
+    if (filterable) {
+      const activeFilter = this.query.filter?.[id];
+      const isFilterActive = activeFilter !== undefined && activeFilter !== "";
+      const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
+      const filterBtn = el(
+        "button",
+        {
+          class: isFilterActive
+            ? "tbx-col-filter-btn tbx-col-filter-btn--active"
+            : "tbx-col-filter-btn",
+          attrs: {
+            type: "button",
+            "aria-label": `Options and filter for ${getColumnTitle(column) || id}`,
+          },
+        },
+        [dotsVerticalIcon("tbx-icon")],
+      );
+      filterBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.openFilterColumn = this.openFilterColumn === id ? null : id;
+        this.render();
+      });
+      filterWrap.appendChild(filterBtn);
+
+      if (this.openFilterColumn === id) {
+        filterWrap.appendChild(this.buildColumnFilterPopover(id, column, meta, activeFilter));
+      }
+      inner.appendChild(filterWrap);
+    }
+
+    const ariaSort =
+      sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
+
+    const customWidth = this.columnWidths[id];
+    const effectiveWidth =
+      customWidth !== undefined
+        ? customWidth
+        : meta.width !== undefined
+          ? meta.width
+          : undefined;
+
+    const thAttrs: Record<string, string | number | boolean | null | undefined> = {
+      scope: "col",
+      "aria-sort": sortable ? ariaSort : undefined,
+      tabindex: sortable ? 0 : undefined,
+      "data-column-id": id,
+      "data-tbx-focus": sortable ? `sort:${id}` : undefined,
+    };
+    if (rowSpan > 1) {
+      thAttrs.rowspan = rowSpan;
+    }
+
+    const thClasses = ["tbx-th"];
+    if (sortable) thClasses.push("tbx-th--sortable");
+    if (isGroupChild) thClasses.push("tbx-th--grouped-child");
+
+    const thStyle: Record<string, string | undefined> = {};
+    if (effectiveWidth !== undefined) {
+      thStyle.width = `${effectiveWidth}px`;
+    }
+    if (meta.minWidth !== undefined) {
+      thStyle.minWidth = `${meta.minWidth}px`;
+    }
+
+    const pinned = isPinned(column);
+    if (pinned === "left" && leftOffsets.has(id)) {
+      thClasses.push("tbx-th--pinned-left");
+      thStyle.left = `${leftOffsets.get(id)}px`;
+      if (lastLeftPinnedId === id) thClasses.push("tbx-pinned-border-left");
+    } else if (pinned === "right" && rightOffsets.has(id)) {
+      thClasses.push("tbx-th--pinned-right");
+      thStyle.right = `${rightOffsets.get(id)}px`;
+      if (firstRightPinnedId === id) thClasses.push("tbx-pinned-border-right");
+    }
+
+    const th = el("th", { class: thClasses.join(" "), style: thStyle, attrs: thAttrs }, [inner]);
+
+    if (this.options.enableColumnReorder !== false && !isGroupChild) {
+      th.draggable = true;
+      th.classList.add("tbx-th--draggable");
+      th.addEventListener("dragstart", (e: DragEvent) => {
+        this.draggedColumnId = id;
+        th.classList.add("tbx-th--dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", id);
+        }
+      });
+      th.addEventListener("dragover", (e: DragEvent) => {
+        e.preventDefault();
+        if (this.draggedColumnId && this.draggedColumnId !== id) {
+          th.classList.add("tbx-th--drag-over-left");
+        }
+      });
+      th.addEventListener("dragleave", () => {
+        th.classList.remove("tbx-th--drag-over-left");
+      });
+      th.addEventListener("drop", (e: DragEvent) => {
+        e.preventDefault();
+        th.classList.remove("tbx-th--drag-over-left");
+        if (!this.draggedColumnId || this.draggedColumnId === id) return;
+
+        const fromIdx = this.columns.findIndex((c) => getColumnId(c) === this.draggedColumnId);
+        const toIdx = this.columns.findIndex((c) => getColumnId(c) === id);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const nextCols = [...this.columns];
+          const moved = nextCols[fromIdx];
+          if (!moved) return;
+          nextCols.splice(fromIdx, 1);
+          nextCols.splice(toIdx, 0, moved);
+          this.columns = nextCols;
+          this.options.onColumnOrderChange?.(nextCols.map(getColumnId));
+          this.saveState();
+          this.render();
+        }
+      });
+      th.addEventListener("dragend", () => {
+        this.draggedColumnId = null;
+        th.classList.remove("tbx-th--dragging");
+        th.classList.remove("tbx-th--drag-over-left");
+      });
+    }
+
+    if (sortable) {
+      th.addEventListener("click", (event: MouseEvent) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
+          return;
+        }
+        const next = event.shiftKey
+          ? withToggledMultiSort(this.query, id)
+          : withToggledSort(this.query, id);
+        this.applyQuery(next);
+      });
+      th.addEventListener("keydown", (event: KeyboardEvent) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const target = event.target as HTMLElement | null;
+        if (target?.closest(".tbx-col-filter-wrap")) return;
+        event.preventDefault();
+        const next = event.shiftKey
+          ? withToggledMultiSort(this.query, id)
+          : withToggledSort(this.query, id);
+        this.applyQuery(next);
+      });
+    }
+
+    if (this.options.enableColumnResize !== false) {
+      const handle = el("div", { class: "tbx-resize-handle" });
+      handle.addEventListener("pointerdown", (event: PointerEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const startX = event.clientX;
+        const startWidth = th.getBoundingClientRect ? th.getBoundingClientRect().width : (customWidth ?? meta.width ?? 120);
+        const onMove = (e: PointerEvent) => {
+          const nextWidth = Math.max(meta.minWidth ?? 60, Math.round(startWidth + (e.clientX - startX)));
+          this.columnWidths[id] = nextWidth;
+          th.style.width = `${nextWidth}px`;
+        };
+        const onUp = () => {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.body?.classList.remove("tbx-resizing");
+          this.saveState();
+          this.render();
+        };
+        document.body?.classList.add("tbx-resizing");
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onUp);
+      });
+      handle.addEventListener("dblclick", (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.autoFitColumn(id);
+      });
+      th.appendChild(handle);
+    }
+
+    return th;
   }
 
   private buildHeaderLabel(column: TableXVanillaColumn<TData>): HTMLSpanElement {

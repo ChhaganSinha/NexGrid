@@ -7,18 +7,19 @@ The grid never holds your dataset. It holds one page, turns every user action
 into a `QueryState`, and hands that back to you; you fetch and feed the next
 page in. Search, sorting, paging and filtering happen where the data lives.
 
-- Global search, debounced 350 ms
-- Column visibility and density menus
-- Server sorting with the `asc → desc → cleared` cycle
-- Row selection across pages
-- Automatic `S.No.` column
-- Formatted Excel (`.xls`) and raw CSV export, optionally over the **whole**
-  filtered dataset
-- Full pagination footer with page jump
-- Responsive: a table at ≥ 768 px, a card list below — same cells, same
-  selection, same row clicks
-- Light / dark / auto theming through CSS custom properties
-- Every user-facing string localizable
+- 🗂️ **Column Header Grouping (Multi-Level / Stacked Headers)** — Group sub-columns beneath parent categories with automatic `colSpan` and `rowSpan`.
+- 🚀 **Client-Side Pagination & In-Memory Engine** (`clientSidePagination`) — Zero-config in-memory paging, sorting, search, filtering, and export over local arrays.
+- 💾 **Grid State Persistence (`storageKey`)** — Automatically saves column widths, drag order, hidden columns, and density to `localStorage` + 1-click Reset View.
+- ↔️ **Interactive Column Resizing & Double-Click Auto-Fit** — Drag handles to adjust column widths, double-click to measure and auto-fit to content.
+- 🏷️ **Active Filter Pills Bar** — Interactive chip badges beneath the toolbar for active search & column filters with one-click `✕` removal and "Clear all".
+- 🔍 **Global search**, debounced 350 ms · 3-dot column filters · column visibility and density menus
+- 🔄 **Server sorting** with the `asc → desc → cleared` cycle and multi-column sorting
+- ☑️ **Row selection across pages**, automatic `S.No.` column
+- 📊 **Formatted Excel (`.xls`) and raw CSV export**, optionally over the **whole** filtered dataset
+- 📄 **Full pagination footer** with page jump
+- 📱 **Responsive:** a table at ≥ 768 px, a card list below — same cells, same selection, same row clicks
+- 🎨 **Light / dark / auto theming** through CSS custom properties
+- 🌍 **Every user-facing string localizable**
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX Angular Data Grid Preview" width="100%" />
@@ -215,26 +216,35 @@ and (debounced) keystroke arrives as one `queryChange` with a ready-to-send
 
 | Input | Type | Default | Description |
 |---|---|---|---|
-| `columns` **(required)** | `TableXAngularColumn<TData>[]` | — | Column definitions. See [Columns](#columns). |
-| `data` **(required)** | `TData[]` | `[]` | The **current page** of rows only. |
-| `total` **(required)** | `number` | `0` | Full filtered row count from the server. Drives the pager. |
-| `query` **(required)** | `QueryState` | `defaultQuery()` | The active query. The grid is fully controlled — it never mutates this. |
+| `columns` **(required)** | `TableXAngularColumn<TData>[]` | — | Column definitions (supports nested `columns` for multi-level stacked headers). |
+| `data` **(required)** | `TData[]` | `[]` | The current page of rows (or full dataset if `clientSidePagination` is true). |
+| `total` **(required)** | `number` | `0` | Full filtered row count from the server (automatically computed in client mode). |
+| `query` **(required)** | `QueryState` | `defaultQuery()` | The active query. In client mode this is handled reactively. |
+| `clientSidePagination` | `boolean` | `false` | Zero-config in-memory paging, sorting, search, and filtering over local data. |
+| `storageKey` | `string` | — | Persists custom column widths, column order, hidden columns, and density to `localStorage`. |
 | `caption` **(required)** | `string` | `''` | Accessible name for the table; also seeds the export file name. |
 | `density` | `'compact' \| 'default' \| 'comfortable'` | `'default'` | Initial row height. Changing it later overrides the user's menu choice. |
+| `enableColumnResize` | `boolean` | `true` | Interactive drag-to-resize and double-click auto-fit on column borders. |
+| `enableColumnFilters` | `boolean` | `true` | 3-dot column filter popovers (⋮) for search, select, and range filters. |
+| `enableSorting` | `boolean` | `true` | Global switch for column sorting. |
+| `enableSummaryRow` | `boolean` | `false` | Bottom aggregation / summary row (`sum`, `avg`, `min`, `max`, `count`). |
+| `enableRowExpansion` | `boolean` | `false` | Master-detail accordion expandable sub-rows. |
+| `enableBulkActions` | `boolean` | `false` | Contextual floating bottom pill bar for batch operations on selected rows. |
 | `isLoading` | `boolean` | `false` | Replaces the rows with a spinner. The toolbar and footer stay. |
 | `error` | `boolean` | `false` | Replaces the **whole** grid with an error card. |
 | `enableSelection` | `boolean` | `false` | Adds the checkbox column, the card checkbox and the "N selected" badge. |
+| `selectionMode` | `'multi' \| 'single'` | `'multi'` | Selection mode. |
 | `enableSearch` | `boolean` | `true` | Show the global search box. |
 | `searchPlaceholder` | `string` | locale | Overrides `locale.searchPlaceholder`. |
 | `showSerialNumber` | `boolean` | `true` | Show the automatic `S.No.` column. |
 | `enableExport` | `boolean` | `true` | Show the export menu. |
 | `exportFileName` | `string` | slug of `caption` | Export file name, without extension. |
-| `fetchEndpoint` | `string` | — | List endpoint used to collect the whole filtered dataset for an export. Without it, exports contain the current page. |
+| `fetchEndpoint` | `string` | — | List endpoint used to collect the whole filtered dataset for an export. |
 | `badgeRules` | `readonly ExcelBadgeRule[]` | `DEFAULT_BADGE_RULES` | Value-based cell styling for the Excel export. |
 | `locale` | `Partial<TableXLocale>` | — | Overrides merged over the default strings. |
 | `getRowId` | `(row: TData) => string` | `r => String(r.id ?? r)` | Row identity. Drives selection and DOM reuse. |
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | `dark` / `auto` add `.tbx-dark` / `.tbx-auto` to the root. |
-| `rowClickable` | `boolean` | `false` | Forces the row-click affordance on. Not normally needed — see `rowClick`. |
+| `rowClickable` | `boolean` | `false` | Forces the row-click affordance on. |
 
 Flag inputs coerce like HTML boolean attributes, so `enableSelection` and
 `[enableSelection]="true"` are equivalent.

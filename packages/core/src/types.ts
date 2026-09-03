@@ -76,3 +76,62 @@ export const DENSITIES: readonly Density[] = ["compact", "default", "comfortable
 /** Selection mode: multiple rows or single row. */
 export type SelectionMode = "multi" | "single";
 
+/**
+ * Persisted view state snapshot for a NexGrid instance.
+ */
+export interface GridStateSnapshot {
+  version: number;
+  density?: Density;
+  hiddenColumns?: string[];
+  columnOrder?: string[];
+  columnWidths?: Record<string, number>;
+}
+
+/**
+ * Save a grid state snapshot to localStorage safely (no-ops in SSR or if storage is disabled).
+ */
+export function saveGridState(storageKey: string, state: Omit<GridStateSnapshot, "version">): boolean {
+  if (typeof window === "undefined" || !window.localStorage || !storageKey) return false;
+  try {
+    const payload: GridStateSnapshot = {
+      version: 1,
+      ...state,
+    };
+    window.localStorage.setItem(`nexgrid:${storageKey}`, JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Load a persisted grid state snapshot from localStorage safely.
+ */
+export function loadGridState(storageKey: string): GridStateSnapshot | null {
+  if (typeof window === "undefined" || !window.localStorage || !storageKey) return null;
+  try {
+    const raw = window.localStorage.getItem(`nexgrid:${storageKey}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GridStateSnapshot;
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear a persisted grid state snapshot from localStorage.
+ */
+export function clearGridState(storageKey: string): boolean {
+  if (typeof window === "undefined" || !window.localStorage || !storageKey) return false;
+  try {
+    window.localStorage.removeItem(`nexgrid:${storageKey}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+

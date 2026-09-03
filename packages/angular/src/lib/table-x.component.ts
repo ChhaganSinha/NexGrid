@@ -80,6 +80,14 @@ import {
   withToggledSort,
   withToggledMultiSort,
   copyToClipboard,
+  clearGridState,
+  loadGridState,
+  saveGridState,
+  getCellText,
+  queryClientData,
+  flattenColumns,
+  hasHeaderGroups,
+  buildHeaderRows,
   type Density,
   type ExcelBadgeRule,
   type TableXLocale,
@@ -259,6 +267,17 @@ const SEARCH_DEBOUNCE_MS = 350;
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                     <span>{{ column.title }}</span>
+                  </button>
+                }
+                @if (storageKey) {
+                  <div class="tbx-menu-separator"></div>
+                  <button
+                    type="button"
+                    class="tbx-menu-item tbx-menu-item--reset"
+                    role="menuitem"
+                    (click)="resetView()"
+                  >
+                    <span>Reset to default view</span>
                   </button>
                 }
               </div>
@@ -458,12 +477,238 @@ const SEARCH_DEBOUNCE_MS = 350;
       </div>
       }
 
+      @if (showFilterPills && hasActiveFilters()) {
+        <div class="tbx-filter-pills-bar">
+          <span class="tbx-filter-pills-title">Active filters:</span>
+          @if (query.q) {
+            <div class="tbx-filter-pill">
+              <span class="tbx-filter-pill-label">{{ searchPlaceholder || strings.searchPlaceholder || 'Search' }}:</span>
+              <span class="tbx-filter-pill-val">"{{ query.q }}"</span>
+              <button
+                type="button"
+                class="tbx-filter-pill-remove"
+                title="Clear search"
+                aria-label="Clear search"
+                (click)="clearSearchFilter()"
+              >
+                ✕
+              </button>
+            </div>
+          }
+          @for (item of activeColumnFilterEntries(); track item.key) {
+            <div class="tbx-filter-pill">
+              <span class="tbx-filter-pill-label">{{ item.title }}:</span>
+              <span class="tbx-filter-pill-val">{{ item.val }}</span>
+              <button
+                type="button"
+                class="tbx-filter-pill-remove"
+                [attr.title]="'Remove ' + item.title + ' filter'"
+                [attr.aria-label]="'Remove ' + item.title + ' filter'"
+                (click)="clearColumnFilter(item.key)"
+              >
+                ✕
+              </button>
+            </div>
+          }
+          <button
+            type="button"
+            class="tbx-filter-pill-clear-all"
+            (click)="clearAllFilters()"
+          >
+            Clear all
+          </button>
+        </div>
+      }
+
       <div class="tbx-table-wrap">
         <table class="tbx-table" [attr.aria-label]="caption">
           <thead>
+            <ng-template #thInner let-header>
+              <div
+                class="tbx-th-inner"
+                [class.tbx-th-inner--center]="header.align === 'center'"
+                [class.tbx-th-inner--right]="header.align === 'right'"
+                [attr.role]="header.sortable ? 'button' : null"
+                [attr.tabindex]="header.sortable ? 0 : null"
+                (keydown.enter)="onHeaderKeydown($event, header)"
+                (keydown.space)="onHeaderKeydown($event, header)"
+              >
+                <span>{{ header.title }}</span>
+                @if (header.sortable) {
+                  <span class="tbx-sort-icon-wrap">
+                    @switch (header.sortState) {
+                      @case ('asc') {
+                        <svg
+                          class="tbx-sort-icon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m5 12 7-7 7 7" />
+                          <path d="M12 19V5" />
+                        </svg>
+                      }
+                      @case ('desc') {
+                        <svg
+                          class="tbx-sort-icon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14" />
+                          <path d="m19 12-7 7-7-7" />
+                        </svg>
+                      }
+                      @default {
+                        <svg
+                          class="tbx-sort-icon tbx-sort-icon--idle"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m21 16-4 4-4-4" />
+                          <path d="M17 20V4" />
+                          <path d="m3 8 4-4 4 4" />
+                          <path d="M7 4v16" />
+                        </svg>
+                      }
+                    }
+                    @if (header.sortOrder !== null) {
+                      <span class="tbx-sort-order">{{ header.sortOrder }}</span>
+                    }
+                  </span>
+                }
+
+                @if (header.serverFilterable) {
+                  <div class="tbx-col-filter-wrap">
+                    <button
+                      type="button"
+                      class="tbx-col-filter-btn"
+                      [class.tbx-col-filter-btn--active]="header.activeFilter !== undefined && header.activeFilter !== ''"
+                      [attr.aria-label]="'Options and filter for ' + header.title"
+                      (click)="toggleFilterPopover(header.id, $event)"
+                    >
+                      <svg
+                        class="tbx-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
+                      </svg>
+                    </button>
+
+                    @if (openFilterColumn === header.id) {
+                      <div class="tbx-filter-popover" (click)="$event.stopPropagation()">
+                        <input
+                          #filterInput
+                          type="text"
+                          class="tbx-filter-popover-input"
+                          [value]="header.activeFilter ?? ''"
+                          [placeholder]="'Filter ' + header.title + '…'"
+                          (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                        />
+                        @if (header.filterOptions && header.filterOptions.length > 0) {
+                          <div class="tbx-filter-popover-options">
+                            <div
+                              class="tbx-filter-option"
+                              [class.tbx-filter-option--selected]="!header.activeFilter"
+                              (click)="applyColumnFilter(header.id, undefined)"
+                            >
+                              {{ strings.filterAll }}
+                            </div>
+                            @for (opt of header.filterOptions; track opt) {
+                              <div
+                                class="tbx-filter-option"
+                                [class.tbx-filter-option--selected]="header.activeFilter === opt"
+                                (click)="applyColumnFilter(header.id, opt)"
+                              >
+                                {{ opt }}
+                              </div>
+                            }
+                          </div>
+                        }
+                        <div class="tbx-filter-popover-actions">
+                          <button
+                            type="button"
+                            class="tbx-filter-popover-btn"
+                            (click)="applyColumnFilter(header.id, undefined)"
+                          >
+                            <svg
+                              class="tbx-icon"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                              <path d="M3 3v5h5" />
+                            </svg>
+                            <span>{{ strings.clearFilter }}</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+                            (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
+                          >
+                            <svg
+                              class="tbx-icon"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                            <span>{{ strings.applyFilter }}</span>
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (enableColumnResize) {
+                <div
+                  class="tbx-resize-handle"
+                  (pointerdown)="onResizePointerDown(header.id, header, $event)"
+                  (dblclick)="onResizeHandleDblClick(header.id)"
+                ></div>
+              }
+            </ng-template>
+
             <tr>
               @if (enableSelection) {
-                <th class="tbx-th tbx-th--select" scope="col">
+                <th
+                  class="tbx-th tbx-th--select"
+                  scope="col"
+                  [attr.rowspan]="hasHeaderGroups ? 2 : null"
+                >
                   @if (selectionMode !== 'single') {
                     <input
                       type="checkbox"
@@ -476,194 +721,58 @@ const SEARCH_DEBOUNCE_MS = 350;
                 </th>
               }
               @if (showSerialNumber) {
-                <th class="tbx-th tbx-th--serial" scope="col">{{ strings.serialHeader }}</th>
-              }
-              @for (header of headers; track header.key) {
                 <th
-                  class="tbx-th"
+                  class="tbx-th tbx-th--serial"
                   scope="col"
-                  [class.tbx-th--sortable]="header.sortable"
-                  [attr.aria-sort]="header.ariaSort"
-                  [style.width.px]="header.width"
-                  [style.minWidth.px]="header.minWidth"
-                  [style.textAlign]="header.align"
-                  (click)="onHeaderActivate(header, $event)"
+                  [attr.rowspan]="hasHeaderGroups ? 2 : null"
                 >
-                  <div
-                    class="tbx-th-inner"
-                    [class.tbx-th-inner--center]="header.align === 'center'"
-                    [class.tbx-th-inner--right]="header.align === 'right'"
-                    [attr.role]="header.sortable ? 'button' : null"
-                    [attr.tabindex]="header.sortable ? 0 : null"
-                    (keydown.enter)="onHeaderKeydown($event, header)"
-                    (keydown.space)="onHeaderKeydown($event, header)"
-                  >
-                    <span>{{ header.title }}</span>
-                    @if (header.sortable) {
-                      <span class="tbx-sort-icon-wrap">
-                        @switch (header.sortState) {
-                          @case ('asc') {
-                            <svg
-                              class="tbx-sort-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="m5 12 7-7 7 7" />
-                              <path d="M12 19V5" />
-                            </svg>
-                          }
-                          @case ('desc') {
-                            <svg
-                              class="tbx-sort-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M12 5v14" />
-                              <path d="m19 12-7 7-7-7" />
-                            </svg>
-                          }
-                          @default {
-                            <svg
-                              class="tbx-sort-icon tbx-sort-icon--idle"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="m21 16-4 4-4-4" />
-                              <path d="M17 20V4" />
-                              <path d="m3 8 4-4 4 4" />
-                              <path d="M7 4v16" />
-                            </svg>
-                          }
-                        }
-                        @if (header.sortOrder !== null) {
-                          <span class="tbx-sort-order">{{ header.sortOrder }}</span>
-                        }
-                      </span>
-                    }
-
-                    @if (header.serverFilterable) {
-                      <div class="tbx-col-filter-wrap">
-                        <button
-                          type="button"
-                          class="tbx-col-filter-btn"
-                          [class.tbx-col-filter-btn--active]="header.activeFilter !== undefined && header.activeFilter !== ''"
-                          [attr.aria-label]="'Options and filter for ' + header.title"
-                          (click)="toggleFilterPopover(header.id, $event)"
-                        >
-                          <svg
-                            class="tbx-icon"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="12" cy="5" r="1.5" />
-                            <circle cx="12" cy="12" r="1.5" />
-                            <circle cx="12" cy="19" r="1.5" />
-                          </svg>
-                        </button>
-
-                        @if (openFilterColumn === header.id) {
-                          <div class="tbx-filter-popover" (click)="$event.stopPropagation()">
-                            <input
-                              #filterInput
-                              type="text"
-                              class="tbx-filter-popover-input"
-                              [value]="header.activeFilter ?? ''"
-                              [placeholder]="'Filter ' + header.title + '…'"
-                              (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                            />
-                            @if (header.filterOptions && header.filterOptions.length > 0) {
-                              <div class="tbx-filter-popover-options">
-                                <div
-                                  class="tbx-filter-option"
-                                  [class.tbx-filter-option--selected]="!header.activeFilter"
-                                  (click)="applyColumnFilter(header.id, undefined)"
-                                >
-                                  {{ strings.filterAll }}
-                                </div>
-                                @for (opt of header.filterOptions; track opt) {
-                                  <div
-                                    class="tbx-filter-option"
-                                    [class.tbx-filter-option--selected]="header.activeFilter === opt"
-                                    (click)="applyColumnFilter(header.id, opt)"
-                                  >
-                                    {{ opt }}
-                                  </div>
-                                }
-                              </div>
-                            }
-                            <div class="tbx-filter-popover-actions">
-                              <button
-                                type="button"
-                                class="tbx-filter-popover-btn"
-                                (click)="applyColumnFilter(header.id, undefined)"
-                              >
-                                <svg
-                                  class="tbx-icon"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                  <path d="M3 3v5h5" />
-                                </svg>
-                                <span>{{ strings.clearFilter }}</span>
-                              </button>
-                              <button
-                                type="button"
-                                class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                                (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                              >
-                                <svg
-                                  class="tbx-icon"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M20 6 9 17l-5-5" />
-                                </svg>
-                                <span>{{ strings.applyFilter }}</span>
-                              </button>
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-
-                  @if (enableColumnResize) {
-                    <div class="tbx-resize-handle" (pointerdown)="onResizePointerDown(header.id, header, $event)"></div>
-                  }
+                  {{ strings.serialHeader }}
                 </th>
               }
+              @for (header of topHeaderCells; track header.key) {
+                @if (header.isGroup) {
+                  <th
+                    class="tbx-th tbx-th--group"
+                    scope="colgroup"
+                    [attr.colspan]="header.colSpan"
+                  >
+                    <span class="tbx-th-group-title">{{ header.title }}</span>
+                  </th>
+                } @else {
+                  <th
+                    class="tbx-th"
+                    scope="col"
+                    [attr.rowspan]="header.rowSpan && header.rowSpan > 1 ? header.rowSpan : null"
+                    [class.tbx-th--sortable]="header.sortable"
+                    [attr.aria-sort]="header.ariaSort"
+                    [style.width.px]="header.width"
+                    [style.minWidth.px]="header.minWidth"
+                    [style.textAlign]="header.align"
+                    (click)="onHeaderActivate(header, $event)"
+                  >
+                    <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
+                  </th>
+                }
+              }
             </tr>
+            @if (hasHeaderGroups) {
+              <tr>
+                @for (header of bottomHeaderCells; track header.key) {
+                  <th
+                    class="tbx-th tbx-th--grouped-child"
+                    scope="col"
+                    [class.tbx-th--sortable]="header.sortable"
+                    [attr.aria-sort]="header.ariaSort"
+                    [style.width.px]="header.width"
+                    [style.minWidth.px]="header.minWidth"
+                    [style.textAlign]="header.align"
+                    (click)="onHeaderActivate(header, $event)"
+                  >
+                    <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
+                  </th>
+                }
+              </tr>
+            }
           </thead>
           <tbody>
             @if (isLoading) {
@@ -991,6 +1100,18 @@ export class TableXComponent<TData>
   /** Show the entire footer area. */
   @Input({ transform: booleanAttribute }) showFooter = true;
 
+  /** Unique key to persist and restore grid state (column widths, column order, hidden columns, density) in localStorage. */
+  @Input() storageKey?: string;
+
+  /** Show the active filter pills bar beneath the toolbar when filters or search are active. */
+  @Input({ transform: booleanAttribute }) showFilterPills = true;
+
+  /** Enable client-side pagination, sorting, search, and filtering over in-memory `data`. */
+  @Input({ transform: booleanAttribute }) clientSidePagination = false;
+
+  /** Explicit pagination mode: `"server"` (default) or `"client"`. */
+  @Input() paginationMode: "client" | "server" = "server";
+
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
 
@@ -1067,6 +1188,9 @@ export class TableXComponent<TData>
   protected jumpInputId = "tbx-jump-page";
 
   protected headers: NexGridHeaderView[] = [];
+  protected hasHeaderGroups = false;
+  protected topHeaderCells: NexGridHeaderView[] = [];
+  protected bottomHeaderCells: NexGridHeaderView[] = [];
   protected rows: NexGridRowView<TData>[] = [];
   protected columnToggles: TableXColumnToggle[] = [];
   protected densityOptions: NexGridDensityOption[] = [];
@@ -1123,6 +1247,7 @@ export class TableXComponent<TData>
   private readonly subscriptions = new Subscription();
 
   private hiddenColumns: Readonly<Record<string, boolean>> = {};
+  private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
   private selectedIds: ReadonlySet<string> = new Set<string>();
   private cellTemplates = new Map<string, TemplateRef<NexGridCellTemplateContext<TData>>>();
@@ -1156,7 +1281,43 @@ export class TableXComponent<TData>
     if (changes["locale"]) this.strings = resolveLocale(this.locale);
     if (changes["density"]) this.currentDensity = this.density;
     if (changes["columns"] && !this.columnsSeeded && this.columns.length > 0) {
-      this.hiddenColumns = initialHiddenColumns(this.columns);
+      this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
+      this.orderedColumns = [...this.columns];
+      if (this.storageKey) {
+        const persisted = loadGridState(this.storageKey);
+        if (persisted) {
+          if (persisted.density) {
+            this.density = persisted.density;
+            this.currentDensity = persisted.density;
+          }
+          if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
+          if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
+            const hiddenMap: Record<string, boolean> = {};
+            for (const col of flattenColumns(this.columns)) {
+              const id = getColumnId(col);
+              if (id) hiddenMap[id] = persisted.hiddenColumns.includes(id);
+            }
+            this.hiddenColumns = hiddenMap;
+          }
+          if (persisted.columnOrder && Array.isArray(persisted.columnOrder)) {
+            const colMap = new Map(this.columns.map((c) => [getColumnId(c), c]));
+            const reordered: TableXAngularColumn<TData>[] = [];
+            for (const id of persisted.columnOrder) {
+              const col = colMap.get(id);
+              if (col) {
+                reordered.push(col);
+                colMap.delete(id);
+              }
+            }
+            for (const remaining of colMap.values()) {
+              reordered.push(remaining);
+            }
+            if (reordered.length === this.columns.length) {
+              this.orderedColumns = reordered;
+            }
+          }
+        }
+      }
       this.columnsSeeded = true;
     }
     if (changes["query"]) this.syncFromQuery();
@@ -1259,11 +1420,13 @@ export class TableXComponent<TData>
    */
   protected toggleColumn(id: string): void {
     this.hiddenColumns = { ...this.hiddenColumns, [id]: this.hiddenColumns[id] !== true };
+    this.saveState();
     this.recompute();
   }
 
   protected setDensity(density: Density): void {
     this.currentDensity = density;
+    this.saveState();
     this.recompute();
   }
 
@@ -1320,11 +1483,103 @@ export class TableXComponent<TData>
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
       document.body?.classList.remove("tbx-resizing");
+      this.saveState();
     };
 
     document.body?.classList.add("tbx-resizing");
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+  }
+
+  protected onResizeHandleDblClick(id: string): void {
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const col = cols.find((c) => getColumnId(c) === id);
+    if (!col) return;
+    const meta = col.meta ?? {};
+    let maxContentWidth = 0;
+    const headerTitle = getColumnTitle(col) || id;
+    maxContentWidth = Math.max(maxContentWidth, headerTitle.length * 8.5 + 50);
+
+    for (const row of this.data) {
+      const rawVal = getCellValue(col, row);
+      const val = getCellText(rawVal);
+      if (val) {
+        maxContentWidth = Math.max(maxContentWidth, String(val).length * 8 + 26);
+      }
+    }
+
+    const minW = meta.minWidth ?? 60;
+    const maxW = 550;
+    const finalWidth = Math.min(maxW, Math.max(minW, Math.round(maxContentWidth)));
+
+    this.columnWidths[id] = finalWidth;
+    this.saveState();
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  private saveState(): void {
+    if (!this.storageKey) return;
+    const hiddenList: string[] = [];
+    for (const [id, isHidden] of Object.entries(this.hiddenColumns)) {
+      if (isHidden) hiddenList.push(id);
+    }
+    const cols = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    saveGridState(this.storageKey, {
+      density: this.currentDensity,
+      columnWidths: { ...this.columnWidths },
+      columnOrder: cols.map(getColumnId).filter(Boolean) as string[],
+      hiddenColumns: hiddenList,
+    });
+  }
+
+  protected resetView(): void {
+    if (this.storageKey) {
+      clearGridState(this.storageKey);
+    }
+    this.density = "default";
+    this.currentDensity = "default";
+    this.columnWidths = {};
+    this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
+    this.orderedColumns = [...this.columns];
+    this.openMenu = null;
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected hasActiveFilters(): boolean {
+    return Boolean(this.query.q?.trim()) || Object.keys(this.query.filter ?? {}).some((k) => Boolean(this.query.filter?.[k]));
+  }
+
+  protected activeColumnFilterEntries(): Array<{ key: string; title: string; val: string }> {
+    const filters = this.query.filter ?? {};
+    const entries: Array<{ key: string; title: string; val: string }> = [];
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    for (const [key, val] of Object.entries(filters)) {
+      if (val === undefined || val === "") continue;
+      const col = cols.find((c) => getColumnId(c) === key);
+      const title = col ? (getColumnTitle(col) || key) : key;
+      entries.push({ key, title, val: String(val) });
+    }
+    return entries;
+  }
+
+  protected clearSearchFilter(): void {
+    this.clearSearch();
+    this.emitQuery(withSearch(this.query, ""));
+  }
+
+  protected clearColumnFilter(key: string): void {
+    this.emitQuery(withFilter(this.query, key, undefined));
+  }
+
+  protected clearAllFilters(): void {
+    this.clearSearch();
+    this.emitQuery({ ...this.query, page: 1, q: undefined, filter: {} });
   }
 
   // ---------------------------------------------------------------------
@@ -1429,10 +1684,13 @@ export class TableXComponent<TData>
       }
 
       // 4. Visible + exportable columns only, rendered as plain text.
-      const exportColumns = toExportColumns(visibleColumns(this.columns, this.hiddenColumns), {
-        yes: this.strings.booleanYes,
-        no: this.strings.booleanNo,
-      });
+      const exportColumns = toExportColumns(
+        visibleColumns(flattenColumns(this.columns), this.hiddenColumns),
+        {
+          yes: this.strings.booleanYes,
+          no: this.strings.booleanNo,
+        },
+      );
       const prefix = this.exportFileName ?? filePrefixFromCaption(this.caption);
 
       // 5. Write the file or copy to clipboard
@@ -1488,6 +1746,11 @@ export class TableXComponent<TData>
    * what the user is looking at.
    */
   private async collectExportRows(): Promise<TData[]> {
+    if (this.clientSidePagination || this.paginationMode === "client") {
+      const full = queryClientData(this.data, this.query, { paginate: false });
+      return full.items;
+    }
+
     const endpoint = this.fetchEndpoint;
     if (!endpoint || this.data.length >= this.total) return this.data;
 
@@ -1521,6 +1784,11 @@ export class TableXComponent<TData>
   // ---------------------------------------------------------------------
 
   private emitQuery(next: QueryState): void {
+    if (this.clientSidePagination || this.paginationMode === "client") {
+      this.query = next;
+      this.recompute();
+      this.cdr.markForCheck();
+    }
     this.queryChange.emit(next);
   }
 
@@ -1551,57 +1819,99 @@ export class TableXComponent<TData>
     this.recompute();
   }
 
+  private mapColumnToHeaderView(
+    column: TableXAngularColumn<TData>,
+    key: string,
+    rowSpan = 1,
+    isGroupChild = false,
+  ): NexGridHeaderView {
+    const id = getColumnId(column);
+    const sortable = isSortable(column);
+    const sortIndex = this.query.sort.findIndex((s) => s.field === id);
+    const sortItem = sortIndex >= 0 ? this.query.sort[sortIndex] : undefined;
+    const direction = sortable && sortItem ? sortItem.dir : null;
+    const sortOrder = this.query.sort.length > 1 && sortIndex >= 0 ? sortIndex + 1 : null;
+    const customWidth = this.columnWidths[id];
+    const width = customWidth !== undefined ? customWidth : (column.meta?.width ?? null);
+    const activeFilter = this.query.filter?.[id];
+    return {
+      key,
+      id,
+      title: headerText(column) || id || "Column",
+      sortable: sortable && this.enableSorting !== false,
+      sortState: direction ?? "none",
+      sortOrder,
+      serverFilterable: isFilterable(column, this.enableColumnFilters !== false),
+      filterOptions: column.meta?.filterOptions,
+      activeFilter,
+      ariaSort: !sortable
+        ? null
+        : direction === "asc"
+          ? "ascending"
+          : direction === "desc"
+            ? "descending"
+            : "none",
+      align: column.meta?.align ?? "left",
+      width,
+      minWidth: width === null ? (column.meta?.minWidth ?? 120) : null,
+      rowSpan,
+      colSpan: 1,
+      isGroup: false,
+      isGroupChild,
+    };
+  }
+
   /** Rebuild everything the template reads. Cheap enough to never be partial. */
   private recompute(): void {
     const strings = this.strings;
-    const columns = this.columns;
-    const visible = visibleColumns(columns, this.hiddenColumns);
+    const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const leafCols = flattenColumns(rawColumns);
+    const visible = visibleColumns(leafCols, this.hiddenColumns);
     const keys = trackKeys(visible.map(getColumnId));
-    const sort = primarySort(this.query);
+    const headerRows = buildHeaderRows(rawColumns, this.hiddenColumns);
+    this.hasHeaderGroups = headerRows.hasGroups;
     const labels = { yes: strings.booleanYes, no: strings.booleanNo };
 
     this.searchLabel = `Search ${this.caption}`;
     this.jumpInputId = `tbx-jump-page-${this.caption.toLowerCase().replace(/\s+/g, "-")}`;
 
-    this.headers = visible.map((column, index) => {
-      const id = getColumnId(column);
-      const sortable = isSortable(column);
-      const sortIndex = this.query.sort.findIndex((s) => s.field === id);
-      const sortItem = sortIndex >= 0 ? this.query.sort[sortIndex] : undefined;
-      const direction = sortable && sortItem ? sortItem.dir : null;
-      const sortOrder = this.query.sort.length > 1 && sortIndex >= 0 ? sortIndex + 1 : null;
-      const customWidth = this.columnWidths[id];
-      const width = customWidth !== undefined ? customWidth : (column.meta?.width ?? null);
-      const activeFilter = this.query.filter?.[id];
-      return {
-        key: keys[index] ?? String(index),
-        id,
-        title: headerText(column) || id || "Column",
-        sortable,
-        sortState: direction ?? "none",
-        sortOrder,
-        serverSortable: isSortable(column) && this.enableSorting !== false,
-        serverFilterable: isFilterable(column, this.enableColumnFilters !== false),
-        filterOptions: column.meta?.filterOptions,
-        activeFilter,
-        ariaSort: !sortable
-          ? null
-          : direction === "asc"
-            ? "ascending"
-            : direction === "desc"
-              ? "descending"
-              : "none",
-        align: column.meta?.align ?? "left",
-        width,
-        minWidth: width === null ? (column.meta?.minWidth ?? 120) : null,
-      };
-    });
+    this.headers = visible.map((column, index) =>
+      this.mapColumnToHeaderView(column, keys[index] ?? String(index), 1, false),
+    );
+
+    if (!headerRows.hasGroups) {
+      this.topHeaderCells = this.headers;
+      this.bottomHeaderCells = [];
+    } else {
+      this.topHeaderCells = headerRows.topRow.map((cell, idx) => {
+        if (cell.isGroup) {
+          return {
+            key: `grp-${cell.id}-${idx}`,
+            id: cell.id,
+            title: cell.title,
+            isGroup: true,
+            colSpan: cell.colSpan,
+            rowSpan: cell.rowSpan,
+          };
+        }
+        return this.mapColumnToHeaderView(cell.leafColumn!, cell.id, cell.rowSpan, false);
+      });
+
+      this.bottomHeaderCells = headerRows.bottomRow.map((cell) => {
+        return this.mapColumnToHeaderView(cell.leafColumn!, cell.id, 1, true);
+      });
+    }
+
+    const isClient = this.clientSidePagination || this.paginationMode === "client";
+    const clientPaged = isClient ? queryClientData(this.data, this.query) : null;
+    const displayData = clientPaged ? clientPaged.items : this.data;
+    const effectiveTotal = clientPaged ? clientPaged.total : this.total;
 
     const page = Math.max(1, Math.trunc(this.query.page));
     const pageSize = this.query.pageSize;
     const rowKeys = new Set<string>();
 
-    this.rows = this.data.map((row, rowIndex) => {
+    this.rows = displayData.map((row, rowIndex) => {
       const id = this.getRowId(row);
       const selected = this.selectedIds.has(id);
       const cells: NexGridCellView<TData>[] = visible.map((column, columnIndex) => {
@@ -1629,7 +1939,7 @@ export class TableXComponent<TData>
     });
 
     const toggleKeys = new Set<string>();
-    this.columnToggles = columns.filter(isHideable).map((column, index) => {
+    this.columnToggles = leafCols.filter(isHideable).map((column, index) => {
       const id = getColumnId(column);
       return {
         key: uniqueKey(id === "" ? String(index) : id, toggleKeys),
@@ -1652,7 +1962,7 @@ export class TableXComponent<TData>
       visible.length + (this.showSerialNumber ? 1 : 0) + (this.enableSelection ? 1 : 0) || 1;
 
     this.currentPage = page;
-    this.totalPages = totalPagesFor(this.total, pageSize);
+    this.totalPages = totalPagesFor(effectiveTotal, pageSize);
     this.pagerItems = getPageNumbers(this.currentPage, this.totalPages).map((item, index) =>
       item === "..."
         ? { key: `gap-${index}`, gap: true, page: 0, current: false, label: "" }
@@ -1665,7 +1975,7 @@ export class TableXComponent<TData>
           },
     );
 
-    const range: RecordRange = getRecordRange(this.currentPage, pageSize, this.total);
+    const range: RecordRange = getRecordRange(this.currentPage, pageSize, effectiveTotal);
     this.rangeParts = buildRangeParts(strings.showingRange, {
       start: range.start.toLocaleString(),
       end: range.end.toLocaleString(),

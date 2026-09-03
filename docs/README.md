@@ -1,9 +1,9 @@
-# 📖 TableX Documentation
+# 📖 NexGrid Documentation
 
-Welcome to the official documentation for **TableX** — the server-driven data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
+Welcome to the official documentation for **NexGrid** — the enterprise data grid for React, Next.js, Angular, Vanilla JavaScript, and ASP.NET Core.
 
 <p align="center">
-  <img src="assets/tablex-preview.png" alt="TableX Data Grid Actual View" width="100%" />
+  <img src="assets/tablex-preview.png" alt="NexGrid Data Grid Actual View" width="100%" />
 </p>
 
 ---
@@ -14,6 +14,7 @@ Welcome to the official documentation for **TableX** — the server-driven data 
 docs/
 ├── concepts.md                 # Server-driven architecture & data flow
 ├── getting-started.md          # Step-by-step guides for all 4 frameworks
+├── javascript-guide.md         # Plain JavaScript (JS / JSX) & JSDoc IntelliSense guide
 ├── columns.md                  # Column definitions, widths, alignment, custom cells
 ├── theming.md                  # CSS custom properties, dark mode, color presets
 ├── localization.md             # Custom strings, translations, RTL support
@@ -22,6 +23,11 @@ docs/
 ├── faq.md                      # Common questions and troubleshooting
 ├── adapter-spec.md             # Normative DOM & behavior contract for adapters
 ├── features/                   # Deep dives into grid capabilities
+│   ├── column-grouping.md      # Multi-level & stacked column headers
+│   ├── client-side-pagination.md # Client-side pagination & in-memory engine
+│   ├── state-persistence.md    # Grid state persistence (storageKey & Reset View)
+│   ├── column-resizing.md      # Drag resize & double-click auto-fit
+│   ├── active-filters.md       # Active filter pills bar with instant removal
 │   ├── search.md               # Debounced search & highlight
 │   ├── sorting.md              # 3-state sorting & multi-sort
 │   ├── pagination.md           # Numbered pager, range calculation, jump box
@@ -40,7 +46,7 @@ docs/
     ├── react.md                # @nexgrid/react
     ├── angular.md              # @nexgrid/angular
     ├── vanilla.md              # @nexgrid/vanilla
-    └── aspnet.md               # TableX.AspNetCore
+    └── aspnet.md               # TableX.AspNetCore / NexGrid.AspNetCore
 ```
 
 ---
@@ -50,6 +56,7 @@ docs/
 | Guide | Description |
 | :--- | :--- |
 | 🚀 [**Getting Started**](getting-started.md) | Installation and first working grid in React, Next.js, Angular, ASP.NET Core, and Vanilla HTML. |
+| 💛 [**JavaScript Guide**](javascript-guide.md) | Dedicated guide for JS/JSX developers: plain objects, JSDoc autocomplete, and script-tag usage. |
 | 💡 [**Core Concepts**](concepts.md) | Why TableX never holds your dataset, the `QueryState` / `PagedResponse` contract, and data flow. |
 | 📐 [**Columns & Custom Cells**](columns.md) | Header names, accessor keys, custom cell templates (JSX, Angular templates, DOM nodes), alignment, and width. |
 | 🎨 [**Theming & Styling**](theming.md) | CSS custom properties (`--tbx-*`), Dark mode, high-contrast themes, and customization. |
@@ -66,6 +73,11 @@ Every feature in TableX behaves with 100% parity across all platforms:
 
 | Feature | Topics Covered |
 | :--- | :--- |
+| 🗂️ [**Column Header Grouping**](features/column-grouping.md) | Multi-level stacked headers with automatic `colSpan`/`rowSpan`, responsive layout, and full sorting/filter support. |
+| 🚀 [**Client-Side Pagination**](features/client-side-pagination.md) | In-memory dataset paging, full-dataset search, sorting, filtering, and export without backend APIs. |
+| 💾 [**Grid State Persistence**](features/state-persistence.md) | Save & restore column widths, drag order, hidden columns, and density to `localStorage` + "Reset View". |
+| ↔️ [**Column Resizing & Auto-Fit**](features/column-resizing.md) | Interactive drag resizing and Excel/AG Grid-style double-click auto-fit measuring. |
+| 🏷️ [**Active Filter Pills**](features/active-filters.md) | Interactive chip bar displaying active search & column filters with one-click `✕` removal and "Clear all". |
 | 🔍 [**Global Search**](features/search.md) | 350ms debouncing, clear button, custom search fields, and server translation. |
 | 🔄 [**Sorting**](features/sorting.md) | Three-state sort cycle (`asc → desc → clear`), multi-column sort tokens, and server allowlists. |
 | 📄 [**Pagination**](features/pagination.md) | Page size allowlists, smart ellipsis calculations, "Go to page" jump input, live record count. |

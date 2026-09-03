@@ -53,21 +53,28 @@ export interface TableXOptions<TData> {
   /** Accessible name for the table; also the default export file prefix. */
   caption: string;
 
-  // ---- Controlled mode -----------------------------------------------------
+  // ---- Controlled / Client-side mode --------------------------------------
 
-  /** The CURRENT page of rows only — never the full dataset. Default `[]`. */
+  /** The CURRENT page of rows (in server mode) or the full in-memory dataset (in client-side mode). Default `[]`. */
   data?: TData[];
   /** Total filtered row count; drives pagination. Default `0`. */
   total?: number;
   /** Initial query state. Defaults to `defaultQuery()`. */
   query?: QueryState;
   /**
+   * Enable client-side pagination, sorting, search, and filtering over in-memory `data`.
+   * When enabled (or when `paginationMode: "client"`), the grid manages page slicing,
+   * total counts, search, and sorting internally. Default is auto (true when no endpoint or onQueryChange).
+   */
+  clientSidePagination?: boolean;
+  /** Explicit pagination mode: `"server"` (default with endpoint/onQueryChange) or `"client"`. */
+  paginationMode?: "client" | "server";
+  /**
    * Emitted whenever the user changes page, size, sort, search or a filter.
    *
-   * In controlled mode the grid does NOT move on its own: fetch the new page
-   * and call `handle.update({ data, total, query })`. In endpoint mode the
-   * grid has already applied the query and this is purely informational (use
-   * it to mirror the query into the URL, for example).
+   * In controlled server mode the grid does NOT move on its own: fetch the new page
+   * and call `handle.update({ data, total, query })`. In client-side or endpoint mode the
+   * grid has already applied the query and this is informational.
    */
   onQueryChange?: (next: QueryState) => void;
 
@@ -161,6 +168,10 @@ export interface TableXOptions<TData> {
   onColumnOrderChange?: (newOrder: string[]) => void;
   /** Called when a cell's value is committed via inline cell editing. */
   onCellEdit?: (edit: { row: TData; columnId: string; oldValue: unknown; newValue: unknown }) => void;
+  /** Unique key to persist and restore grid state (column widths, column order, hidden columns, density) in localStorage. */
+  storageKey?: string;
+  /** Show the active filter pills bar beneath the toolbar when filters or search are active. Default `true`. */
+  showFilterPills?: boolean;
   /**
    * Called with the running selection whenever it changes.
    * `allAcrossSelected` is always `false` today — the argument is reserved for
@@ -222,6 +233,8 @@ export interface TableXHandle<TData> {
   getQuery(): QueryState;
   /** Ids of the currently selected rows, in selection order. */
   getSelection(): string[];
+  /** Set the dataset (updates in-memory data in client mode, or current page in server mode). */
+  setData(data: TData[]): void;
   /** Tear down: detach the grid and remove every listener it registered. */
   destroy(): void;
 }

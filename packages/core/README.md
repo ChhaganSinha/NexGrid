@@ -13,13 +13,15 @@ export engine (e.g. in server code or tests).
 | Area | Exports |
 | ---- | ------- |
 | **Server contract** | `QueryState`, `PagedResponse<T>`, `SortSpec`, `PAGE_SIZES`, `Density` |
-| **Column model** | `TableXColumn<T>` (TanStack-compatible shape), `getColumnId`, `getColumnTitle`, `getCellText`, visibility helpers |
-| **Query reducers** | `withToggledSort`, `withSearch`, `withPage`, `withPageSize`, `withFilter` — pure functions so every adapter behaves identically |
-| **Pagination math** | `getPageNumbers` (ellipsis model), `getRecordRange`, `serialNumber` |
-| **Wire format** | `serializeQuery` / `parseQuery` / `buildQueryUrl` — the exact format `TableX.AspNetCore` binds on the server |
+| **Column model & Grouping** | `TableXColumn<T>` (recursive `columns` for multi-level stacked headers), `flattenColumns`, `hasHeaderGroups`, `buildHeaderRows`, `getColumnId`, `getColumnTitle`, `getCellText`, visibility helpers |
+| **Client query engine** | `queryClientData` — in-memory search, sorting, filtering, and page slicing for local arrays |
+| **State persistence** | `saveGridState`, `loadGridState`, `clearGridState` — persistent column widths, ordering, visibility, and density |
+| **Query reducers** | `withToggledSort`, `withToggledMultiSort`, `withSearch`, `withPage`, `withPageSize`, `withFilter` — pure functions so every adapter behaves identically |
+| **Pagination math** | `getPageNumbers` (ellipsis model), `getRecordRange`, `serialNumber`, `totalPagesFor` |
+| **Wire format & OData** | `serializeQuery` / `parseQuery` / `buildQueryUrl`, plus OData v4 helpers (`toODataParams`, `buildODataUrl`, `fromODataResponse`) |
 | **Export engine** | RFC 4180 CSV (BOM + formula-injection defense) and formatted Excel (.xls) with value-based badge styling |
 | **Full-dataset collection** | `fetchAllPages` — walks a paginated endpoint at the max allowlisted page size, with a hard row cap |
-| **Locale** | `TableXLocale`, `DEFAULT_LOCALE`, `formatMessage` |
+| **Locale** | `TableXLocale`, `DEFAULT_LOCALE`, `formatMessage`, `resolveLocale` |
 | **Theme** | `@nexgrid/core/styles.css` — the shared stylesheet, themed entirely via `--tbx-*` CSS custom properties |
 
 <p align="center">

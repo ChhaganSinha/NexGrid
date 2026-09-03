@@ -51,14 +51,22 @@ export type NexGridTheme = TableXTheme;
 export interface TableXProps<TData> {
   /** Column definitions, in display order. */
   columns: TableXReactColumn<TData>[];
-  /** The CURRENT page of rows only — never the full dataset. */
+  /** The CURRENT page of rows (server mode) or the full in-memory dataset (client-side mode). */
   data: TData[];
-  /** Total filtered row count from the server; drives the pager. */
-  total: number;
-  /** The query the `data` above answers. */
-  query: QueryState;
-  /** Called with the next query whenever the user changes page/sort/search/size. */
-  onQueryChange: (next: QueryState) => void;
+  /** Total filtered row count from the server; drives the pager. In client-side mode, this is computed automatically. */
+  total?: number;
+  /** The query the `data` answers. In client-side mode, this is managed internally if omitted. */
+  query?: QueryState;
+  /** Called with the next query whenever the user changes page/sort/search/size. Optional in client-side mode. */
+  onQueryChange?: (next: QueryState) => void;
+  /**
+   * Enable client-side pagination, sorting, search, and filtering over in-memory `data`.
+   * When enabled (or when `paginationMode: "client"`), the grid manages page slicing,
+   * total counts, search, and sorting internally. Default is auto (true when onQueryChange is omitted).
+   */
+  clientSidePagination?: boolean;
+  /** Explicit pagination mode: `"server"` (default with onQueryChange) or `"client"`. */
+  paginationMode?: "client" | "server";
   /** Accessible name for the table. Also the default export file name and sheet title. */
   caption: string;
 
@@ -134,6 +142,10 @@ export interface TableXProps<TData> {
   onColumnOrderChange?: (newOrder: string[]) => void;
   /** Called when a cell's value is committed via inline cell editing. */
   onCellEdit?: (edit: { row: TData; columnId: string; oldValue: unknown; newValue: unknown }) => void;
+  /** Unique key to persist and restore grid state (column widths, column order, hidden columns, density) in localStorage. */
+  storageKey?: string;
+  /** Show the active filter pills bar beneath the toolbar when filters or search are active. Default `true`. */
+  showFilterPills?: boolean;
   /** Rendered at the end of the toolbar, after the export menu. */
   toolbarActions?: ReactNode;
   /** Clicking a row (or a card) invokes this. Adds a pointer cursor. */

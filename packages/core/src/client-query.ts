@@ -21,6 +21,8 @@ export interface ClientQueryOptions<TData> {
   sortableFields?: (keyof TData & string)[];
   /** Explicit list of field names that may be filtered. If omitted, all fields are filterable. */
   filterableFields?: (keyof TData & string)[];
+  /** Whether to slice items into the requested page window. Defaults to `true`. If `false`, returns all matching rows (useful for export). */
+  paginate?: boolean;
 }
 
 /** Compare two arbitrary values for client-side sorting. */
@@ -188,6 +190,15 @@ function matchesFilterValue(val: unknown, filterVal: string): boolean {
 
   // 4. Pagination
   const total = matching.length;
+  if (options?.paginate === false) {
+    return {
+      items: matching,
+      page: 1,
+      pageSize: isPageSize(query.pageSize) ? query.pageSize : DEFAULT_PAGE_SIZE,
+      total,
+      totalPages: 1,
+    };
+  }
   const pageSize = isPageSize(query.pageSize) ? query.pageSize : DEFAULT_PAGE_SIZE;
   const totalPages = totalPagesFor(total, pageSize);
   const page = Math.min(Math.max(1, query.page || 1), totalPages);

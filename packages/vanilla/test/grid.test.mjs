@@ -553,3 +553,166 @@ test("createTableX renders pinned columns, summary row, row expansion, and bulk 
 
   handle.destroy();
 });
+
+test("createTableX supports state persistence and active filter pills bar", () => {
+  const store = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    },
+  };
+
+  // Seed persisted state
+  store.set("nexgrid:test-persist", JSON.stringify({
+    version: 1,
+    density: "compact",
+    columnWidths: { name: 220 },
+  }));
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "id", header: "ID" },
+    { accessorKey: "name", header: "Name" },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Persistence Test",
+    columns,
+    data: [{ id: "1", name: "Alice" }],
+    total: 1,
+    storageKey: "test-persist",
+    query: {
+      page: 1,
+      pageSize: 10,
+      sort: [],
+      q: "Alice",
+      filter: { name: "Ali" },
+    },
+  });
+
+  // Verify loaded density
+  const root = container.querySelector(".tbx-root");
+  assert.equal(root.dataset.density, "compact", "Density should be loaded from storage");
+
+  // Verify filter pills bar
+  const pillsBar = container.querySelector(".tbx-filter-pills-bar");
+  assert.ok(pillsBar, "Filter pills bar should be rendered");
+  const pills = pillsBar.querySelectorAll(".tbx-filter-pill");
+  assert.equal(pills.length, 2, "Should have search pill and name filter pill");
+
+  // Test double click on resize handle
+  const resizeHandle = container.querySelector(".tbx-resize-handle");
+  assert.ok(resizeHandle, "Resize handle should exist");
+  resizeHandle.dispatchEvent(new MockMouseEvent("dblclick"));
+
+  handle.destroy();
+});
+
+test("createTableX supports client-side pagination and setData", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "id", header: "ID" },
+    { accessorKey: "name", header: "Name" },
+  ];
+
+  // 25 items
+  const allItems = Array.from({ length: 25 }, (_, i) => ({
+    id: String(i + 1),
+    name: `User ${i + 1}`,
+  }));
+
+  const handle = createTableX(container, {
+    caption: "Client Pagination Test",
+    columns,
+    data: allItems,
+    clientSidePagination: true,
+    query: {
+      page: 1,
+      pageSize: 10,
+      sort: [],
+    },
+  });
+
+  // Page 1 should render 10 rows
+  const rows = container.querySelectorAll(".tbx-row");
+  assert.equal(rows.length, 10, "Page 1 should render 10 rows");
+
+  // Navigate to page 2
+  const nextBtn = container.querySelector('[data-tbx-focus="page-next"]');
+  assert.ok(nextBtn, "Next button should exist");
+  nextBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  const page2Rows = container.querySelectorAll(".tbx-row");
+  assert.equal(page2Rows.length, 10, "Page 2 should render 10 rows");
+  assert.equal(handle.getQuery().page, 2, "Query page should be 2");
+
+  // Navigate to page 3
+  const nextBtn2 = container.querySelector('[data-tbx-focus="page-next"]');
+  assert.ok(nextBtn2, "Next button should exist on page 2");
+  nextBtn2.dispatchEvent(new MockMouseEvent("click"));
+  const page3Rows = container.querySelectorAll(".tbx-row");
+  assert.equal(page3Rows.length, 5, "Page 3 should render remaining 5 rows");
+
+  // Test setData
+  handle.setData([
+    { id: "101", name: "New User 1" },
+    { id: "102", name: "New User 2" },
+  ]);
+  const updatedRows = container.querySelectorAll(".tbx-row");
+  assert.equal(updatedRows.length, 2, "Should render updated items");
+
+  handle.destroy();
+});
+
+test("createTableX renders multi-level stacked column headers", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    {
+      header: "User Details",
+      columns: [
+        { accessorKey: "firstName", header: "First Name" },
+        { accessorKey: "lastName", header: "Last Name" },
+      ],
+    },
+    { accessorKey: "status", header: "Status" },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Grouping Test",
+    columns,
+    data: [{ id: "1", firstName: "Alice", lastName: "Smith", status: "Active" }],
+    total: 1,
+    showSerialNumber: false,
+    enableSelection: false,
+  });
+
+  const thead = container.querySelector("thead");
+  assert.ok(thead, "thead should exist");
+  const trs = thead.querySelectorAll("tr");
+  assert.equal(trs.length, 2, "thead should contain 2 rows for multi-level headers");
+
+  // Top row: User Details (group) + Status (standalone)
+  const row1Ths = trs[0].querySelectorAll("th");
+  assert.equal(row1Ths.length, 2, "Top row should have 2 th elements");
+  assert.ok(row1Ths[0].classList.contains("tbx-th--group"), "User Details should be group header");
+  assert.equal(row1Ths[0].attributes.get("colspan"), "2", "User Details should span 2 columns");
+  assert.equal(row1Ths[1].attributes.get("rowspan"), "2", "Status should span 2 rows");
+
+  // Bottom row: First Name + Last Name
+  const row2Ths = trs[1].querySelectorAll("th");
+  assert.equal(row2Ths.length, 2, "Bottom row should have 2 th elements");
+  assert.ok(row2Ths[0].classList.contains("tbx-th--grouped-child"), "First Name should be child header");
+  assert.ok(row2Ths[1].classList.contains("tbx-th--grouped-child"), "Last Name should be child header");
+
+  handle.destroy();
+});
+
+

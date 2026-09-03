@@ -36,8 +36,11 @@ encapsulation and will not reach the grid's markup.
 
 ## React
 
-Two files: a column set and a component. The grid is fully controlled — hold a
-`QueryState`, fetch when it changes, pass the result straight through.
+Two files: a column set and a component. NexGrid supports both **TypeScript** and **plain JavaScript (JSX)** out of the box.
+
+### TypeScript (TSX)
+
+The grid is fully controlled — hold a `QueryState`, fetch when it changes, pass the result straight through:
 
 ```tsx
 // students-grid.tsx
@@ -143,7 +146,91 @@ export default function App() {
 }
 ```
 
-Full prop table: [`@nexgrid/react` API](api/react.md).
+### JavaScript (JSX)
+
+If you are using plain JavaScript (without TypeScript), write standard `.jsx` files. You can optionally add JSDoc comments (`/** @type {import('@nexgrid/react').TableXColumn[]} */`) to get full IDE autocomplete:
+
+```jsx
+// students-grid.jsx
+import { useCallback, useEffect, useState } from "react";
+import { TableX, buildQueryUrl, defaultQuery } from "@nexgrid/react";
+import "@nexgrid/react/styles.css";
+
+// Optional JSDoc gives VS Code & WebStorm full autocomplete without TypeScript:
+/** @type {import('@nexgrid/react').TableXColumn[]} */
+const columns = [
+  { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
+  { accessorKey: "email", header: "Email" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    meta: { align: "center", width: 130 },
+    cell: ({ getValue }) => {
+      const status = String(getValue() || "");
+      return <span className={`pill pill--${status.toLowerCase()}`}>{status}</span>;
+    },
+  },
+  { accessorKey: "score", header: "Score", meta: { align: "right", width: 90 } },
+  {
+    accessorKey: "joinedAt",
+    header: "Joined",
+    cell: ({ getValue }) => new Date(String(getValue())).toLocaleDateString(),
+  },
+];
+
+export function StudentsGrid() {
+  const [query, setQuery] = useState(defaultQuery());
+  const [page, setPage] = useState({ items: [], total: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const load = useCallback(async (next) => {
+    setIsLoading(true);
+    setError(false);
+    try {
+      const response = await fetch(buildQueryUrl("/api/students", next));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setPage(await response.json());
+    } catch {
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(query);
+  }, [load, query]);
+
+  return (
+    <TableX
+      caption="Students"
+      columns={columns}
+      data={page.items}
+      total={page.total}
+      query={query}
+      onQueryChange={setQuery}
+      isLoading={isLoading}
+      error={error}
+      onRetry={() => load(query)}
+      enableSelection
+      onSelectionChange={(ids) => console.log("selected", ids)}
+    />
+  );
+}
+```
+
+> 💡 **Client-Side In-Memory Data**: In JavaScript, if you already have an array of records in memory, you can simply pass `clientSidePagination={true}` and omit `query` and `onQueryChange`:
+> ```jsx
+> <TableX
+>   caption="Students"
+>   columns={columns}
+>   data={studentsArray}
+>   clientSidePagination={true}
+> />
+> ```
+
+Full prop table: [`@nexgrid/react` API](api/react.md). For dedicated details on plain JS, see the [JavaScript Guide](javascript-guide.md).
 
 ## Next.js (App Router)
 
@@ -641,6 +728,7 @@ Worked endpoints for ASP.NET Core, Node/Express and Next.js are in
 
 ## Next
 
+- [JavaScript Guide](javascript-guide.md) — Using NexGrid in plain JS / JSX with JSDoc autocomplete
 - [Columns](columns.md) — custom cells, widths, alignment, visibility
 - [Features](README.md#features) — search, sorting, pagination, selection, density, export, responsive
 - [Theming](theming.md) — every token, dark mode

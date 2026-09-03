@@ -10,16 +10,19 @@ There is no local sort that quietly reorders 10 rows out of 40,000, and no
 client-side filter that hides records the total still counts.
 
 Around that core it provides the things every real admin table ends up needing:
-debounced global search, a sort cycle, column visibility, row density,
-selection, formatted Excel and CSV export, a paginated footer with a page-jump,
-loading / empty / error states, and a card layout for phones — all styled by one
-stylesheet shared with the Angular and vanilla adapters, so the same grid looks
-identical on every platform.
+- 🗂️ **Column Header Grouping (Multi-Level / Stacked Headers)** — Group sub-columns beneath parent categories with automatic `colSpan` and `rowSpan` calculation.
+- 🚀 **Client-Side Pagination & In-Memory Engine** — Zero-config in-memory paging, sorting, search, filtering, and export over local arrays.
+- 💾 **Grid State Persistence (`storageKey`)** — Automatically saves column widths, column order, hidden columns, and row density to `localStorage`.
+- ↔️ **Column Resizing & Auto-Fit** — Interactive drag resize handles and double-click auto-fit measuring.
+- 🏷️ **Active Filter Pills Bar** — Interactive chip badges beneath the toolbar for active search & column filters with one-click `✕` removal and "Clear all".
+- 🔍 **Debounced global search** (350 ms), 3-state sorting cycle (`asc → desc → cleared`), multi-column sorting.
+- 📌 **Pinned columns** (left / right freeze), master-detail accordion row expansion, summary/aggregation footer row.
+- 📊 **Formatted Excel (`.xls`) and CSV export**, including whole-dataset export across pages.
+- 📱 **Responsive layout** — Full desktop table at ≥ 768 px, smart card list below.
+- 💛 **Dual Language Support** — 100% compatible with both **TypeScript (TSX)** and **plain JavaScript (JSX)** with JSDoc typing.
 
 - Zero runtime dependencies beyond `@nexgrid/core`. React is a peer dependency.
-- Written for strict TypeScript, generic over your row type.
-- Ships ESM and CJS, with a `"use client"` banner so it drops straight into the
-  Next.js App Router.
+- Ships ESM and CJS, with a `"use client"` banner so it drops straight into the Next.js App Router.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ChhaganSinha/NexGrid/master/docs/assets/tablex-preview.png" alt="TableX React Data Grid Preview" width="100%" />
@@ -186,33 +189,41 @@ Two notes:
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `columns` | `TableXReactColumn<TData>[]` | required | Column definitions, in display order. |
-| `data` | `TData[]` | required | The **current page** of rows only. |
-| `total` | `number` | required | Total filtered row count from the server. Drives the pager. |
-| `query` | `QueryState` | required | The query the `data` above answers. |
-| `onQueryChange` | `(next: QueryState) => void` | required | Called with the next query on page / size / sort / search changes. |
-| `caption` | `string` | required | Accessible name for the table; also the default export file name and sheet title. |
-| `density` | `"compact" \| "default" \| "comfortable"` | `"default"` | **Initial** density. The user owns it afterwards. |
-| `isLoading` | `boolean` | `false` | Replaces the rows with a spinner. The toolbar and footer stay usable. |
-| `error` | `boolean` | `false` | Replaces the **whole grid** with an error card. |
-| `onRetry` | `() => void` | — | When set, the error card offers a retry button. |
-| `enableSelection` | `boolean` | `false` | Renders selection checkboxes. |
-| `onSelectionChange` | `(ids: string[], allAcrossSelected: boolean) => void` | — | Fires after each selection change. `allAcrossSelected` is reserved and always `false`. |
+| `columns` | `TableXReactColumn<TData>[]` | required | Column definitions, in display order (supports multi-level `columns`). |
+| `data` | `TData[]` | required | The current page of rows, or the entire array if `clientSidePagination` is true. |
+| `total` | `number` | optional in client mode | Total filtered row count from the server. Drives the pager. |
+| `query` | `QueryState` | optional in client mode | The query the `data` above answers. |
+| `onQueryChange` | `(next: QueryState) => void` | optional in client mode | Called with the next query on page / size / sort / search changes. |
+| `clientSidePagination` | `boolean` | `false` | Enables zero-config in-memory paging, sorting, search, and filtering over local data. |
+| `storageKey` | `string` | — | Persists custom column widths, column order, hidden columns, and density to `localStorage`. |
+| `caption` | `string` | required | Accessible name for the table; also default export filename and sheet title. |
+| `density` | `"compact" \| "default" \| "comfortable"` | `"default"` | Initial density preset. |
+| `enableColumnResize` | `boolean` | `true` | Enables interactive drag-to-resize and double-click auto-fit on column borders. |
+| `enableColumnFilters` | `boolean` | `true` | Enables 3-dot column filter popovers (⋮) for text, select, and range filters. |
+| `enableSorting` | `boolean` | `true` | Global switch for column sorting. |
+| `enableSummaryRow` | `boolean` | `false` | Renders a summary / aggregation row in `<tfoot>`. |
+| `enableRowExpansion` | `boolean` | `false` | Master-detail accordion expandable sub-rows. |
+| `renderExpandedRow` | `(row: TData) => ReactNode` | — | Render function for expanded row content. |
+| `enableBulkActions` | `boolean` | `false` | Floating bottom pill bar for batch operations on selected rows. |
+| `isLoading` | `boolean` | `false` | Replaces rows with a spinner while keeping toolbar and footer interactive. |
+| `error` | `boolean` | `false` | Replaces the whole grid with an accessible error card. |
+| `onRetry` | `() => void` | — | When set, the error card displays a retry button. |
+| `enableSelection` | `boolean` | `false` | Renders row selection checkboxes. |
+| `selectionMode` | `"multi" \| "single"` | `"multi"` | Whether multiple rows or only one row can be selected. |
+| `onSelectionChange` | `(ids: string[]) => void` | — | Fires after each selection change. |
 | `enableSearch` | `boolean` | `true` | Shows the debounced global search box. |
 | `searchPlaceholder` | `string` | `locale.searchPlaceholder` | Placeholder text for the search box. |
-| `toolbarActions` | `ReactNode` | — | Rendered at the end of the toolbar, after the export menu. |
-| `onRowClick` | `(row: TData) => void` | — | Row / card click handler. Adds a pointer cursor and makes rows keyboard-activatable. |
+| `toolbarActions` | `ReactNode` | — | Custom actions rendered at the end of the toolbar. |
+| `onRowClick` | `(row: TData) => void` | — | Row / card click handler. Adds pointer cursor and keyboard activation. |
 | `getRowId` | `(row: TData) => string` | `String(row.id ?? row)` | Stable row identity, used for selection and React keys. |
-| `className` | `string` | — | Extra class(es) on the grid root. |
-| `showSerialNumber` | `boolean` | `true` | Shows the automatic `S.No.` column, numbered across the whole result set. |
-| `enableExport` | `boolean` | `true` | Shows the export menu. |
-| `exportFileName` | `string` | caption, lower-cased and underscored | File name prefix, without extension. |
-| `onExportAll` | `() => void \| Promise<void>` | — | Takes over exporting entirely; the built-in flow never runs. |
-| `fetchEndpoint` | `string` | — | List endpoint used to page in the rest of the dataset when exporting. |
-| `badgeRules` | `readonly ExcelBadgeRule[]` | core's `DEFAULT_BADGE_RULES` | Value-based cell styling for the Excel export. |
+| `showSerialNumber` | `boolean` | `true` | Shows automatic `S.No.` column, numbered across pages. |
+| `enableExport` | `boolean` | `true` | Shows the export menu (Excel, CSV, Clipboard). |
+| `exportFileName` | `string` | caption, slug-safe | File name prefix without extension. |
+| `fetchEndpoint` | `string` | — | Endpoint used to page in the full dataset during export. |
+| `badgeRules` | `readonly ExcelBadgeRule[]` | core's `DEFAULT_BADGE_RULES` | Value-based cell styling for Excel export. |
 | `locale` | `Partial<TableXLocale>` | English defaults | Overrides for any user-facing string. |
-| `onNotify` | `(notice: TableXNotice) => void` | no-op | Receives `{ type, message }` for export progress, failures, and successes. |
-| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Adds `.tbx-dark` / `.tbx-auto` to the root. |
+| `onNotify` | `(notice: TableXNotice) => void` | no-op | Receives `{ type, message }` for notifications. |
+| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | Sets `.tbx-dark` / `.tbx-auto` theme mode. |
 
 ## Column definitions
 
@@ -224,6 +235,7 @@ A column is a plain object, structurally compatible with TanStack Table's
 | `id` | `string` | Column id. Falls back to `accessorKey`. |
 | `accessorKey` | `string` | The row property this column reads. |
 | `header` | `string \| (ctx) => ReactNode` | Header content. A string is also used for menus and export headers. |
+| `columns` | `TableXReactColumn<TData>[]` | Nested sub-columns for multi-level stacked column header groups. |
 | `cell` | `(ctx: { row: { original: TData }, getValue(): unknown }) => ReactNode` | Custom cell renderer. Without it the raw value is rendered as text. |
 | `enableSorting` | `boolean` | Sorting is on by default; set `false` to opt out. |
 | `meta` | `TableXColumnMeta` | Layout and behavior hints — see below. |
