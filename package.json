@@ -16,7 +16,7 @@
     "packages/angular"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:core && npm run build:vanilla && npm run build:react && npm run build:angular",
     "build:core": "npm run build -w @nexgrid/core",
     "build:vanilla": "npm run build -w @nexgrid/vanilla",
     "build:react": "npm run build -w @nexgrid/react",
