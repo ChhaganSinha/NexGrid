@@ -102,7 +102,7 @@ Every feature in TableX behaves with 100% parity across all platforms:
 | [`@nexgrid/react`](api/react.md) | `<TableX />` props, hooks, and types. |
 | [`@nexgrid/angular`](api/angular.md) | `<table-x>` inputs, outputs, `*tableXCell`, and `*tableXToolbar` directives. |
 | [`@nexgrid/vanilla`](api/vanilla.md) | `createTableX()` options, event handlers, and handle methods. |
-| [`TableX.AspNetCore`](api/aspnet.md) | `<table-x>` Tag Helpers, `TableXQuery` model binder, and EF Core `IQueryable` extensions. |
+| [`NexGrid.AspNetCore`](api/aspnet.md) | `<table-x>` Tag Helpers, `TableXQuery` model binder, and EF Core `IQueryable` extensions. |
 
 ---
 

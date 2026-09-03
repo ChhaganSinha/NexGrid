@@ -9,7 +9,7 @@ namespace TableX.AspNetCore;
 
 /// <summary>
 /// Paths to the static web assets this package publishes under
-/// <c>_content/TableX.AspNetCore/</c>.
+/// <c>_content/NexGrid.AspNetCore/</c>.
 /// </summary>
 /// <remarks>
 /// <example>
@@ -22,7 +22,10 @@ namespace TableX.AspNetCore;
 public static class TableXAssets
 {
     /// <summary>The static web asset root this package publishes to.</summary>
-    public const string ContentRoot = "/_content/TableX.AspNetCore";
+    public const string ContentRoot = "/_content/NexGrid.AspNetCore";
+
+    /// <summary>Legacy asset path for backwards compatibility.</summary>
+    public const string LegacyContentRoot = "/_content/TableX.AspNetCore";
 
     /// <summary>
     /// The shared TableX stylesheet — the same file every adapter uses, so a

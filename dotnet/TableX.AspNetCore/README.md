@@ -35,15 +35,15 @@ This package gives you three things and nothing you have to glue together:
 ## Install
 
 ```bash
-dotnet add package TableX.AspNetCore
+dotnet add package NexGrid.AspNetCore
 ```
 
 Reference the bundle once, in `_Layout.cshtml`. Both files ship inside the
 package as static web assets — there is nothing to copy, download, or build:
 
 ```cshtml
-<link rel="stylesheet" href="~/_content/TableX.AspNetCore/tablex.css" />
-<script src="~/_content/TableX.AspNetCore/tablex.global.js"></script>
+<link rel="stylesheet" href="~/_content/NexGrid.AspNetCore/tablex.css" />
+<script src="~/_content/NexGrid.AspNetCore/tablex.global.js"></script>
 ```
 
 Or without hard-coding the paths:

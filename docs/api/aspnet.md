@@ -7,7 +7,7 @@
 > wiring it up.
 
 ```bash
-dotnet add package TableX.AspNetCore
+dotnet add package NexGrid.AspNetCore
 ```
 
 A Razor Class Library targeting `net8.0`, with a `FrameworkReference` on
@@ -364,7 +364,7 @@ public enum TableXColumnAlign { Left, Center, Right }
 ```csharp
 public static class TableXAssets
 {
-    public const string ContentRoot   = "/_content/TableX.AspNetCore";
+    public const string ContentRoot    = "/_content/NexGrid.AspNetCore";
     public const string StylesheetPath = ContentRoot + "/tablex.css";
     public const string ScriptPath     = ContentRoot + "/tablex.global.js";
     public const string GlobalName     = "TableX";
