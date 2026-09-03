@@ -1,6 +1,6 @@
 {
   "name": "tablex-example-nextjs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "TableX in the Next.js App Router: a server page, a client grid, and a route handler that parses QueryState with parseQuery.",
   "scripts": {

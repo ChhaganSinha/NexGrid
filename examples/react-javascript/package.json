@@ -1,6 +1,6 @@
 {
   "name": "tablex-example-react-javascript",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "NexGrid + React in pure JavaScript (JSX) with no TypeScript required.",
   "type": "module",

@@ -1,13 +1,13 @@
 {
   "name": "@nexgrid/vanilla",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Zero-dependency vanilla JS/DOM renderer for TableX — the professional, server-driven data grid. Also powers TableX.AspNetCore.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ChhaganSinha/NexGrid.git",
+    "url": "git+https://github.com/ChhaganSinha/NexGrid.git",
     "directory": "packages/vanilla"
   },
   "bugs": {
@@ -51,7 +51,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@nexgrid/core": "^0.2.0"
+    "@nexgrid/core": "^0.2.1"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

@@ -23,7 +23,7 @@
   <PropertyGroup Label="NuGet">
     <IsPackable>true</IsPackable>
     <PackageId>NexGrid.AspNetCore</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Title>NexGrid for ASP.NET Core</Title>
     <Authors>Chhagan Sinha</Authors>
     <Company>NexGrid</Company>
