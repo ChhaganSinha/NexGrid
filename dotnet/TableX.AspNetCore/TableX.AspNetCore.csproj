@@ -32,8 +32,8 @@
     <PackageTags>datagrid;data-grid;table;aspnetcore;taghelper;razor;pagination;sorting;filtering;export;iqueryable;efcore;server-side</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageProjectUrl>https://github.com/ChhaganSinha/TableX</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ChhaganSinha/TableX.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ChhaganSinha/NexGrid</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ChhaganSinha/NexGrid.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Copyright>Copyright (c) Chhagan Sinha</Copyright>

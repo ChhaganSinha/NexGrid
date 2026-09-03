@@ -82,7 +82,13 @@ jobs:
         run: |
           dotnet pack dotnet/TableX.AspNetCore/TableX.AspNetCore.csproj -c Release -o ./nupkg
 
-      - name: Push to NuGet.org (Trusted Publishing / OIDC)
+      - name: NuGet Login (Trusted Publishing / OIDC)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ChhaganSinha
+
+      - name: Push to NuGet.org
         run: |
-          dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY || 'nuget' }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push ./nupkg/*.nupkg --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
