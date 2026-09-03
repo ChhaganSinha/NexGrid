@@ -182,6 +182,42 @@ public static class TableXQueryableExtensions
                 continue;
             }
 
+            var returnType = selector.ReturnType;
+            var underlyingType = Nullable.GetUnderlyingType(returnType) ?? returnType;
+
+            // Handle range filter syntax: "min..max", "min..", "..max"
+            if (entry.Value.Contains("..") &&
+                (underlyingType.IsPrimitive || underlyingType == typeof(decimal) ||
+                 underlyingType == typeof(DateTime) || underlyingType == typeof(DateOnly) ||
+                 underlyingType == typeof(DateTimeOffset)))
+            {
+                var parts = entry.Value.Split([".."], StringSplitOptions.None);
+                var minStr = parts[0].Trim();
+                var maxStr = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+
+                var rowParam = Expression.Parameter(typeof(T), "row");
+                var memberExpr = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], rowParam);
+                Expression? rangePredicate = null;
+
+                if (!string.IsNullOrEmpty(minStr) && TableXExpressions.TryConvertFilterValue(minStr, returnType, out var minVal))
+                {
+                    var gte = Expression.GreaterThanOrEqual(memberExpr, TableXExpressions.Parameterize(minVal, returnType));
+                    rangePredicate = gte;
+                }
+
+                if (!string.IsNullOrEmpty(maxStr) && TableXExpressions.TryConvertFilterValue(maxStr, returnType, out var maxVal))
+                {
+                    var lte = Expression.LessThanOrEqual(memberExpr, TableXExpressions.Parameterize(maxVal, returnType));
+                    rangePredicate = rangePredicate is null ? lte : Expression.AndAlso(rangePredicate, lte);
+                }
+
+                if (rangePredicate is not null)
+                {
+                    source = source.Where(Expression.Lambda<Func<T, bool>>(rangePredicate, rowParam));
+                    continue;
+                }
+            }
+
             if (!TableXExpressions.TryConvertFilterValue(entry.Value, selector.ReturnType, out var value))
             {
                 continue;

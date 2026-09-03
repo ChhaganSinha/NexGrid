@@ -1,6 +1,7 @@
 // Bridging grid column definitions to export columns.
 
 import {
+  flattenColumns,
   getCellText,
   getCellValue,
   getColumnId,
@@ -27,7 +28,8 @@ export function toExportColumns<TData, TRender>(
   columns: readonly NexGridColumn<TData, TRender>[],
   labels?: { yes: string; no: string },
 ): ExportColumn<TData>[] {
-  return columns.filter(isExportable).map((col) => ({
+  const leafCols = flattenColumns(columns as NexGridColumn<TData, TRender>[]);
+  return leafCols.filter(isExportable).map((col) => ({
     header: getColumnTitle(col) || getColumnId(col),
     value: (row: TData) => getCellText(getCellValue(col, row), labels),
   }));

@@ -37,6 +37,7 @@ export {
   isEditable,
   computeAggregation,
   isStructuralColumn,
+  isGroupColumn,
   initialHiddenColumns,
   visibleColumns,
   flattenColumns,

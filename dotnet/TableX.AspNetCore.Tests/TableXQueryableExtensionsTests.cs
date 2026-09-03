@@ -68,6 +68,22 @@ public class TableXQueryableExtensionsTests
     }
 
     [Fact]
+    public void ToPagedResponse_Filter_Range_FiltersNumericRange()
+    {
+        var query = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["score"] = "80..92" }
+        };
+
+        var response = _students.AsQueryable().ToPagedResponse(query, options => options
+            .Filterable("score", s => s.Score));
+
+        // 82.0 (Bob), 88.0 (Charlie), 91.0 (Evan)
+        Assert.Equal(3, response.Total);
+        Assert.All(response.Items, s => Assert.True(s.Score >= 80 && s.Score <= 92));
+    }
+
+    [Fact]
     public void ToPagedResponse_Search_FiltersMatchingFields()
     {
         var query = new TableXQuery { Q = "Smith" };

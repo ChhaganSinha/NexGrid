@@ -134,19 +134,27 @@ export function getCellText(
   return String(value);
 }
 
+/** Is this column a group header with child columns? */
+export function isGroupColumn<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
+  return Boolean(col.columns && col.columns.length > 0);
+}
+
 /** Is this column sortable? (TanStack convention: on unless opted out.) */
 export function isSortable<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
+  if (isGroupColumn(col)) return false;
   return col.enableSorting !== false && getColumnId(col) !== "" && !isStructuralColumn(col);
 }
 
 /** Can this column be toggled in the Columns menu? */
 export function isHideable<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
+  if (isGroupColumn(col)) return false;
   if (isStructuralColumn(col) || getColumnId(col) === "") return false;
   return col.meta?.hideable !== false;
 }
 
 /** Should this column appear in exports? */
 export function isExportable<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
+  if (isGroupColumn(col)) return false;
   if (isStructuralColumn(col) || getColumnId(col) === "") return false;
   return col.meta?.exportable !== false;
 }
@@ -156,7 +164,7 @@ export function initialHiddenColumns<TData, TRender>(
   columns: readonly TableXColumn<TData, TRender>[],
 ): Record<string, boolean> {
   const hidden: Record<string, boolean> = {};
-  for (const col of columns) {
+  for (const col of flattenColumns(columns as TableXColumn<TData, TRender>[])) {
     const id = getColumnId(col);
     if (id && col.meta?.hidden) hidden[id] = true;
   }
@@ -179,6 +187,7 @@ export function isFilterable<TData, TRender>(
   col: TableXColumn<TData, TRender>,
   globalFilterable = true,
 ): boolean {
+  if (isGroupColumn(col)) return false;
   if (isStructuralColumn(col) || getColumnId(col) === "") return false;
   if (col.enableFiltering === false || col.filterable === false) return false;
   if (col.meta?.filterable === false || col.meta?.enableFiltering === false) return false;
@@ -201,6 +210,7 @@ export function isPinned<TData, TRender>(
 export function isEditable<TData, TRender>(
   col: TableXColumn<TData, TRender>,
 ): boolean {
+  if (isGroupColumn(col)) return false;
   return col.meta?.editable === true;
 }
 
