@@ -182,6 +182,47 @@ export function visibleColumns<TData, TRender>(
   });
 }
 
+/**
+ * The row fields a global search should look at: every visible, non-structural
+ * leaf column that actually reads a field.
+ *
+ * Searching the whole row object instead (`Object.values`) matches data the
+ * user cannot see — a GUID `id`, an internal `tenantId` — so typing "5" lights
+ * up nearly every row with no visible reason why. Anchoring the search to the
+ * displayed columns keeps the result explainable: every match is on screen.
+ *
+ * Hidden columns are excluded for the same reason; re-showing one brings its
+ * field back. A host that wants to search fields it does not render passes an
+ * explicit list to `ClientQueryOptions.searchableFields` instead.
+ *
+ * The returned strings are ROW FIELDS, not column ids. The two differ whenever
+ * a column carries both: `getColumnId` prefers `id`, which is often a display
+ * slug (`"lastLogin"`) over the property it actually reads
+ * (`accessorKey: "lastLoginAt"`). Returning the id there would leave a column
+ * the user can see silently unsearchable — a worse failure than the wide match
+ * this replaces, and one with nothing on screen to explain it. Visibility and
+ * the structural check still key on the id, because that is what the hidden map
+ * is keyed by.
+ *
+ * A column with no `accessorKey` and a custom `cell` that composes its value
+ * (e.g. city + country) still cannot be searched: there is no single row field
+ * behind it. Name the underlying fields via `searchableFields` for those.
+ */
+export function searchableColumnIds<TData, TRender>(
+  columns: readonly TableXColumn<TData, TRender>[],
+  hidden: Record<string, boolean> = {},
+): string[] {
+  const fields: string[] = [];
+  for (const col of flattenColumns(columns)) {
+    const id = getColumnId(col);
+    if (!id || isStructuralColumn(col) || hidden[id] === true) continue;
+    const field = col.accessorKey === undefined ? id : String(col.accessorKey);
+    if (!field || fields.includes(field)) continue;
+    fields.push(field);
+  }
+  return fields;
+}
+
 /** Is this column filterable? Defaults to true for all non-structural data columns unless explicitly disabled. */
 export function isFilterable<TData, TRender>(
   col: TableXColumn<TData, TRender>,

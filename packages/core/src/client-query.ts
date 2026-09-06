@@ -15,7 +15,13 @@ import { totalPagesFor } from "./query.js";
 
 /** Options for client-side in-memory querying. */
 export interface ClientQueryOptions<TData> {
-  /** Explicit list of field names to search when `query.q` is present. If omitted, all string properties are searched. */
+  /**
+   * Explicit list of field names to search when `query.q` is present.
+   *
+   * If omitted (or empty), EVERY property on the row is searched — including
+   * fields no column displays, such as an `id` GUID. Adapters should pass the
+   * displayed columns (see `searchableColumnIds`) so a match is always visible.
+   */
   searchableFields?: (keyof TData & string)[];
   /** Explicit list of field names that may be sorted. If omitted, all fields are sortable. */
   sortableFields?: (keyof TData & string)[];

@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import type {
   Density,
   ExcelBadgeRule,
+  ExportFormat,
   TableXColumn as TableXCoreColumn,
   TableXLocale,
   QueryState,
@@ -67,6 +68,15 @@ export interface TableXProps<TData> {
   clientSidePagination?: boolean;
   /** Explicit pagination mode: `"server"` (default with onQueryChange) or `"client"`. */
   paginationMode?: "client" | "server";
+  /**
+   * Row fields the client-side global search looks at.
+   *
+   * Defaults to the currently VISIBLE, non-structural columns, so every match
+   * is one the user can actually see. Pass an explicit list to search fields
+   * the grid does not render (or to keep a field searchable while hidden).
+   * Server mode ignores this — the server owns its own search.
+   */
+  searchableFields?: (keyof TData & string)[];
   /** Accessible name for the table. Also the default export file name and sheet title. */
   caption: string;
 
@@ -158,8 +168,15 @@ export interface TableXProps<TData> {
   showSerialNumber?: boolean;
   /** File name prefix, without extension. Default: the caption, lower-cased and underscored. */
   exportFileName?: string;
-  /** Take over exporting entirely; when set, the grid's own export flow never runs. */
-  onExportAll?: () => void | Promise<void>;
+  /**
+   * Take over exporting entirely; when set, the grid's own export flow never runs.
+   *
+   * Receives the format the user picked, so one handler can still honour the
+   * three menu items ({@link ExportFormat}) rather than collapsing them into a
+   * single hard-coded output. Existing zero-argument handlers keep working —
+   * an unused parameter is source-compatible.
+   */
+  onExportAll?: (format: ExportFormat) => void | Promise<void>;
   /**
    * Endpoint used to fetch the full filtered dataset for export when the current
    * page is only part of it.

@@ -9,6 +9,7 @@ import {
   toExportColumns,
   getCellText,
   DEFAULT_BADGE_RULES,
+  EXPORT_FORMATS,
   filePrefixFromCaption,
   timestampedFilename,
 } from "../dist/index.js";
@@ -152,4 +153,10 @@ test("file naming is slug-safe and dated", () => {
     timestampedFilename("students", new Date("2026-08-24T10:30:00Z")),
     "students_export_2026-08-24",
   );
+});
+
+test("every export menu destination is named by ExportFormat", () => {
+  // A host that takes the export over is handed one of these; the menu and the
+  // union must not drift apart.
+  assert.deepEqual([...EXPORT_FORMATS], ["excel", "csv", "clipboard"]);
 });
