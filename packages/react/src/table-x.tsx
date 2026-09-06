@@ -284,6 +284,28 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const rows = isClientSide ? (clientPaged?.items ?? data) : data;
   const total = isClientSide ? (clientPaged?.total ?? data.length) : (totalProp ?? data.length);
 
+  /**
+   * Which `storageKey` has been read back into state.
+   *
+   * Persistence is a load-then-save cycle, and the two halves must not land in
+   * the same commit. The restore effect applies its values through `setState`,
+   * so a save effect running in that same commit still closes over the INITIAL
+   * density and columns and writes them straight back over the snapshot it just
+   * read. StrictMode double-invokes effects, which makes it fire on every mount,
+   * so a page reload always converged on the initial state and the user's choice
+   * looked as though it had never been saved.
+   *
+   * This is state and not a ref on purpose: a ref flips synchronously, and the
+   * save effect running later in the SAME commit would still see stale values.
+   * A state flag defers the first save to the next render, by which point the
+   * restored values are live.
+   *
+   * It holds the key rather than a boolean so a grid whose `storageKey` changes
+   * re-arms — otherwise the outgoing grid's state is written under the incoming
+   * key before that key has been read.
+   */
+  const [hydratedKey, setHydratedKey] = React.useState<string | null>(null);
+
   // Restore persisted state on mount
   React.useEffect(() => {
     if (!storageKey) return;
@@ -317,11 +339,19 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         }
       }
     }
+    // Arms the save effect — see `hydratedKey`. Set even when nothing was
+    // stored: a first-time grid has still been "read", and its state should
+    // start being persisted from here on.
+    setHydratedKey(storageKey);
   }, [storageKey, columns]);
 
   // Persist state changes
   React.useEffect(() => {
     if (!storageKey) return;
+    // Not yet read back, or read under a different key. Saving now would
+    // overwrite the stored snapshot with whatever this grid happens to be
+    // showing before the restore has been applied.
+    if (hydratedKey !== storageKey) return;
     const hiddenList = Object.entries(hiddenCols)
       .filter(([_, isHidden]) => isHidden)
       .map(([id]) => id);
@@ -331,7 +361,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       columnOrder: colList.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
     });
-  }, [storageKey, density, hiddenCols, colList, colWidths]);
+  }, [storageKey, hydratedKey, density, hiddenCols, colList, colWidths]);
 
   const columnsMenu = useDropdown();
   const densityMenu = useDropdown();

@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-06
+
+### Fixed
+
+- **@nexgrid/react** — `storageKey` persistence no longer discards the state it
+  had just restored. The restore effect applies its values through `setState`,
+  so the save effect — running in the same commit — still closed over the
+  INITIAL density and columns and wrote them straight back over the snapshot it
+  had only just read. React StrictMode double-invokes effects, so in a
+  development build this fired on every mount and the stored snapshot was
+  overwritten with defaults before the user ever saw it.
+
+  The visible symptom: density and hidden columns survived an in-page remount
+  (a tab switch, a route change) but were silently lost on a page RELOAD, which
+  is the case users actually notice — and `localStorage` was left holding the
+  defaults, so it looked as though the choice had never been saved at all.
+
+  Saving is now gated until the stored state has been read back into a rendered
+  commit. The gate holds the key rather than a boolean, so a grid whose
+  `storageKey` changes re-arms instead of writing the outgoing grid's state
+  under the incoming key.
+
+  No API change — `storageKey` now behaves the way it was already documented to.
+
 ## [0.3.0] - 2026-09-06
 
 ### Added

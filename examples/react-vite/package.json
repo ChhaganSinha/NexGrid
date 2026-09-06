@@ -1,6 +1,6 @@
 {
   "name": "tablex-example-react-vite",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "TableX + React + Vite: a controlled grid driven by an in-memory mock API that honours QueryState.",
   "type": "module",
