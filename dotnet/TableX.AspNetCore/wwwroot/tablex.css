@@ -8,6 +8,13 @@
    host app can re-skin the grid by overriding tokens — no class overrides
    needed. Dark mode: add `.tbx-dark` on the root (or any ancestor), or use
    `.tbx-auto` to follow the OS preference.
+
+   Direction: anything that means "the reading-order start/end" uses logical
+   properties (`inset-inline-*`, `padding-inline-*`, `text-align: start`) so a
+   host that sets `dir="rtl"` gets a mirrored grid for free. The handful of
+   places that stay physical are commented where they appear — they are either
+   direction-neutral geometry (a checkmark glyph, a downward shadow) or paired
+   with a physical offset computed in the adapter (pinned columns).
    ========================================================================== */
 
 .tbx-root {
@@ -257,7 +264,11 @@
     gap: 6px;
   }
 
-  /* Compact square icon-only buttons on narrow mobile screens */
+  /* Compact square icon-only buttons on narrow mobile screens.
+     The rule below hides each button's visible label, which is exactly why the
+     toolbar buttons carry an `aria-label` in every adapter: the accessible name
+     must not depend on that span being rendered. A host theme that wants an
+     icon-only toolbar at every width can hide the same span safely. */
   .tbx-toolbar .tbx-btn {
     width: 36px;
     height: 36px;
@@ -277,7 +288,8 @@
   .tbx-toolbar .tbx-select {
     height: 36px;
     font-size: 12px;
-    padding: 0 24px 0 8px;
+    padding-block: 0;
+    padding-inline: 8px 24px;
     max-width: 130px;
   }
 }
@@ -306,7 +318,7 @@
 
 .tbx-search-icon {
   position: absolute;
-  left: 11px;
+  inset-inline-start: 11px;
   top: 50%;
   transform: translateY(-50%);
   width: 15px;
@@ -318,7 +330,9 @@
 .tbx-search-input {
   height: 36px;
   width: 100%;
-  padding: 0 30px 0 34px;
+  /* Room for the leading magnifier (start) and the trailing clear button (end). */
+  padding-block: 0;
+  padding-inline: 34px 30px;
   font-size: 13px;
   font-family: inherit;
   color: var(--tbx-fg);
@@ -346,7 +360,7 @@
 
 .tbx-search-clear {
   position: absolute;
-  right: 8px;
+  inset-inline-end: 8px;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
@@ -433,7 +447,9 @@
   display: inline-flex;
   align-items: center;
   height: 36px;
-  padding: 0 28px 0 12px;
+  /* Trailing room for the painted chevron below. */
+  padding-block: 0;
+  padding-inline: 12px 28px;
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -460,6 +476,13 @@
 .tbx-select:hover {
   background-color: var(--tbx-card-2);
   border-color: #94a3b8;
+}
+
+/* `background-position` has no logical form, so the chevron needs an explicit
+   flip: under RTL the select's trailing edge is on the left. */
+[dir="rtl"] .tbx-select,
+.tbx-select[dir="rtl"] {
+  background-position: left 8px center;
 }
 
 .btn-action,
@@ -508,10 +531,13 @@
   display: inline-flex;
 }
 
+/* Anchored to the trigger's inline START edge. Logical, not `left`: the
+   toolbar's end group flips sides under `dir="rtl"`, and a physically-anchored
+   panel would then hang off the opposite edge of the viewport. */
 .tbx-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  inset-inline-start: 0;
   z-index: 50;
   min-width: 208px;
   padding: 6px;
@@ -521,9 +547,11 @@
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
+/* Re-anchored to the trigger's inline END edge (the export menu, which sits
+   last in the toolbar and would otherwise overflow the container). */
 .tbx-menu--end {
-  left: auto;
-  right: 0;
+  inset-inline-start: auto;
+  inset-inline-end: 0;
   min-width: 224px;
 }
 
@@ -550,7 +578,7 @@
   padding: 8px 10px;
   font-size: 13px;
   font-family: inherit;
-  text-align: left;
+  text-align: start;
   color: var(--tbx-fg);
   background: transparent;
   border: 0;
@@ -643,7 +671,7 @@
 
 .tbx-table {
   width: 100%;
-  text-align: left;
+  text-align: start;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
@@ -656,7 +684,8 @@
 
 .tbx-th {
   position: relative;
-  padding: 10px 10px 10px 14px;
+  padding: 10px;
+  padding-inline-start: 14px;
   font-size: 13px;
   font-weight: 600;
   color: var(--tbx-fg);
@@ -688,7 +717,7 @@
   letter-spacing: 0.02em;
   background: var(--tbx-card-2);
   border-bottom: 1px solid var(--tbx-border);
-  border-right: 1px solid var(--tbx-border);
+  border-inline-end: 1px solid var(--tbx-border);
   padding: 8px 12px;
 }
 
@@ -778,7 +807,7 @@
 .tbx-col-filter-wrap {
   position: relative;
   display: inline-flex;
-  margin-left: auto;
+  margin-inline-start: auto;
   flex-shrink: 0;
 }
 
@@ -789,7 +818,7 @@
   width: 20px;
   height: 20px;
   padding: 0;
-  margin-right: -4px;
+  margin-inline-end: -4px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
@@ -820,7 +849,7 @@
 .tbx-filter-popover {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 50;
   min-width: 200px;
   max-width: min(280px, calc(100vw - 24px));
@@ -829,7 +858,7 @@
   border-radius: var(--tbx-radius-sm);
   box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   padding: 8px;
-  text-align: left;
+  text-align: start;
 }
 
 .tbx-filter-popover-input {
@@ -952,14 +981,16 @@
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.04em;
-  margin-right: 4px;
+  margin-inline-end: 4px;
 }
 
 .tbx-filter-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px 3px 10px;
+  /* Tighter on the trailing edge, where the remove button sits. */
+  padding-block: 3px;
+  padding-inline: 10px 8px;
   background: var(--tbx-card);
   border: 1px solid var(--tbx-border);
   border-radius: 9999px;
@@ -990,7 +1021,7 @@
   width: 16px;
   height: 16px;
   padding: 0;
-  margin-left: 2px;
+  margin-inline-start: 2px;
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -1040,7 +1071,7 @@
 .tbx-resize-handle {
   position: absolute;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   width: 8px;
   cursor: col-resize;
@@ -1054,7 +1085,7 @@
   position: absolute;
   top: 20%;
   bottom: 20%;
-  right: 3px;
+  inset-inline-end: 3px;
   width: 2px;
   background: var(--tbx-border);
   opacity: 0;
@@ -1177,6 +1208,9 @@
   border-color: var(--tbx-primary);
 }
 
+/* Deliberately physical: these two rules centre a tick / a dot inside the
+   18px box. The glyphs are direction-neutral — a checkmark is not mirrored in
+   RTL — so `inset-inline-start` would only move them off-centre. */
 .tbx-checkbox:checked::after {
   content: "";
   position: absolute;
@@ -1462,7 +1496,7 @@
 @media (min-width: 768px) {
   .tbx-range {
     justify-content: flex-start;
-    text-align: left;
+    text-align: start;
   }
 }
 
@@ -1478,7 +1512,7 @@
 .tbx-selected-badge {
   display: inline-flex;
   align-items: center;
-  margin-left: 8px;
+  margin-inline-start: 8px;
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 12px;
@@ -1608,6 +1642,13 @@
   background: transparent;
 }
 
+/* The prev/next chevrons are drawn pointing left/right, which is backwards
+   once the page reads right-to-left. Mirror the glyph rather than shipping a
+   second icon per adapter. */
+[dir="rtl"] .tbx-page-nav > svg {
+  transform: scaleX(-1);
+}
+
 .tbx-page-ellipsis {
   padding: 0 4px;
   color: #9ca3af;
@@ -1684,6 +1725,11 @@
   text-align: center;
 }
 
+/* Deliberately physical: `.tbx-align-right` is a public utility, and its twin
+   `meta.align: "right"` in the column API, both of which promise a physical
+   edge. Silently making them mean "inline end" would flip a consumer's
+   right-aligned currency column the day they set `dir="rtl"`. Anything that
+   should follow reading order uses `text-align: start | end` instead. */
 .tbx-align-right {
   text-align: right;
 }
@@ -1693,7 +1739,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  text-align: left;
+  text-align: start;
 }
 
 .avatar,
@@ -1712,7 +1758,7 @@
   display: inline-flex;
   flex-direction: column;
   line-height: 1.3;
-  text-align: left;
+  text-align: start;
 }
 
 .cell-stack strong,
@@ -1861,7 +1907,13 @@
    Enterprise Features
    ========================================================================== */
 
-/* ---- Pinned / Sticky Columns ---- */
+/* ---- Pinned / Sticky Columns ----
+   Deliberately physical. The adapters compute each pinned column's cumulative
+   offset in JS and write it as an inline `left` / `right`; converting only the
+   rules below to `inset-inline-*` would leave the two fighting under RTL (the
+   sheet pinning to one edge, the inline style to the other). Pinning follows
+   the physical `pin: "left" | "right"` column API, so it stays physical until
+   that API grows start/end values and the adapters emit logical offsets. */
 .tbx-th--pinned-left,
 .tbx-td--pinned-left {
   position: sticky !important;
@@ -1884,6 +1936,8 @@
   background-color: var(--tbx-card-2);
 }
 
+/* Physical by necessity: `box-shadow` offsets have no logical form, and these
+   two shadows sit on the physically pinned edges above. */
 .tbx-pinned-border-left {
   box-shadow: inset -1px 0 0 var(--tbx-border), 4px 0 8px -3px rgba(0, 0, 0, 0.08);
 }
@@ -2004,6 +2058,16 @@
   transform: rotate(90deg);
 }
 
+/* Collapsed, the disclosure chevron points along the reading direction; open,
+   it points down. Under RTL both halves have to mirror. */
+[dir="rtl"] .tbx-expand-btn > svg {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .tbx-expand-btn--open {
+  transform: rotate(-90deg);
+}
+
 .tbx-expanded-row {
   background-color: #f8fafc;
 }
@@ -2044,7 +2108,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--tbx-muted-fg);
-  margin-right: 4px;
+  margin-inline-end: 4px;
 }
 
 /* ---- Range Filters ---- */
@@ -2088,6 +2152,9 @@
   cursor: grabbing;
 }
 
+/* Physical by necessity again — `box-shadow` has no logical offset. The two
+   classes name the physical edge the drop indicator is painted on, and the
+   adapter picks between them from the pointer's own physical position. */
 .tbx-th--drag-over-left {
   box-shadow: inset 3px 0 0 var(--tbx-primary) !important;
 }

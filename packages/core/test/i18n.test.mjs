@@ -39,3 +39,18 @@ test("an unknown placeholder is left intact rather than blanked", () => {
 test("a message with no placeholders is returned unchanged", () => {
   assert.equal(formatMessage("No records found.", {}), "No records found.");
 });
+
+test("resetView is a real key, not an adapter's hardcoded English", () => {
+  assert.equal(typeof DEFAULT_LOCALE.resetView, "string");
+  assert.equal(resolveLocale({ resetView: "Réinitialiser la vue" }).resetView, "Réinitialiser la vue");
+});
+
+test("resolveLocale fills in optional keys so adapters can read them unconditionally", () => {
+  // `resetView` is optional on the interface (added after the contract shipped),
+  // but a resolved locale must still carry every key.
+  const resolved = resolveLocale({ emptyText: "Nichts" });
+
+  for (const key of Object.keys(DEFAULT_LOCALE)) {
+    assert.equal(typeof resolved[key], "string", `${key} must survive resolution`);
+  }
+});

@@ -17,6 +17,7 @@ import {
   computeAggregation,
   initialHiddenColumns,
   visibleColumns,
+  searchableColumnIds,
 } from "../dist/index.js";
 
 test("column id prefers id, then accessorKey", () => {
@@ -109,4 +110,57 @@ test("visibleColumns filters by the hidden map and keeps unnamed columns", () =>
   const visible = visibleColumns(columns, { email: true });
 
   assert.deepEqual(visible.map(getColumnId), ["name", ""]);
+});
+
+test("searchableColumnIds lists the fields a user can actually see", () => {
+  const columns = [
+    { id: "select" },
+    { accessorKey: "name" },
+    { accessorKey: "email" },
+    { accessorKey: "secret" },
+    { id: "actions" },
+    {},
+  ];
+
+  // Structural columns, unnamed columns and hidden columns hold nothing the
+  // user could point at, so a search hit on them would be unexplainable.
+  assert.deepEqual(searchableColumnIds(columns, { secret: true }), ["name", "email"]);
+  assert.deepEqual(searchableColumnIds(columns), ["name", "email", "secret"]);
+});
+
+test("searchableColumnIds descends into header groups", () => {
+  const columns = [
+    { accessorKey: "name" },
+    { header: "Contact", columns: [{ accessorKey: "email" }, { accessorKey: "phone" }] },
+  ];
+
+  assert.deepEqual(searchableColumnIds(columns), ["name", "email", "phone"]);
+  assert.deepEqual(searchableColumnIds(columns, { phone: true }), ["name", "email"]);
+});
+
+test("searchableColumnIds is empty when nothing is on screen", () => {
+  assert.deepEqual(searchableColumnIds([]), []);
+  assert.deepEqual(searchableColumnIds([{ accessorKey: "name" }], { name: true }), []);
+});
+
+test("searchableColumnIds returns the ROW FIELD when the id is a display slug", () => {
+  // `getColumnId` prefers `id`, so a column written the TanStack way —
+  // a slug id over the property it reads — would otherwise contribute
+  // "lastLogin", a key no row carries. The column is on screen; confining the
+  // search to a key that resolves to `undefined` would make a visible column
+  // silently unsearchable, which is exactly the failure the narrow default
+  // exists to avoid.
+  const columns = [
+    { id: "select" },
+    { id: "fullName", accessorKey: "fullName" },
+    { id: "lastLogin", accessorKey: "lastLoginAt" },
+    // Composed cell with no accessorKey: the id is all there is, and no row
+    // field backs it. It stays in the list (it is a visible column) but a host
+    // that needs it searchable names the real fields via `searchableFields`.
+    { id: "location", header: "Location" },
+  ];
+
+  assert.deepEqual(searchableColumnIds(columns), ["fullName", "lastLoginAt", "location"]);
+  // Hiding still keys on the column ID, not the field it resolves to.
+  assert.deepEqual(searchableColumnIds(columns, { lastLogin: true }), ["fullName", "location"]);
 });

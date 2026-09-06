@@ -38,6 +38,7 @@ export {
   computeAggregation,
   isStructuralColumn,
   isGroupColumn,
+  searchableColumnIds,
   initialHiddenColumns,
   visibleColumns,
   flattenColumns,
@@ -85,6 +86,8 @@ export { fetchAllPages, MAX_PAGE_SIZE, DEFAULT_ROW_CAP } from "./fetch-all-pages
 export type { AllPages } from "./fetch-all-pages.js";
 
 // Export engine
+export { EXPORT_FORMATS } from "./export/format.js";
+export type { ExportFormat, NexGridExportFormat } from "./export/format.js";
 export { toExportColumns } from "./export/columns.js";
 export type { ExportColumn } from "./export/columns.js";
 export { toCsv, downloadCsv } from "./export/csv.js";

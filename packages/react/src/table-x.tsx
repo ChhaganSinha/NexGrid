@@ -58,11 +58,13 @@ import {
   getCellValue,
   getCellText,
   queryClientData,
+  searchableColumnIds,
   defaultQuery,
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
   type Density,
+  type ExportFormat,
   type PagedResponse,
   type TableXColumn,
   type QueryState,
@@ -152,6 +154,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     onQueryChange: onQueryChangeProp,
     clientSidePagination,
     paginationMode,
+    searchableFields,
     caption,
     density: initialDensity = "default",
     isLoading = false,
@@ -218,13 +221,6 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     [onQueryChangeProp],
   );
 
-  const clientPaged = React.useMemo(() => {
-    if (!isClientSide) return null;
-    return queryClientData(data, query);
-  }, [isClientSide, data, query]);
-
-  const rows = isClientSide ? (clientPaged?.items ?? data) : data;
-  const total = isClientSide ? (clientPaged?.total ?? data.length) : (totalProp ?? data.length);
   const locale = resolveLocale(localeOverrides);
   const boolLabels = { yes: locale.booleanYes, no: locale.booleanNo };
 
@@ -255,6 +251,38 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+
+  // ---- Client-side dataset ------------------------------------------------
+  //
+  // Declared after the column state because the search has to know which
+  // columns are on screen: without a field list the engine matches every
+  // property on the row, so a row's `id` GUID or a `tenantId` the grid never
+  // renders makes "5" or "ab" match almost everything, with nothing on screen
+  // to explain the hit. A host that really does want to search unrendered
+  // fields says so with `searchableFields`.
+  const clientSearchFields = React.useMemo<(keyof TData & string)[]>(
+    // `searchableColumnIds` returns row properties (a column's `accessorKey`,
+    // falling back to its id), which the column type cannot state for the
+    // compiler — hence the narrowing cast.
+    () => searchableFields ?? (searchableColumnIds(colList, hiddenCols) as (keyof TData & string)[]),
+    [searchableFields, colList, hiddenCols],
+  );
+
+  const clientQueryOptions = React.useMemo(
+    // An empty list means "search everything" to the engine, so only pass one
+    // when it has entries — with no visible column there is nothing to narrow
+    // to anyway, and the old behaviour is the safer fallback.
+    () => (clientSearchFields.length > 0 ? { searchableFields: clientSearchFields } : undefined),
+    [clientSearchFields],
+  );
+
+  const clientPaged = React.useMemo(() => {
+    if (!isClientSide) return null;
+    return queryClientData(data, query, clientQueryOptions);
+  }, [isClientSide, data, query, clientQueryOptions]);
+
+  const rows = isClientSide ? (clientPaged?.items ?? data) : data;
+  const total = isClientSide ? (clientPaged?.total ?? data.length) : (totalProp ?? data.length);
 
   // Restore persisted state on mount
   React.useEffect(() => {
@@ -530,12 +558,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   // ---- Export --------------------------------------------------------------
 
-  const handleExport = async (format: "excel" | "csv" | "clipboard"): Promise<void> => {
+  const handleExport = async (format: ExportFormat): Promise<void> => {
     exportMenu.close();
 
     if (onExportAll) {
       try {
-        await onExportAll();
+        // The user picked one of three menu items; a handler that cannot see
+        // which one has to guess, and every format silently becomes the same file.
+        await onExportAll(format);
       } catch (err) {
         notify("error", err instanceof Error ? err.message : "Export failed");
       }
@@ -559,7 +589,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         });
         exportRows = full.items;
       } else if (isClientSide) {
-        const full = queryClientData(data, query, { paginate: false });
+        // Same searchable set as the on-screen page, or the export would carry
+        // rows the grid never matched (or drop rows it did).
+        const full = queryClientData(data, query, { ...clientQueryOptions, paginate: false });
         exportRows = full.items;
       }
 
@@ -786,8 +818,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               ) : (
                 <ArrowUpDownIcon className="tbx-sort-icon tbx-sort-icon--idle" />
               )}
+              {/* The rank badge is hidden from AT on purpose. It is a bare
+                  digit sitting inside the header cell, so it would otherwise be
+                  read as part of the column name ("Name 2"). The sort state
+                  itself is already exposed properly, via `aria-sort` on the th. */}
               {query.sort.length > 1 && sortIndex >= 0 ? (
-                <span className="tbx-sort-order">{sortIndex + 1}</span>
+                <span className="tbx-sort-order" aria-hidden="true">
+                  {sortIndex + 1}
+                </span>
               ) : null}
             </span>
           ) : null}
@@ -815,12 +853,15 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   className="tbx-filter-popover"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {/* The placeholder is only a last-resort accessible name, and
+                      it disappears the moment the user types. Name it outright. */}
                   <input
                     autoFocus
                     type="text"
                     className="tbx-filter-popover-input"
                     defaultValue={activeFilter ?? ""}
                     placeholder={`Filter by ${title}...`}
+                    aria-label={`Filter by ${title}`}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -910,6 +951,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           ) : null}
         </div>
 
+        {/* Each trigger below carries an `aria-label` that repeats its visible
+            label. That is not redundant: the label lives in a plain <span>, and
+            hiding that span is the normal way to get an icon-only toolbar —
+            the grid's own stylesheet does it under 640px. Without the label the
+            button's accessible name would simply disappear at that breakpoint,
+            leaving a screen reader with an unnamed control. The strings match
+            the visible text exactly so voice control still matches on them. */}
         <div className="tbx-toolbar-group tbx-toolbar-group--end">
           {isColumnsVisible ? (
             <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
@@ -920,6 +968,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 ref={columnsMenu.triggerRef}
                 aria-haspopup="menu"
                 aria-expanded={columnsMenu.isOpen}
+                aria-label={locale.columnsButton}
                 onClick={columnsMenu.toggle}
               >
                 <ColumnsIcon className="tbx-icon" />
@@ -955,7 +1004,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                       role="menuitem"
                       onClick={handleResetView}
                     >
-                      <span>Reset to default view</span>
+                      <span>{locale.resetView}</span>
                     </button>
                   </>
                 ) : null}
@@ -973,6 +1022,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 ref={densityMenu.triggerRef}
                 aria-haspopup="menu"
                 aria-expanded={densityMenu.isOpen}
+                aria-label={formatMessage(locale.densityButton, { density })}
                 onClick={densityMenu.toggle}
               >
                 <DensityIcon className="tbx-icon" />
@@ -1011,6 +1061,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 disabled={isExporting}
                 aria-haspopup="menu"
                 aria-expanded={exportMenu.isOpen}
+                aria-label={isExporting ? locale.exportingButton : locale.exportButton}
                 onClick={exportMenu.toggle}
               >
                 <DownloadTrayIcon className="tbx-icon" />
@@ -1421,6 +1472,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                                   <button
                                     type="button"
                                     className="tbx-cell-edit-btn tbx-cell-edit-btn--save"
+                                    aria-label="Save"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const el = document.getElementById(`${instanceId}-edit-${id}-${colId}`) as HTMLInputElement | HTMLSelectElement | null;
@@ -1438,6 +1490,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                                   <button
                                     type="button"
                                     className="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
+                                    aria-label="Cancel"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setEditingCell(null);

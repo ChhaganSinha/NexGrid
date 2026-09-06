@@ -39,6 +39,9 @@ export type {
   PagedResponse,
   Density,
   ExcelBadgeRule,
+  // Named so a host can type its own `onExportAll` handler.
+  ExportFormat,
+  NexGridExportFormat,
 } from "@nexgrid/core";
 
 export { useClientTableX, useClientNexGrid } from "./use-client-table-x.js";

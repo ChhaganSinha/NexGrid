@@ -1,6 +1,6 @@
 {
   "name": "@nexgrid/core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Framework-agnostic engine for TableX: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
   "license": "MIT",
   "author": "Chhagan Sinha <sinhachhagan@outlook.com>",

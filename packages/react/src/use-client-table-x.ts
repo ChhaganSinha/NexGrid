@@ -19,6 +19,11 @@ export type UseClientNexGridOptions<TData> = UseClientTableXOptions<TData>;
  * Automatically manages search, sorting, column filtering, and pagination
  * over a client-side dataset array.
  *
+ * The hook never sees the column set, so its search still matches every
+ * property on the row — an `id` GUID included. Pass `searchableFields` to
+ * confine it to what the grid displays; `<TableX />`'s own client mode does
+ * that by default because there it can read the columns.
+ *
  * @example
  * ```tsx
  * export function StudentsGrid({ allStudents }: { allStudents: Student[] }) {

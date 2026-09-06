@@ -46,10 +46,21 @@ export interface TableXLocale {
   exportNoData: string;
   exportExcelSuccess: string;
   exportCsvSuccess: string;
+  /**
+   * Label of the "reset the view" item in the Columns menu.
+   *
+   * Optional because it was added after the contract shipped: every field above
+   * is required, so a consumer who annotates a complete `TableXLocale` object
+   * would stop compiling the day a required key appears. `resolveLocale` fills
+   * it in from {@link DEFAULT_LOCALE}, so adapters can read it unconditionally.
+   */
+  resetView?: string;
 }
 export type NexGridLocale = TableXLocale;
 
-export const DEFAULT_LOCALE: TableXLocale = {
+// Typed `Required<>` so that reading an optional key off the defaults yields a
+// string rather than `string | undefined`.
+export const DEFAULT_LOCALE: Required<TableXLocale> = {
   searchPlaceholder: "Search records…",
   clearSearch: "Clear search",
   columnsButton: "Columns",
@@ -93,10 +104,15 @@ export const DEFAULT_LOCALE: TableXLocale = {
   exportNoData: "No data available to export.",
   exportExcelSuccess: "Exported {count} formatted records to Excel (.xls)",
   exportCsvSuccess: "Exported {count} raw records to CSV (.csv)",
+  resetView: "Reset to default view",
 };
 
-/** Merge a partial locale over the defaults. */
-export function resolveLocale(partial?: Partial<TableXLocale>): TableXLocale {
+/**
+ * Merge a partial locale over the defaults. The result is `Required<>`: every
+ * key — including the optional ones — is present, so adapters never have to
+ * re-apply a fallback at the render site.
+ */
+export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXLocale> {
   return partial ? { ...DEFAULT_LOCALE, ...partial } : DEFAULT_LOCALE;
 }
 
