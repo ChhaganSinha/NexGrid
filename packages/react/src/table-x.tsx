@@ -704,6 +704,23 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const exportButtonId = `${instanceId}-export`;
   const jumpInputId = `${instanceId}-jump`;
   const rootRef = React.useRef<HTMLDivElement>(null);
+  const tableWrapRef = React.useRef<HTMLDivElement>(null);
+  const prevHeightRef = React.useRef<number>(0);
+
+  React.useLayoutEffect(() => {
+    if (typeof window === "undefined" || !tableWrapRef.current) return;
+    if (isLoading) {
+      if (prevHeightRef.current > 0) {
+        tableWrapRef.current.style.minHeight = `${prevHeightRef.current}px`;
+      }
+    } else {
+      const h = tableWrapRef.current.getBoundingClientRect().height;
+      if (h > 0) {
+        prevHeightRef.current = h;
+      }
+      tableWrapRef.current.style.minHeight = "";
+    }
+  }, [isLoading, rows.length]);
 
   const notify = (type: TableXNoticeType, message: string): void => {
     onNotify?.({ type, message });
@@ -1612,7 +1629,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       ) : null}
 
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
-      <div className="tbx-table-wrap">
+      <div ref={tableWrapRef} className="tbx-table-wrap">
         <table className="tbx-table" aria-label={caption}>
           <thead>
             <tr>
@@ -2093,7 +2110,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   type="button"
                   className="tbx-page-nav"
                   disabled={currentPage <= 1}
-                  onClick={() => onQueryChange(withPage(query, currentPage - 1, totalPages))}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onQueryChange(withPage(query, currentPage - 1, totalPages));
+                  }}
                   aria-label={locale.previousPage}
                 >
                   <ChevronLeftIcon size={16} />
@@ -2112,7 +2133,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                       className={
                         item === currentPage ? "tbx-page-btn tbx-page-btn--current" : "tbx-page-btn"
                       }
-                      onClick={() => onQueryChange(withPage(query, item, totalPages))}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onQueryChange(withPage(query, item, totalPages));
+                      }}
                       aria-label={formatMessage(locale.pageLabel, { page: item })}
                       aria-current={item === currentPage ? "page" : undefined}
                     >
@@ -2125,7 +2150,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   type="button"
                   className="tbx-page-nav"
                   disabled={currentPage >= totalPages}
-                  onClick={() => onQueryChange(withPage(query, currentPage + 1, totalPages))}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onQueryChange(withPage(query, currentPage + 1, totalPages));
+                  }}
                   aria-label={locale.nextPage}
                 >
                   <ChevronRightIcon size={16} />

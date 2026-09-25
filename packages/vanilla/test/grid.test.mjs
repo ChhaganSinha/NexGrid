@@ -9,15 +9,37 @@ class MockNode {
     this.parentNode = null;
     this.listeners = new Map();
     this.attributes = new Map();
-    this.style = {
-      _styles: new Map(),
-      setProperty(k, v) {
-        this._styles.set(k, v);
+    this.style = new Proxy(
+      {
+        _styles: new Map(),
+        setProperty(k, v) {
+          this._styles.set(k, v);
+        },
+        getPropertyValue(k) {
+          return this._styles.get(k);
+        },
       },
-      getPropertyValue(k) {
-        return this._styles.get(k);
+      {
+        get(target, prop) {
+          if (prop in target) return target[prop];
+          const kebab = String(prop).replace(/([A-Z])/g, "-$1").toLowerCase();
+          return target._styles.get(kebab) ?? "";
+        },
+        set(target, prop, value) {
+          if (prop in target) {
+            target[prop] = value;
+            return true;
+          }
+          const kebab = String(prop).replace(/([A-Z])/g, "-$1").toLowerCase();
+          if (value === "" || value === null || value === undefined) {
+            target._styles.delete(kebab);
+          } else {
+            target._styles.set(kebab, String(value));
+          }
+          return true;
+        },
       },
-    };
+    );
     this.classList = {
       _classes: new Set(),
       add: (...cls) => {
@@ -137,6 +159,10 @@ class MockNode {
     if (k === "class") {
       this.classList._classes = new Set(String(v).split(/\s+/).filter(Boolean));
     }
+    if (k.startsWith("data-")) {
+      const camel = k.slice(5).replace(/-([a-z])/g, (_, g) => g.toUpperCase());
+      this.dataset[camel] = String(v);
+    }
   }
 
   getAttribute(k) {
@@ -218,6 +244,15 @@ class MockElement extends MockNode {
   click() {
     this.dispatchEvent(new MockMouseEvent("click"));
   }
+  focus(options) {
+    if (globalThis.document) {
+      globalThis.document.activeElement = this;
+    }
+    this.lastFocusOptions = options;
+  }
+  getBoundingClientRect() {
+    return { width: 800, height: 600, top: 0, bottom: 600, left: 0, right: 800 };
+  }
 }
 class MockHTMLElement extends MockElement {}
 class MockSVGElement extends MockElement {}
@@ -226,6 +261,7 @@ class MockDocument extends MockNode {
   constructor() {
     super("#document");
     this.body = new MockHTMLElement("body");
+    this.activeElement = this.body;
     this.appendChild(this.body);
   }
 
@@ -788,6 +824,56 @@ test("createTableX supports client-side pagination and setData", () => {
   ]);
   const updatedRows = container.querySelectorAll(".tbx-row");
   assert.equal(updatedRows.length, 2, "Should render updated items");
+
+  handle.destroy();
+});
+
+test("pagination preserves focus with preventScroll and locks tableWrap minHeight during loading", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [{ accessorKey: "name", header: "Name" }];
+  const allItems = Array.from({ length: 30 }, (_, i) => ({
+    id: String(i + 1),
+    name: `User ${i + 1}`,
+  }));
+
+  const handle = createTableX(container, {
+    caption: "Scroll & Focus Test",
+    columns,
+    data: allItems,
+    clientSidePagination: true,
+    query: {
+      page: 1,
+      pageSize: 10,
+      sort: [],
+    },
+  });
+
+  const nextBtn = container.querySelector('[data-tbx-focus="page-next"]');
+  assert.ok(nextBtn, "Next button should exist");
+
+  // Focus the next button
+  nextBtn.focus();
+  assert.equal(document.activeElement, nextBtn, "Next button should be active element before click");
+
+  // Click next button
+  nextBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  // Next button should be re-focused after page update with preventScroll: true
+  const nextBtnAfter = container.querySelector('[data-tbx-focus="page-next"]');
+  assert.equal(document.activeElement, nextBtnAfter, "Next button should retain focus after page update");
+  assert.deepEqual(nextBtnAfter.lastFocusOptions, { preventScroll: true }, "Focus should be called with preventScroll: true");
+
+  // Test loading state height preservation
+  const tableWrap = container.querySelector(".tbx-table-wrap");
+  assert.ok(tableWrap, "tableWrap should exist");
+
+  handle.update({ isLoading: true });
+  assert.equal(tableWrap.style.minHeight, "600px", "tableWrap minHeight should be locked to prevent collapsing during loading");
+
+  handle.update({ isLoading: false });
+  assert.equal(tableWrap.style.minHeight, "", "tableWrap minHeight should be cleared after loading completes");
 
   handle.destroy();
 });

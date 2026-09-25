@@ -1102,7 +1102,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   class="tbx-page-nav"
                   [disabled]="currentPage <= 1"
                   [attr.aria-label]="strings.previousPage"
-                  (click)="goToPage(currentPage - 1)"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); goToPage(currentPage - 1)"
                 >
                   <svg
                     class="tbx-icon"
@@ -1128,7 +1128,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [class.tbx-page-btn--current]="item.current"
                       [attr.aria-current]="item.current ? 'page' : null"
                       [attr.aria-label]="item.label"
-                      (click)="goToPage(item.page)"
+                      (click)="$event.preventDefault(); $event.stopPropagation(); goToPage(item.page)"
                     >
                       {{ item.page }}
                     </button>
@@ -1139,7 +1139,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   class="tbx-page-nav"
                   [disabled]="currentPage >= totalPages"
                   [attr.aria-label]="strings.nextPage"
-                  (click)="goToPage(currentPage + 1)"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); goToPage(currentPage + 1)"
                 >
                   <svg
                     class="tbx-icon"

@@ -433,7 +433,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
       for (const size of PAGE_SIZES) {
         this.rowsSelect.appendChild(el("option", { attrs: { value: String(size) }, text: `${size} rows` }));
       }
-      this.rowsSelect.addEventListener("change", () => {
+      this.rowsSelect.addEventListener("change", (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (this.rowsSelect) {
           this.applyQuery(withPageSize(this.query, Number.parseInt(this.rowsSelect.value, 10)));
         }
@@ -464,6 +466,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       ]);
       jumpForm.addEventListener("submit", (event) => {
         event.preventDefault();
+        event.stopPropagation();
         this.submitJump();
       });
       this.jumpInput.addEventListener("blur", () => this.submitJump());
@@ -1009,6 +1012,24 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (this.destroyed) return;
 
     const focusKey = this.captureFocusKey();
+    const docEl = typeof document !== "undefined" ? document.documentElement : null;
+    const scrollY = typeof window !== "undefined" ? (window.scrollY ?? docEl?.scrollTop ?? 0) : 0;
+    const scrollX = typeof window !== "undefined" ? (window.scrollX ?? docEl?.scrollLeft ?? 0) : 0;
+
+    // Prevent table height from collapsing during loading to avoid viewport scroll clamping
+    if (this.isLoading) {
+      if (typeof this.tableWrap?.getBoundingClientRect === "function") {
+        const rect = this.tableWrap.getBoundingClientRect();
+        if (rect && rect.height > 0) {
+          this.tableWrap.style.minHeight = `${rect.height}px`;
+        }
+      }
+    } else {
+      if (this.tableWrap?.style?.minHeight) {
+        this.tableWrap.style.minHeight = "";
+      }
+    }
+
     this.root.dataset["density"] = this.density;
 
     if (this.isError) {
@@ -1032,11 +1053,27 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const wrap = this.openMenu === null ? null : this.menuWraps.get(this.openMenu);
       const first = wrap?.querySelector<HTMLElement>('[role^="menuitem"]');
       if (first) {
-        first.focus();
+        try {
+          first.focus({ preventScroll: true });
+        } catch {
+          first.focus();
+        }
         return;
       }
     }
     this.restoreFocus(focusKey);
+
+    // If DOM replacement or focus shift caused the window scroll position to jump, restore it
+    if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+      const currentScrollY = window.scrollY ?? docEl?.scrollTop ?? 0;
+      if (Math.abs(currentScrollY - scrollY) > 5) {
+        try {
+          window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" as ScrollBehavior });
+        } catch {
+          window.scrollTo(scrollX, scrollY);
+        }
+      }
+    }
   }
 
   /**
@@ -1222,15 +1259,28 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private captureFocusKey(): string | null {
     const active = document.activeElement;
     if (!(active instanceof HTMLElement) || !this.root.contains(active)) return null;
-    return active.dataset["nxgFocus"] ?? null;
+    return (
+      active.dataset["tbxFocus"] ??
+      active.getAttribute("data-tbx-focus") ??
+      active.dataset["nxgFocus"] ??
+      null
+    );
   }
 
   private restoreFocus(key: string | null): void {
     if (key === null) return;
     const candidates = this.root.querySelectorAll<HTMLElement>("[data-tbx-focus]");
     for (const candidate of Array.from(candidates)) {
-      if (candidate.dataset["nxgFocus"] === key) {
-        candidate.focus();
+      const match =
+        candidate.dataset["tbxFocus"] === key ||
+        candidate.getAttribute("data-tbx-focus") === key ||
+        candidate.dataset["nxgFocus"] === key;
+      if (match) {
+        try {
+          candidate.focus({ preventScroll: true });
+        } catch {
+          candidate.focus();
+        }
         return;
       }
     }
@@ -2777,9 +2827,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         },
         [glyph, el("span", { class: "tbx-sr-only", text: label })],
       );
-      button.addEventListener("click", () =>
-        this.applyQuery(withPage(this.query, target, totalPages)),
-      );
+      button.addEventListener("click", (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.applyQuery(withPage(this.query, target, totalPages));
+      });
       return button;
     };
 
@@ -2803,9 +2855,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         },
         text: String(item),
       });
-      button.addEventListener("click", () =>
-        this.applyQuery(withPage(this.query, item, totalPages)),
-      );
+      button.addEventListener("click", (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.applyQuery(withPage(this.query, item, totalPages));
+      });
       buttons.push(button);
     }
 
