@@ -306,13 +306,13 @@ export class StudentsGridComponent {
 
 ---
 
-### 3. ASP.NET Core (Razor Tag Helpers + EF Core)
+### 3. ASP.NET Core (Razor Tag Helpers & Blazor Components)
 
 ```bash
 dotnet add package TableX.AspNetCore
 ```
 
-**Controller / Minimal API Endpoint:**
+**Controller / Minimal API Endpoint (Shared):**
 ```csharp
 [HttpGet("/api/students")]
 public async Task<PagedResponse<Student>> Get([FromQuery] TableXQuery query, AppDbContext db)
@@ -327,7 +327,25 @@ public async Task<PagedResponse<Student>> Get([FromQuery] TableXQuery query, App
 }
 ```
 
-**Razor View (`.cshtml`):**
+<details open>
+<summary><b>Option A: Blazor (.NET 8 Server / WebAssembly / Auto)</b></summary>
+
+```razor
+@page "/students"
+@using TableX.AspNetCore.Components
+
+<TableX TItem="Student" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true" EnableExport="true">
+    <TableXColumn Field="name" Header="Name" MinWidth="180" />
+    <TableXColumn Field="email" Header="Email" />
+    <TableXColumn Field="status" Header="Status" Align="TableXColumnAlign.Center" Filterable="true" FilterOptions="Active,Pending,Suspended" />
+</TableX>
+```
+
+</details>
+
+<details>
+<summary><b>Option B: Razor MVC / Razor Pages (`.cshtml`)</b></summary>
+
 ```cshtml
 @using TableX.AspNetCore
 @addTagHelper *, TableX.AspNetCore
@@ -335,12 +353,14 @@ public async Task<PagedResponse<Student>> Get([FromQuery] TableXQuery query, App
 <link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
 <script src="@TableXAssets.ScriptPath"></script>
 
-<table-x caption="Students Directory" endpoint="/api/students" enable-selection="true">
+<table-x caption="Students Directory" endpoint="/api/students" enable-selection="true" enable-export="true">
     <table-x-column field="name" header="Name" min-width="180" />
     <table-x-column field="email" header="Email" />
-    <table-x-column field="status" header="Status" align="Center" />
+    <table-x-column field="status" header="Status" align="Center" filterable="true" filter-options="Active,Pending,Suspended" />
 </table-x>
 ```
+
+</details>
 
 ---
 

@@ -10,6 +10,7 @@ This directory contains complete, runnable example applications demonstrating Ne
 | 🅰️ [**`angular/`**](angular/) | **Angular 17+ (Standalone)** | Modern Angular standalone component using Signals, typed columns, and client/server pagination. |
 | 🍦 [**`vanilla-html/`**](vanilla-html/) | **Vanilla HTML / JS** | Zero-build HTML page using `<script src="tablex.global.js">` directly in the browser. |
 | 🔷 [**`aspnet-mvc/`**](aspnet-mvc/) | **ASP.NET Core MVC** | Tag Helpers `<table-x>` with EF Core query translation, sorting, and Excel export. |
+| ⚡ [**`blazor/`**](blazor/) | **Blazor (.NET 8 Server / WebAssembly)** | Native Blazor components `<TableX>` and `<TableXColumn>` with server query endpoint and Excel export. |
 
 ---
 

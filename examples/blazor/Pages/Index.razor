@@ -1,0 +1,33 @@
+@page "/"
+
+<PageTitle>TableX Blazor Example</PageTitle>
+
+<div class="container">
+    <h1>TableX — Blazor (.NET 8 Server / WebAssembly)</h1>
+    <p class="subtitle">
+        Native Blazor components (<code>&lt;TableX&gt;</code> and <code>&lt;TableXColumn&gt;</code>)
+        with zero-latency client-side interaction, 1-click full-dataset Excel export, and EF Core / LINQ server paging.
+    </p>
+
+    <TableX TItem="Employee"
+            Caption="Employees Directory"
+            Endpoint="/api/employees"
+            EnableSelection="true"
+            EnableExport="true"
+            PageSize="25">
+        <TableXColumn Field="id" Header="ID" Width="100" />
+        <TableXColumn Field="name" Header="Name" MinWidth="180" />
+        <TableXColumn Field="company" Header="Company" MinWidth="130"
+                     Filterable="true"
+                     FilterOptions="IPAI,CIS,NexGrid,Acme Corp" />
+        <TableXColumn Field="status" Header="Status" Align="TableXColumnAlign.Center" Width="140"
+                     Filterable="true"
+                     FilterOptions="Probation,Permanent,Temporary,Resigned,Consultant" />
+        <TableXColumn Field="department" Header="Department" MinWidth="140"
+                     Filterable="true"
+                     FilterOptions="Engineering,Marketing,Sales,Support,HR" />
+        <TableXColumn Field="mobile" Header="Mobile" Width="140" />
+        <TableXColumn Field="email" Header="Email" MinWidth="200" />
+        <TableXColumn Field="score" Header="Score" Align="TableXColumnAlign.Right" Width="90" />
+    </TableX>
+</div>

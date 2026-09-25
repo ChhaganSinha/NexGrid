@@ -359,6 +359,56 @@ public enum TableXTheme { Light, Dark, Auto }
 public enum TableXColumnAlign { Left, Center, Right }
 ```
 
+## Blazor components
+
+The package provides native Blazor components for .NET 8 / .NET 9 (Blazor Server, WebAssembly, or Auto):
+
+```razor
+@using TableX.AspNetCore.Components
+
+<TableX TItem="Student" Caption="Students Directory" Endpoint="/api/students" EnableSelection="true" EnableExport="true">
+    <TableXColumn Field="name" Header="Name" MinWidth="180" />
+    <TableXColumn Field="email" Header="Email" />
+    <TableXColumn Field="status" Header="Status" Align="TableXColumnAlign.Center" Filterable="true" FilterOptions="Active,Pending,Suspended" />
+    <TableXColumn Field="score" Header="Score" Align="TableXColumnAlign.Right" Width="90" />
+</TableX>
+```
+
+### `<TableX<TItem>>` Parameters
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Caption` | `string` | `""` | Accessible name and default export file prefix. Required. |
+| `Endpoint` | `string?` | `null` | API endpoint that accepts `TableXQuery` and returns `PagedResponse<TItem>`. |
+| `FetchEndpoint` | `string?` | `null` | Whole-dataset export endpoint. Defaults to `Endpoint`. |
+| `EnableSearch` | `bool` | `true` | Show the debounced global search input. |
+| `SearchPlaceholder` | `string?` | `null` | Placeholder text for the search field. |
+| `EnableSelection` | `bool` | `false` | Show row selection checkboxes. |
+| `EnableExport` | `bool` | `true` | Show the Excel/CSV 1-click export menu. |
+| `ExportFileName` | `string?` | `null` | File name for exported sheets (defaults to slug of `Caption`). |
+| `ShowSerialNumber` | `bool` | `true` | Show automatic `S.No.` column. |
+| `Density` | `TableXDensity` | `Default` | Row density: `Default`, `Compact`, or `Comfortable`. |
+| `Theme` | `TableXTheme` | `Light` | Theme: `Light`, `Dark`, or `Auto`. |
+| `AutoInit` | `bool` | `true` | Emit automatic client-side initialization script. |
+
+### `<TableXColumn>` Parameters
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Field` | `string` | `""` | JSON property name. Required. |
+| `Header` | `string?` | `null` | Header label text (defaults to capitalized `Field`). |
+| `Sortable` | `bool` | `true` | Clickable header to cycle sort. |
+| `Align` | `TableXColumnAlign` | `Left` | Alignment: `Left`, `Center`, or `Right`. |
+| `Width` | `int?` | `null` | Fixed width in pixels. |
+| `MinWidth` | `int?` | `null` | Minimum column width in pixels. |
+| `Flex` | `int?` | `null` | Proportional flex width unit. |
+| `Hidden` | `bool` | `false` | Start hidden (toggleable from Columns menu). |
+| `Hideable` | `bool` | `true` | Allow column to be toggled in Columns menu. |
+| `Exportable` | `bool` | `true` | Include in CSV and Excel exports. |
+| `Filterable` | `bool` | `false` | Enable 3-dot column filter popup (⋮). |
+| `FilterField` | `string?` | `null` | Query parameter name to send when different from `Field`. |
+| `FilterOptions` | `string?` | `null` | Comma-separated allowed filter dropdown values. |
+
 ## Assets
 
 ```csharp
