@@ -189,6 +189,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                 [placeholder]="searchPlaceholder ?? strings.searchPlaceholder"
                 [attr.aria-label]="searchLabel"
                 (input)="onSearchInput($event)"
+                (keydown.escape)="clearSearch()"
               />
               @if (searchText !== '') {
                 <button

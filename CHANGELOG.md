@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Exporting Only Current Page Data**: Resolved the bug where exports only included the on-screen visible page (e.g., 10 rows) when using in-memory datasets or custom client/controlled pagination. The grid now accurately collects all matching records from `fetchAllData`, `rawClientData` / `allData` (via `queryClientData(allData, query, { paginate: false })`), `fetchPage`, or `fetchEndpoint`.
 - **`onExportAll` Custom Row Feeding**: Handlers can now return an array of rows from `onExportAll` to leverage TableX's built-in styling, column mappings, and file download without having to re-implement Excel/CSV generators.
+- **Duplicate Clear "X" in Search Bar**: Disabled browser-native search cancel buttons (`::-webkit-search-cancel-button` and `::-ms-clear`) in WebKit/Blink browsers (Chrome, Edge, Safari) so only TableX's custom, accessible `.tbx-search-clear` button is shown, eliminating the duplicate "X" icons inside the search input. Added Escape key handling to clear search across React, Vanilla, and Angular adapters.
 - **Examples**: Updated `examples/react-vite`, `examples/vanilla-html`, `examples/nextjs`, and `examples/angular` to demonstrate 1-click full-dataset Excel exports with split buttons.
 
 ## [0.3.1] - 2026-09-06

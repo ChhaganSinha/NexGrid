@@ -297,6 +297,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
         this.syncSearchClear();
         this.scheduleSearch(input.value);
       });
+      input.addEventListener("keydown", (event: Event) => {
+        const kEvent = event as KeyboardEvent;
+        if (kEvent.key === "Escape" && input.value !== "") {
+          input.value = "";
+          this.syncSearchClear();
+          this.scheduleSearch("");
+        }
+      });
       this.searchInput = input;
       this.searchWrap = el("div", { class: "tbx-search" }, [searchIcon(), input]);
       startGroup.appendChild(this.searchWrap);

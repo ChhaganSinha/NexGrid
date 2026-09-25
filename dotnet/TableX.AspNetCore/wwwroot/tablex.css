@@ -358,6 +358,29 @@
   box-shadow: var(--tbx-focus-ring);
 }
 
+/* Hide duplicate browser-native clear/cancel buttons in input[type="search"] */
+.tbx-search input[type="search"]::-webkit-search-cancel-button,
+.tbx-search input[type="search"]::-webkit-search-decoration,
+.tbx-search input[type="search"]::-webkit-search-results-button,
+.tbx-search input[type="search"]::-webkit-search-results-decoration,
+.tbx-search-input::-webkit-search-cancel-button,
+.tbx-search-input::-webkit-search-decoration,
+.tbx-search-input::-webkit-search-results-button,
+.tbx-search-input::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.tbx-search input[type="search"]::-ms-clear,
+.tbx-search input[type="search"]::-ms-reveal,
+.tbx-search-input::-ms-clear,
+.tbx-search-input::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .tbx-search-clear {
   position: absolute;
   inset-inline-end: 8px;

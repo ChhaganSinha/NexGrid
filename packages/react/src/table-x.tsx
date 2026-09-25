@@ -1021,6 +1021,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 className="tbx-search-input"
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && searchText) {
+                    event.preventDefault();
+                    setSearchText("");
+                  }
+                }}
                 placeholder={searchPlaceholder ?? locale.searchPlaceholder}
                 aria-label={`Search ${caption}`}
               />
