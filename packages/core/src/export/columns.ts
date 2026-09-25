@@ -31,6 +31,11 @@ export function toExportColumns<TData, TRender>(
   const leafCols = flattenColumns(columns as NexGridColumn<TData, TRender>[]);
   return leafCols.filter(isExportable).map((col) => ({
     header: getColumnTitle(col) || getColumnId(col),
-    value: (row: TData) => getCellText(getCellValue(col, row), labels),
+    value: (row: TData) => {
+      if (typeof col.meta?.exportValue === "function") {
+        return col.meta.exportValue(row);
+      }
+      return getCellText(getCellValue(col, row), labels);
+    },
   }));
 }

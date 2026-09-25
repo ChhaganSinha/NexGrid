@@ -443,6 +443,24 @@
   background: var(--tbx-card-2);
 }
 
+.tbx-split-btn {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+
+.tbx-split-btn .tbx-btn:first-child {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.tbx-split-btn .tbx-btn:last-child {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  margin-inline-start: -1px;
+  padding-inline: 6px;
+}
+
 .tbx-select {
   display: inline-flex;
   align-items: center;

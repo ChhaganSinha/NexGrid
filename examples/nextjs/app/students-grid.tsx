@@ -92,6 +92,7 @@ export function StudentsGrid({ initial }: { initial: PagedResponse<Student> }) {
         onRetry={() => void load(query)}
         enableSelection
         exportFileName="students"
+        exportMode="split"
         // With an endpoint to page through, an export can cover the WHOLE
         // filtered dataset instead of just the visible page.
         fetchEndpoint="/api/students"

@@ -55,6 +55,8 @@ export interface TableXColumnMeta {
   editType?: "text" | "number" | "select";
   /** Options list for select editor. */
   editOptions?: readonly string[];
+  /** Custom export value formatter returning plain text / value for CSV and Excel. */
+  exportValue?: (row: unknown) => string | number | null | undefined;
 }
 export type NexGridColumnMeta = TableXColumnMeta;
 

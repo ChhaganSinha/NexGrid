@@ -10,6 +10,8 @@
 import type {
   Density,
   ExcelBadgeRule,
+  ExportFormat,
+  PagedResponse,
   TableXColumn,
   TableXLocale,
   QueryState,
@@ -189,8 +191,24 @@ export interface TableXOptions<TData> {
 
   /** File prefix; defaults to `filePrefixFromCaption(caption)`. */
   exportFileName?: string;
-  /** Replaces the built-in export entirely when set. */
-  onExportAll?: () => void | Promise<void>;
+  /** Full in-memory dataset when available, enabling full export across all pages. */
+  allData?: readonly TData[];
+  /** Function returning all matching rows for export without manual formatting. */
+  fetchAllData?: (query: QueryState) => Promise<readonly TData[]> | readonly TData[];
+  /** Paged fetch function to walk all pages for export without requiring a REST URL. */
+  fetchPage?: (page: number, pageSize: number, query: QueryState) => Promise<PagedResponse<TData>>;
+  /** Maximum rows collected during a full dataset export walk. Defaults to DEFAULT_ROW_CAP (2000). Pass 0 for uncapped. */
+  maxExportRows?: number;
+  /** Export button presentation: "menu" (default), "excel" (1-click direct), "csv" (1-click direct), or "split". */
+  exportMode?: "menu" | "split" | "excel" | "csv";
+  /** Shortcut for direct 1-click export (defaults to "excel" when true). */
+  quickExport?: boolean | ExportFormat;
+  /**
+   * Custom export handler.
+   * If it returns an array of rows, TableX uses them for built-in Excel/CSV/Clipboard formatting.
+   * If it returns void, TableX assumes the host handled the export externally.
+   */
+  onExportAll?: (format: ExportFormat) => void | Promise<void> | Promise<readonly TData[]> | readonly TData[];
   /**
    * Endpoint used to collect the FULL filtered dataset for export when the
    * current page is only part of it. Defaults to {@link TableXOptions.endpoint}.

@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-25
+
+### Added
+
+- **Full-Dataset Export Across All Adapters (@nexgrid/react, @nexgrid/vanilla, @nexgrid/angular, TableX.AspNetCore)**:
+  - `allData` prop/input: pass the full in-memory dataset to the grid. Even when viewing a single page (e.g. 10 rows on screen), exporting collects all matching rows across all pages into a single Excel (.xls), CSV (.csv), or clipboard TSV.
+  - `fetchAllData` prop/input: async or sync function `(query: QueryState) => Promise<readonly TData[]> | readonly TData[]` returning all matching rows for export without requiring custom workbook formatting code.
+  - `fetchPage` prop/input: async function `(page: number, pageSize: number, query: QueryState) => Promise<PagedResponse<TData>>` enabling the exporter to walk all pages for server-driven datasets without requiring a REST URL.
+  - `maxExportRows` prop/input: configure or uncap (pass `0`) the maximum number of rows collected during full-dataset export pagination walks.
+  - `exportMode` and `quickExport` props/inputs (`"menu" | "split" | "excel" | "csv"`):
+    - `exportMode="excel"` / `quickExport={true}`: Direct 1-click "Export Excel" button on the toolbar without needing a dropdown menu.
+    - `exportMode="split"`: Split button with direct 1-click primary action (Export Excel) and chevron dropdown for CSV and Clipboard.
+    - `exportMode="csv"` / `quickExport="csv"`: Direct 1-click "Export CSV" button.
+- **@nexgrid/core**:
+  - `TableXColumnMeta.exportValue`: Optional column-level formatter `(row: unknown) => string | number | null | undefined` giving columns fine-grained control over their exported text/value in Excel and CSV.
+  - `fetchAllPages`: Support `cap <= 0` or non-finite cap for uncapped/unlimited page walking.
+  - `TableXLocale`: Added `exportExcelButton` ("Export Excel") and `exportCsvButton` ("Export CSV") strings to `TableXLocale`, `DEFAULT_LOCALE`, and `resolveLocale`.
+  - Added `.tbx-split-btn` styles to `tablex.css`.
+- **@nexgrid/react**:
+  - `useClientTableX`: Exposes `allData`, `fetchAllData`, `clientSidePagination: true`, and `paginationMode: "client"`.
+  - `onExportAll` signature: Handlers can now return `readonly TData[]` to use TableX's built-in Excel/CSV exporter with custom rows.
+
+### Fixed
+
+- **Exporting Only Current Page Data**: Resolved the bug where exports only included the on-screen visible page (e.g., 10 rows) when using in-memory datasets or custom client/controlled pagination. The grid now accurately collects all matching records from `fetchAllData`, `rawClientData` / `allData` (via `queryClientData(allData, query, { paginate: false })`), `fetchPage`, or `fetchEndpoint`.
+- **`onExportAll` Custom Row Feeding**: Handlers can now return an array of rows from `onExportAll` to leverage TableX's built-in styling, column mappings, and file download without having to re-implement Excel/CSV generators.
+- **Examples**: Updated `examples/react-vite`, `examples/vanilla-html`, `examples/nextjs`, and `examples/angular` to demonstrate 1-click full-dataset Excel exports with split buttons.
+
 ## [0.3.1] - 2026-09-06
 
 ### Fixed

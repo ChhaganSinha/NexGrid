@@ -54,7 +54,7 @@ export async function fetchAllPages<T>(
       items.length >= total ||
       batch.length === 0 ||
       batch.length < MAX_PAGE_SIZE ||
-      items.length >= cap
+      (cap > 0 && Number.isFinite(cap) && items.length >= cap)
     ) {
       break;
     }

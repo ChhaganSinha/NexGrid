@@ -53,8 +53,15 @@ export function useClientTableX<TData>(
     [allData, query, options],
   );
 
+  const fetchAllData = (q: QueryState) =>
+    queryClientData(allData, q, { ...options, paginate: false }).items;
+
   return {
     data: page.items,
+    allData,
+    fetchAllData,
+    clientSidePagination: true,
+    paginationMode: "client" as const,
     total: page.total,
     query,
     onQueryChange: setQuery,

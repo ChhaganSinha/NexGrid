@@ -55,6 +55,10 @@ export interface TableXLocale {
    * it in from {@link DEFAULT_LOCALE}, so adapters can read it unconditionally.
    */
   resetView?: string;
+  /** Direct Excel export button label (for quickExport or split button). */
+  exportExcelButton?: string;
+  /** Direct CSV export button label. */
+  exportCsvButton?: string;
 }
 export type NexGridLocale = TableXLocale;
 
@@ -105,6 +109,8 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
   exportExcelSuccess: "Exported {count} formatted records to Excel (.xls)",
   exportCsvSuccess: "Exported {count} raw records to CSV (.csv)",
   resetView: "Reset to default view",
+  exportExcelButton: "Export Excel",
+  exportCsvButton: "Export CSV",
 };
 
 /**
@@ -113,7 +119,14 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
  * re-apply a fallback at the render site.
  */
 export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXLocale> {
-  return partial ? { ...DEFAULT_LOCALE, ...partial } : DEFAULT_LOCALE;
+  if (!partial) return DEFAULT_LOCALE;
+  return {
+    ...DEFAULT_LOCALE,
+    ...partial,
+    resetView: partial.resetView ?? DEFAULT_LOCALE.resetView,
+    exportExcelButton: partial.exportExcelButton ?? DEFAULT_LOCALE.exportExcelButton,
+    exportCsvButton: partial.exportCsvButton ?? DEFAULT_LOCALE.exportCsvButton,
+  };
 }
 
 /** Tiny `{placeholder}` formatter for locale strings. */

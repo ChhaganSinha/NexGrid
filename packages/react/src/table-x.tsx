@@ -18,6 +18,7 @@
 import * as React from "react";
 import {
   DENSITIES,
+  DEFAULT_ROW_CAP,
   PAGE_SIZES,
   buildQueryUrl,
   computeAggregation,
@@ -197,8 +198,15 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     className,
     showSerialNumber = true,
     exportFileName,
+    allData,
+    fetchAllData,
+    fetchPage,
+    maxExportRows,
+    exportMode = "menu",
+    quickExport,
     onExportAll,
     fetchEndpoint,
+    fetchOptions,
     badgeRules,
     locale: localeOverrides,
     onNotify,
@@ -227,6 +235,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const isColumnsVisible = enableColumns && showColumnsButton !== false;
   const isDensityVisible = enableDensity && showDensityButton !== false;
   const isExportVisible = enableExport && showExportButton !== false;
+  const resolvedExportMode = quickExport
+    ? (typeof quickExport === "string" ? quickExport : "excel")
+    : (exportMode ?? "menu");
   const isPaginationVisible = enablePagination && showPagination !== false;
   const isRowsPerPageVisible = enableRowsPerPage && showRowsPerPage !== false;
   const isJumpToPageVisible = enableJumpToPage && showJumpToPage !== false;
@@ -588,66 +599,113 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   // ---- Export --------------------------------------------------------------
 
+  const executeExportWithRows = async (
+    format: ExportFormat,
+    exportRows: readonly TData[],
+  ): Promise<void> => {
+    if (exportRows.length === 0) {
+      notify("error", locale.exportNoData);
+      return;
+    }
+
+    const exportColumns = toExportColumns(visible, boolLabels);
+    const prefix = exportFileName ?? filePrefixFromCaption(caption);
+
+    if (format === "clipboard") {
+      const ok = await copyToClipboard(exportRows, exportColumns);
+      if (ok) {
+        notify(
+          "success",
+          formatMessage(locale.exportClipboardSuccess, { count: exportRows.length.toLocaleString() }),
+        );
+      } else {
+        notify("error", "Failed to copy to clipboard");
+      }
+    } else if (format === "excel") {
+      const count = downloadExcel({
+        filename: prefix,
+        caption,
+        rows: exportRows,
+        columns: exportColumns,
+        badgeRules,
+        serialHeader: locale.serialHeader,
+      });
+      notify(
+        "success",
+        formatMessage(locale.exportExcelSuccess, { count: count.toLocaleString() }),
+      );
+    } else {
+      const count = downloadCsv(timestampedFilename(prefix), exportRows, exportColumns);
+      notify(
+        "success",
+        formatMessage(locale.exportCsvSuccess, { count: count.toLocaleString() }),
+      );
+    }
+  };
+
+  const collectExportRows = async (): Promise<readonly TData[]> => {
+    if (fetchAllData) {
+      const result = await fetchAllData(query);
+      return Array.isArray(result) ? result : rows;
+    }
+
+    const clientFullData = allData ?? (isClientSide ? data : undefined);
+    if (clientFullData && clientFullData.length > 0) {
+      const full = queryClientData(clientFullData, query, { ...clientQueryOptions, paginate: false });
+      return full.items;
+    }
+
+    if (fetchPage) {
+      const full = await fetchAllPages<TData>(
+        (page, size) => fetchPage(page, size, query),
+        maxExportRows ?? DEFAULT_ROW_CAP,
+      );
+      return full.items;
+    }
+
+    if (fetchEndpoint) {
+      const full = await fetchAllPages<TData>(async (page, size) => {
+        const url = buildQueryUrl(fetchEndpoint, {
+          ...query,
+          page,
+          pageSize: isPageSize(size) ? size : query.pageSize,
+        });
+        const response = await fetch(url, { cache: "no-store", ...fetchOptions });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return (await response.json()) as PagedResponse<TData>;
+      }, maxExportRows ?? DEFAULT_ROW_CAP);
+      return full.items;
+    }
+
+    return rows;
+  };
+
   const handleExport = async (format: ExportFormat): Promise<void> => {
     exportMenu.close();
 
     if (onExportAll) {
       try {
-        // The user picked one of three menu items; a handler that cannot see
-        // which one has to guess, and every format silently becomes the same file.
-        await onExportAll(format);
+        const customRows = await onExportAll(format);
+        if (Array.isArray(customRows)) {
+          return executeExportWithRows(format, customRows);
+        }
+        return;
       } catch (err) {
         notify("error", err instanceof Error ? err.message : "Export failed");
+        return;
       }
-      return;
     }
 
     setIsExporting(true);
-    notify("info", "Exporting...");
+    notify(
+      "info",
+      formatMessage(locale.exportFetchingAll, { total: total.toLocaleString() }),
+    );
     try {
-      let exportRows: readonly TData[] = rows;
-      if (fetchEndpoint) {
-        const full = await fetchAllPages<TData>(async (page, size) => {
-          const url = buildQueryUrl(fetchEndpoint, {
-            ...query,
-            page,
-            pageSize: isPageSize(size) ? size : query.pageSize,
-          });
-          const response = await fetch(url, { cache: "no-store" });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          return (await response.json()) as PagedResponse<TData>;
-        });
-        exportRows = full.items;
-      } else if (isClientSide) {
-        // Same searchable set as the on-screen page, or the export would carry
-        // rows the grid never matched (or drop rows it did).
-        const full = queryClientData(data, query, { ...clientQueryOptions, paginate: false });
-        exportRows = full.items;
-      }
-
-      const exportColumns = toExportColumns(visible, boolLabels);
-      const prefix = exportFileName ?? filePrefixFromCaption(caption);
-
-      if (format === "clipboard") {
-        const ok = await copyToClipboard(exportRows, exportColumns);
-        if (ok) notify("success", "Copied to clipboard");
-        else notify("error", "Failed to copy to clipboard");
-      } else if (format === "excel") {
-        downloadExcel({
-          filename: prefix,
-          caption,
-          rows: exportRows,
-          columns: exportColumns,
-          badgeRules,
-          serialHeader: locale.serialHeader,
-        });
-        notify("success", "Excel downloaded");
-      } else {
-        downloadCsv(timestampedFilename(prefix), exportRows, exportColumns);
-        notify("success", "CSV downloaded");
-      }
+      const exportRows = await collectExportRows();
+      await executeExportWithRows(format, exportRows);
     } catch {
-      notify("error", "Export failed");
+      notify("error", locale.exportFetchFailed);
     } finally {
       setIsExporting(false);
     }
@@ -1082,67 +1140,166 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           ) : null}
 
           {isExportVisible ? (
-            <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
+            resolvedExportMode === "excel" || resolvedExportMode === "csv" ? (
               <button
                 type="button"
                 id={exportButtonId}
                 className="tbx-btn tbx-btn--export"
-                ref={exportMenu.triggerRef}
                 disabled={isExporting}
-                aria-haspopup="menu"
-                aria-expanded={exportMenu.isOpen}
-                aria-label={isExporting ? locale.exportingButton : locale.exportButton}
-                onClick={exportMenu.toggle}
+                aria-label={
+                  isExporting
+                    ? locale.exportingButton
+                    : resolvedExportMode === "excel"
+                      ? (locale.exportExcelButton ?? "Export Excel")
+                      : (locale.exportCsvButton ?? "Export CSV")
+                }
+                onClick={() => void handleExport(resolvedExportMode)}
               >
                 <DownloadTrayIcon className="tbx-icon" />
-                <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
-                <ChevronDownIcon className="tbx-icon tbx-chevron" />
+                <span>
+                  {isExporting
+                    ? locale.exportingButton
+                    : resolvedExportMode === "excel"
+                      ? (locale.exportExcelButton ?? "Export Excel")
+                      : (locale.exportCsvButton ?? "Export CSV")}
+                </span>
               </button>
-              {exportMenu.isOpen ? (
-                <div
-                  className="tbx-menu tbx-menu--end"
-                  role="menu"
-                  aria-labelledby={exportButtonId}
-                >
+            ) : resolvedExportMode === "split" ? (
+              <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
+                <div className="tbx-split-btn">
                   <button
                     type="button"
-                    className="tbx-menu-item"
-                    role="menuitem"
+                    id={exportButtonId}
+                    className="tbx-btn tbx-btn--export"
+                    disabled={isExporting}
+                    aria-label={isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}
                     onClick={() => void handleExport("excel")}
                   >
-                    <FileSpreadsheetIcon className="tbx-icon--excel" />
-                    <div className="tbx-menu-item-title">
-                      <strong>{locale.exportExcelTitle}</strong>
-                      <small>{locale.exportExcelSubtitle}</small>
-                    </div>
+                    <DownloadTrayIcon className="tbx-icon" />
+                    <span>{isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}</span>
                   </button>
                   <button
                     type="button"
-                    className="tbx-menu-item"
-                    role="menuitem"
-                    onClick={() => void handleExport("csv")}
+                    id={`${exportButtonId}-dropdown`}
+                    className="tbx-btn tbx-btn--export"
+                    ref={exportMenu.triggerRef}
+                    disabled={isExporting}
+                    aria-haspopup="menu"
+                    aria-expanded={exportMenu.isOpen}
+                    aria-label="More export options"
+                    onClick={exportMenu.toggle}
                   >
-                    <FileTextIcon className="tbx-icon--csv" />
-                    <div className="tbx-menu-item-title">
-                      <strong>{locale.exportCsvTitle}</strong>
-                      <small>{locale.exportCsvSubtitle}</small>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="tbx-menu-item"
-                    role="menuitem"
-                    onClick={() => void handleExport("clipboard")}
-                  >
-                    <FileTextIcon className="tbx-icon--csv" />
-                    <div className="tbx-menu-item-title">
-                      <strong>{locale.exportClipboardTitle}</strong>
-                      <small>{locale.exportClipboardSubtitle}</small>
-                    </div>
+                    <ChevronDownIcon className="tbx-icon tbx-chevron" />
                   </button>
                 </div>
-              ) : null}
-            </div>
+                {exportMenu.isOpen ? (
+                  <div
+                    className="tbx-menu tbx-menu--end"
+                    role="menu"
+                    aria-labelledby={exportButtonId}
+                  >
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("excel")}
+                    >
+                      <FileSpreadsheetIcon className="tbx-icon--excel" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportExcelTitle}</strong>
+                        <small>{locale.exportExcelSubtitle}</small>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("csv")}
+                    >
+                      <FileTextIcon className="tbx-icon--csv" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportCsvTitle}</strong>
+                        <small>{locale.exportCsvSubtitle}</small>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("clipboard")}
+                    >
+                      <FileTextIcon className="tbx-icon--csv" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportClipboardTitle}</strong>
+                        <small>{locale.exportClipboardSubtitle}</small>
+                      </div>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
+                <button
+                  type="button"
+                  id={exportButtonId}
+                  className="tbx-btn tbx-btn--export"
+                  ref={exportMenu.triggerRef}
+                  disabled={isExporting}
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenu.isOpen}
+                  aria-label={isExporting ? locale.exportingButton : locale.exportButton}
+                  onClick={exportMenu.toggle}
+                >
+                  <DownloadTrayIcon className="tbx-icon" />
+                  <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
+                  <ChevronDownIcon className="tbx-icon tbx-chevron" />
+                </button>
+                {exportMenu.isOpen ? (
+                  <div
+                    className="tbx-menu tbx-menu--end"
+                    role="menu"
+                    aria-labelledby={exportButtonId}
+                  >
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("excel")}
+                    >
+                      <FileSpreadsheetIcon className="tbx-icon--excel" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportExcelTitle}</strong>
+                        <small>{locale.exportExcelSubtitle}</small>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("csv")}
+                    >
+                      <FileTextIcon className="tbx-icon--csv" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportCsvTitle}</strong>
+                        <small>{locale.exportCsvSubtitle}</small>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="tbx-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport("clipboard")}
+                    >
+                      <FileTextIcon className="tbx-icon--csv" />
+                      <div className="tbx-menu-item-title">
+                        <strong>{locale.exportClipboardTitle}</strong>
+                        <small>{locale.exportClipboardSubtitle}</small>
+                      </div>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )
           ) : null}
 
           {toolbarActions}

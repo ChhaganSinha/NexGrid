@@ -212,7 +212,11 @@ function matches(node, selector) {
   return node.nodeName.toLowerCase() === selector.toLowerCase();
 }
 
-class MockElement extends MockNode {}
+class MockElement extends MockNode {
+  click() {
+    this.dispatchEvent(new MockMouseEvent("click"));
+  }
+}
 class MockHTMLElement extends MockElement {}
 class MockSVGElement extends MockElement {}
 
@@ -270,6 +274,13 @@ globalThis.MouseEvent = MockMouseEvent;
 globalThis.KeyboardEvent = MockKeyboardEvent;
 globalThis.EventTarget = MockNode;
 globalThis.document = new MockDocument();
+
+if (!globalThis.URL.createObjectURL) {
+  globalThis.URL.createObjectURL = () => "blob:mock";
+}
+if (!globalThis.URL.revokeObjectURL) {
+  globalThis.URL.revokeObjectURL = () => {};
+}
 
 // Import vanilla package
 const { createTableX, createNexGrid } = await import("../dist/index.js");
@@ -714,5 +725,56 @@ test("createTableX renders multi-level stacked column headers", () => {
 
   handle.destroy();
 });
+
+test("createTableX supports quickExport direct 1-click export", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  let exportCalledWith = null;
+  const items = Array.from({ length: 25 }, (_, i) => ({ id: String(i + 1), name: `User ${i + 1}` }));
+
+  const handle = createTableX(container, {
+    caption: "Export Test",
+    columns: [{ accessorKey: "name", header: "Name" }],
+    data: items,
+    clientSidePagination: true,
+    quickExport: true,
+    onExportAll: (format) => {
+      exportCalledWith = format;
+      return items;
+    },
+  });
+
+  const exportBtn = container.querySelector(".tbx-btn--export");
+  assert.ok(exportBtn, "Direct export button should exist");
+  assert.ok(exportBtn.textContent.includes("Export Excel"), "Should show direct Export Excel text");
+
+  exportBtn.dispatchEvent(new MockMouseEvent("click"));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(exportCalledWith, "excel", "Should trigger excel export directly in 1 click");
+
+  handle.destroy();
+});
+
+test("createTableX supports split export mode", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const handle = createTableX(container, {
+    caption: "Split Export Test",
+    columns: [{ accessorKey: "name", header: "Name" }],
+    data: [{ id: "1", name: "User 1" }],
+    total: 1,
+    exportMode: "split",
+  });
+
+  const splitWrap = container.querySelector(".tbx-split-btn");
+  assert.ok(splitWrap, "Split button wrapper should exist");
+  const buttons = splitWrap.querySelectorAll("button");
+  assert.equal(buttons.length, 2, "Split button should have main button and dropdown chevron trigger");
+
+  handle.destroy();
+});
+
 
 

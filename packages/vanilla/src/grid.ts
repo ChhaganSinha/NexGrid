@@ -19,6 +19,7 @@
 
 import {
   DENSITIES,
+  DEFAULT_ROW_CAP,
   PAGE_SIZES,
   buildQueryUrl,
   computeAggregation,
@@ -316,15 +317,77 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const showExport = options.enableExport !== false && options.showExportButton !== false;
     if (showExport) {
-      this.exportLabel = el("span", { text: this.locale.exportButton });
-      const exportButton = this.createMenuButton(
-        "export",
-        downloadTrayIcon(),
-        this.exportLabel,
-        chevronDownIcon("tbx-icon tbx-chevron"),
-      );
-      exportButton.classList.add("tbx-btn--export");
-      endGroup.appendChild(this.wrapMenu("export", exportButton));
+      const mode = options.quickExport
+        ? (typeof options.quickExport === "string" ? options.quickExport : "excel")
+        : (options.exportMode ?? "menu");
+
+      if (mode === "excel" || mode === "csv") {
+        const btnLabel = mode === "excel" ? (this.locale.exportExcelButton ?? "Export Excel") : (this.locale.exportCsvButton ?? "Export CSV");
+        this.exportLabel = el("span", { text: btnLabel });
+        const exportButton = el(
+          "button",
+          {
+            class: "tbx-btn tbx-btn--export",
+            attrs: {
+              type: "button",
+              id: `${this.uid}-export-btn`,
+              "aria-label": btnLabel,
+            },
+          },
+          [downloadTrayIcon(), this.exportLabel],
+        );
+        exportButton.addEventListener("click", () => void this.runExport(mode));
+        this.menuButtons.set("export", exportButton);
+        endGroup.appendChild(exportButton);
+      } else if (mode === "split") {
+        const btnLabel = this.locale.exportExcelButton ?? "Export Excel";
+        this.exportLabel = el("span", { text: btnLabel });
+        const mainBtn = el(
+          "button",
+          {
+            class: "tbx-btn tbx-btn--export",
+            attrs: {
+              type: "button",
+              id: `${this.uid}-export-btn`,
+              "aria-label": btnLabel,
+            },
+          },
+          [downloadTrayIcon(), this.exportLabel],
+        );
+        mainBtn.addEventListener("click", () => void this.runExport("excel"));
+
+        const chevronBtn = el(
+          "button",
+          {
+            class: "tbx-btn tbx-btn--export",
+            attrs: {
+              type: "button",
+              id: `${this.uid}-export-chevron-btn`,
+              "aria-haspopup": "menu",
+              "aria-expanded": "false",
+              "aria-label": "More export options",
+            },
+          },
+          [chevronDownIcon("tbx-icon tbx-chevron")],
+        );
+        chevronBtn.addEventListener("click", () => this.toggleMenu("export"));
+        this.menuButtons.set("export", mainBtn);
+
+        const splitWrap = el("div", { class: "tbx-split-btn" }, [mainBtn, chevronBtn]);
+        const wrap = el("div", { class: "tbx-menu-wrap" }, [splitWrap]);
+        this.menuWraps.set("export", wrap);
+        endGroup.appendChild(wrap);
+      } else {
+        this.exportLabel = el("span", { text: this.locale.exportButton });
+        const exportButton = this.createMenuButton(
+          "export",
+          downloadTrayIcon(),
+          this.exportLabel,
+          chevronDownIcon("tbx-icon tbx-chevron"),
+        );
+        exportButton.classList.add("tbx-btn--export");
+        endGroup.appendChild(this.wrapMenu("export", exportButton));
+      }
     }
 
     if (options.toolbarActions !== undefined) {
@@ -710,6 +773,53 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // =========================================================================
 
   private async collectExportRows(): Promise<TData[]> {
+    if (this.options.fetchAllData) {
+      this.isExporting = true;
+      this.render();
+      this.notify(
+        "info",
+        formatMessage(this.locale.exportFetchingAll, { total: this.total.toLocaleString() }),
+      );
+      try {
+        const rows = await this.options.fetchAllData(this.query);
+        return Array.isArray(rows) ? (rows as TData[]) : this.data;
+      } catch {
+        this.notify("error", this.locale.exportFetchFailed);
+        return this.data;
+      } finally {
+        this.isExporting = false;
+        this.render();
+      }
+    }
+
+    const allData = this.rawClientData ?? this.options.allData;
+    if (allData && allData.length > 0) {
+      const full = queryClientData(allData, this.query, { paginate: false });
+      return full.items;
+    }
+
+    if (this.options.fetchPage) {
+      this.isExporting = true;
+      this.render();
+      this.notify(
+        "info",
+        formatMessage(this.locale.exportFetchingAll, { total: this.total.toLocaleString() }),
+      );
+      try {
+        const collected = await fetchAllPages<TData>(
+          (page, pageSize) => this.options.fetchPage!(page, pageSize, this.query),
+          this.options.maxExportRows ?? DEFAULT_ROW_CAP,
+        );
+        return collected.items;
+      } catch {
+        this.notify("error", this.locale.exportFetchFailed);
+        return this.data;
+      } finally {
+        this.isExporting = false;
+        this.render();
+      }
+    }
+
     const endpoint = this.options.fetchEndpoint ?? this.options.endpoint;
     if (this.data.length >= this.total || endpoint === undefined) return this.data;
 
@@ -733,7 +843,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
-      });
+      }, this.options.maxExportRows ?? DEFAULT_ROW_CAP);
       return collected.items;
     } catch {
       this.notify("error", this.locale.exportFetchFailed);
@@ -749,12 +859,23 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.setOpenMenu(null, { returnFocusTo: "export" });
 
     const { onExportAll } = this.options;
-    if (onExportAll && format !== "clipboard") {
-      void onExportAll();
-      return;
+    let rows: TData[];
+    if (onExportAll) {
+      try {
+        const customRows = await onExportAll(format);
+        if (Array.isArray(customRows)) {
+          rows = customRows as TData[];
+        } else {
+          return;
+        }
+      } catch {
+        this.notify("error", this.locale.exportFetchFailed);
+        return;
+      }
+    } else {
+      rows = await this.collectExportRows();
     }
 
-    const rows = await this.collectExportRows();
     if (rows.length === 0) {
       this.notify("error", this.locale.exportNoData);
       return;
@@ -1115,9 +1236,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
       });
     }
     if (this.exportLabel) {
+      const mode = this.options.quickExport
+        ? (typeof this.options.quickExport === "string" ? this.options.quickExport : "excel")
+        : (this.options.exportMode ?? "menu");
+
+      let defaultLabel = this.locale.exportButton;
+      if (mode === "excel" || mode === "split") {
+        defaultLabel = this.locale.exportExcelButton ?? "Export Excel";
+      } else if (mode === "csv") {
+        defaultLabel = this.locale.exportCsvButton ?? "Export CSV";
+      }
+
       this.exportLabel.textContent = this.isExporting
         ? this.locale.exportingButton
-        : this.locale.exportButton;
+        : defaultLabel;
     }
 
     const exportButton = this.menuButtons.get("export");

@@ -33,7 +33,7 @@ import {
 import { withFilter } from "@nexgrid/core";
 import { EMPTY, Subject, catchError, switchMap, tap } from "rxjs";
 
-import { STATUSES, StudentsService, type Student } from "./students.service";
+import { STATUSES, STUDENTS, StudentsService, type Student } from "./students.service";
 
 @Component({
   selector: "app-root",
@@ -54,6 +54,8 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
         exportFileName="students"
         searchPlaceholder="Search name, email or department…"
         enableSelection
+        exportMode="split"
+        [allData]="allData"
         [columns]="columns"
         [data]="rows()"
         [total]="total()"
@@ -133,6 +135,7 @@ import { STATUSES, StudentsService, type Student } from "./students.service";
 })
 export class AppComponent {
   private readonly service = inject(StudentsService);
+  readonly allData = STUDENTS;
 
   /**
    * Column definitions, structurally compatible with TanStack Table's

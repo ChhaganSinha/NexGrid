@@ -9,6 +9,7 @@ import type {
   Density,
   ExcelBadgeRule,
   ExportFormat,
+  PagedResponse,
   TableXColumn as TableXCoreColumn,
   TableXLocale,
   QueryState,
@@ -168,15 +169,28 @@ export interface TableXProps<TData> {
   showSerialNumber?: boolean;
   /** File name prefix, without extension. Default: the caption, lower-cased and underscored. */
   exportFileName?: string;
+  /** Full in-memory dataset, enabling whole-dataset export across all pages. */
+  allData?: readonly TData[];
+  /** Function returning all matching rows for export without manual file generation. */
+  fetchAllData?: (query: QueryState) => Promise<readonly TData[]> | readonly TData[];
+  /** Paged fetch function to walk all pages for export without requiring a REST URL. */
+  fetchPage?: (page: number, pageSize: number, query: QueryState) => Promise<PagedResponse<TData>>;
+  /** Maximum rows collected during a full dataset export walk. Defaults to DEFAULT_ROW_CAP (2000). Pass 0 for uncapped. */
+  maxExportRows?: number;
+  /** Export button presentation: "menu" (default), "excel" (1-click direct), "csv" (1-click direct), or "split". */
+  exportMode?: "menu" | "split" | "excel" | "csv";
+  /** Shortcut for direct 1-click export (defaults to "excel" when true). */
+  quickExport?: boolean | ExportFormat;
   /**
-   * Take over exporting entirely; when set, the grid's own export flow never runs.
+   * Custom export handler.
    *
-   * Receives the format the user picked, so one handler can still honour the
-   * three menu items ({@link ExportFormat}) rather than collapsing them into a
-   * single hard-coded output. Existing zero-argument handlers keep working —
-   * an unused parameter is source-compatible.
+   * If this function returns an array of rows (or a Promise resolving to rows),
+   * TableX will use those rows to produce the chosen format (Excel, CSV, Clipboard)
+   * using its built-in styling, serial column, and badge rules.
+   *
+   * If it returns void/undefined, TableX assumes the host handled the export externally.
    */
-  onExportAll?: (format: ExportFormat) => void | Promise<void>;
+  onExportAll?: (format: ExportFormat) => void | Promise<void> | Promise<readonly TData[]> | readonly TData[];
   /**
    * Endpoint used to fetch the full filtered dataset for export when the current
    * page is only part of it.

@@ -120,9 +120,12 @@ function isAllowed(field: string, allowlist: readonly StudentField[]): field is 
   return (allowlist as readonly string[]).includes(field);
 }
 
+export const STUDENTS: readonly Student[] = buildStudents(200);
+
 @Injectable({ providedIn: "root" })
 export class StudentsService {
-  private readonly students: readonly Student[] = buildStudents(200);
+  private readonly students: readonly Student[] = STUDENTS;
+  readonly allStudents = STUDENTS;
 
   private failNext = false;
 
@@ -170,11 +173,11 @@ export class StudentsService {
 
     for (const [field, value] of Object.entries(query.filter ?? {})) {
       if (!value || !isAllowed(field, FILTERABLE)) continue;
-      const wanted = value.toLowerCase();
+      const wanted = String(value).toLowerCase();
       matching = matching.filter((row) => String(row[field]).toLowerCase() === wanted);
     }
 
-    const sorts = query.sort.filter((spec) => isAllowed(spec.field, SORTABLE));
+    const sorts = (query.sort ?? []).filter((spec: { field: string }) => isAllowed(spec.field, SORTABLE));
     matching.sort((left, right) => {
       for (const spec of sorts) {
         const field = spec.field as StudentField;

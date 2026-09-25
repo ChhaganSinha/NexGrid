@@ -17,7 +17,7 @@ import {
 } from "@nexgrid/react";
 
 import { studentColumns } from "./columns";
-import { STATUSES, fetchStudents, scheduleFailure, type Student } from "./mock-api";
+import { STATUSES, STUDENTS, fetchStudents, scheduleFailure, type Student } from "./mock-api";
 
 export function App() {
   const [query, setQuery] = useState<QueryState>(defaultQuery());
@@ -147,6 +147,8 @@ export function App() {
         columns={columns}
         data={page?.items ?? []}
         total={page?.total ?? 0}
+        allData={STUDENTS}
+        exportMode="split"
         query={query}
         onQueryChange={setQuery}
         isLoading={isLoading}

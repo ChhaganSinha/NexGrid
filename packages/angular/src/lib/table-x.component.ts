@@ -48,6 +48,7 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged } from "rxjs"
 import {
   DEFAULT_PAGE_SIZE,
   DENSITIES,
+  DEFAULT_ROW_CAP,
   PAGE_SIZES,
   buildQueryUrl,
   defaultQuery,
@@ -340,15 +341,180 @@ const SEARCH_DEBOUNCE_MS = 350;
         }
 
         @if (isExportVisible) {
-          <div class="tbx-menu-wrap">
+          @if (resolvedExportMode === 'excel' || resolvedExportMode === 'csv') {
             <button
               type="button"
               class="tbx-btn tbx-btn--export"
-              aria-haspopup="menu"
               [disabled]="isExporting"
-              [attr.aria-expanded]="openMenu === 'export'"
-              (click)="toggleMenu('export', $event)"
+              [attr.aria-label]="isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : (strings.exportCsvButton ?? 'Export CSV'))"
+              (click)="runExport(resolvedExportMode)"
             >
+              <svg
+                class="tbx-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+              <span>{{ isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : (strings.exportCsvButton ?? 'Export CSV')) }}</span>
+            </button>
+          } @else if (resolvedExportMode === 'split') {
+            <div class="tbx-menu-wrap">
+              <div class="tbx-split-btn">
+                <button
+                  type="button"
+                  class="tbx-btn tbx-btn--export"
+                  [disabled]="isExporting"
+                  [attr.aria-label]="isExporting ? strings.exportingButton : (strings.exportExcelButton ?? 'Export Excel')"
+                  (click)="runExport('excel')"
+                >
+                  <svg
+                    class="tbx-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" x2="12" y1="15" y2="3" />
+                  </svg>
+                  <span>{{ isExporting ? strings.exportingButton : (strings.exportExcelButton ?? 'Export Excel') }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="tbx-btn tbx-btn--export"
+                  aria-haspopup="menu"
+                  [disabled]="isExporting"
+                  [attr.aria-expanded]="openMenu === 'export'"
+                  aria-label="More export options"
+                  (click)="toggleMenu('export', $event)"
+                >
+                  <svg
+                    class="tbx-icon tbx-chevron"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              </div>
+              @if (openMenu === 'export') {
+                <div
+                  class="tbx-menu tbx-menu--end"
+                  role="menu"
+                  (click)="$event.stopPropagation()"
+                >
+                  <button
+                    type="button"
+                    class="tbx-menu-item"
+                    role="menuitem"
+                    (click)="runExport('excel')"
+                  >
+                    <svg
+                      class="tbx-icon--excel"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M8 13h2" />
+                      <path d="M14 13h2" />
+                      <path d="M8 17h2" />
+                      <path d="M14 17h2" />
+                    </svg>
+                    <div class="tbx-menu-item-title">
+                      <strong>{{ strings.exportExcelTitle }}</strong>
+                      <small>{{ strings.exportExcelSubtitle }}</small>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    class="tbx-menu-item"
+                    role="menuitem"
+                    (click)="runExport('csv')"
+                  >
+                    <svg
+                      class="tbx-icon--csv"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div class="tbx-menu-item-title">
+                      <strong>{{ strings.exportCsvTitle }}</strong>
+                      <small>{{ strings.exportCsvSubtitle }}</small>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    class="tbx-menu-item"
+                    role="menuitem"
+                    (click)="runExport('clipboard')"
+                  >
+                    <svg
+                      class="tbx-icon--csv"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div class="tbx-menu-item-title">
+                      <strong>{{ strings.exportClipboardTitle }}</strong>
+                      <small>{{ strings.exportClipboardSubtitle }}</small>
+                    </div>
+                  </button>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="tbx-menu-wrap">
+              <button
+                type="button"
+                class="tbx-btn tbx-btn--export"
+                aria-haspopup="menu"
+                [disabled]="isExporting"
+                [attr.aria-expanded]="openMenu === 'export'"
+                (click)="toggleMenu('export', $event)"
+              >
                 <svg
                   class="tbx-icon"
                   viewBox="0 0 24 24"
@@ -469,7 +635,8 @@ const SEARCH_DEBOUNCE_MS = 350;
               }
             </div>
           }
-          @if (toolbarSlot) {
+        }
+        @if (toolbarSlot) {
             <ng-container [ngTemplateOutlet]="toolbarSlot.template" />
           }
           <ng-content select="[toolbarActions]" />
@@ -1115,6 +1282,33 @@ export class TableXComponent<TData>
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
 
+  /** Full in-memory dataset, enabling whole-dataset export across all pages. */
+  @Input() allData?: readonly TData[];
+
+  /** Function returning all matching rows for export without manual file generation. */
+  @Input() fetchAllData?: (query: QueryState) => Promise<readonly TData[]> | readonly TData[];
+
+  /** Paged fetch function to walk all pages for export without requiring a REST URL. */
+  @Input() fetchPage?: (page: number, pageSize: number, query: QueryState) => Promise<PagedResponse<TData>>;
+
+  /** Maximum rows collected during a full dataset export walk. Defaults to DEFAULT_ROW_CAP (2000). Pass 0 for uncapped. */
+  @Input() maxExportRows?: number;
+
+  /** Export button presentation: "menu" (default), "excel" (1-click direct), "csv" (1-click direct), or "split". */
+  @Input() exportMode?: "menu" | "split" | "excel" | "csv";
+
+  /** Shortcut for direct 1-click export (defaults to "excel" when true). */
+  @Input() quickExport?: boolean | "excel" | "csv" | "clipboard";
+
+  protected get resolvedExportMode(): "menu" | "split" | "excel" | "csv" {
+    if (this.quickExport) {
+      return typeof this.quickExport === "string" && (this.quickExport === "excel" || this.quickExport === "csv")
+        ? this.quickExport
+        : "excel";
+    }
+    return this.exportMode ?? "menu";
+  }
+
   /**
    * List endpoint used to collect the WHOLE filtered dataset for an export.
    * Without it, exports contain the current page only.
@@ -1746,9 +1940,45 @@ export class TableXComponent<TData>
    * what the user is looking at.
    */
   private async collectExportRows(): Promise<TData[]> {
-    if (this.clientSidePagination || this.paginationMode === "client") {
-      const full = queryClientData(this.data, this.query, { paginate: false });
+    if (this.fetchAllData) {
+      this.notify.emit({
+        type: "info",
+        message: formatMessage(this.strings.exportFetchingAll, {
+          total: this.total.toLocaleString(),
+        }),
+      });
+      try {
+        const rows = await this.fetchAllData(this.query);
+        return Array.isArray(rows) ? (rows as TData[]) : this.data;
+      } catch {
+        this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
+        return this.data;
+      }
+    }
+
+    const all = this.allData ?? (this.clientSidePagination || this.paginationMode === "client" ? this.data : undefined);
+    if (all && all.length > 0) {
+      const full = queryClientData(all, this.query, { paginate: false });
       return full.items;
+    }
+
+    if (this.fetchPage) {
+      this.notify.emit({
+        type: "info",
+        message: formatMessage(this.strings.exportFetchingAll, {
+          total: this.total.toLocaleString(),
+        }),
+      });
+      try {
+        const result = await fetchAllPages<TData>(
+          (page, pageSize) => this.fetchPage!(page, pageSize, this.query),
+          this.maxExportRows ?? DEFAULT_ROW_CAP,
+        );
+        return result.items;
+      } catch {
+        this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
+        return this.data;
+      }
     }
 
     const endpoint = this.fetchEndpoint;
@@ -1771,7 +2001,7 @@ export class TableXComponent<TData>
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
-      });
+      }, this.maxExportRows ?? DEFAULT_ROW_CAP);
       return result.items;
     } catch {
       this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
