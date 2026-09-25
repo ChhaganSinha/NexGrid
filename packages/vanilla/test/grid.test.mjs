@@ -121,7 +121,9 @@ class MockNode {
   }
 
   dispatchEvent(event) {
-    event.target = this;
+    if (!event.target) {
+      event.target = this;
+    }
     event.currentTarget = this;
     const list = this.listeners.get(event.type);
     if (list) {
@@ -271,6 +273,7 @@ globalThis.HTMLSpanElement = MockHTMLElement;
 globalThis.SVGSVGElement = MockSVGElement;
 globalThis.Event = MockEvent;
 globalThis.MouseEvent = MockMouseEvent;
+globalThis.PointerEvent = MockMouseEvent;
 globalThis.KeyboardEvent = MockKeyboardEvent;
 globalThis.EventTarget = MockNode;
 globalThis.document = new MockDocument();
@@ -469,6 +472,114 @@ test("createTableX renders column filter trigger and applies filter", () => {
 
   assert.equal(emittedQuery.filter?.status, undefined, "Filter should be cleared");
   assert.equal(handle.getQuery().filter?.status, undefined, "Internal query filter should be cleared");
+
+  handle.destroy();
+});
+
+test("column filter supports selection, apply button, clear button, and outside click dismissal across multiple columns", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    {
+      accessorKey: "company",
+      header: "Company",
+      meta: { serverFilterable: true, filterOptions: ["IPAI", "CIS"] },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      meta: {
+        serverFilterable: true,
+        serverFilterField: "status",
+        filterOptions: ["Probation", "Permanent", "Temporary"],
+      },
+    },
+  ];
+
+  const data = [
+    { id: "1", company: "IPAI", status: "Probation" },
+    { id: "2", company: "CIS", status: "Permanent" },
+  ];
+
+  let emittedQuery = null;
+  const handle = createTableX(container, {
+    caption: "Multi Filter Test",
+    columns,
+    data,
+    total: 2,
+    onQueryChange: (q) => {
+      emittedQuery = q;
+    },
+  });
+
+  // There are two filter wraps: company (index 0) and status (index 1)
+  const filterBtns = container.querySelectorAll(".tbx-col-filter-btn");
+  assert.equal(filterBtns.length, 2, "Both company and status should have filter buttons");
+
+  // Open status column filter (2nd column)
+  const statusFilterBtn = filterBtns[1];
+  statusFilterBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  let popover = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover, "Status filter popover should be open");
+
+  // Pointerdown inside the popover should not dismiss it
+  const ptDownInside = new MockMouseEvent("pointerdown");
+  ptDownInside.target = popover;
+  document.dispatchEvent(ptDownInside);
+  popover = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover, "Popover should remain open on pointerdown inside popover");
+
+  // Options: All (0), Probation (1), Permanent (2), Temporary (3)
+  const options = popover.querySelectorAll(".tbx-filter-option");
+  assert.equal(options.length, 4, "Should have All + 3 status options");
+
+  // Type into input and click Apply button
+  const input = popover.querySelector(".tbx-filter-popover-input");
+  assert.ok(input, "Filter input should exist");
+  input.value = "Probation";
+
+  const applyBtn = popover.querySelector(".tbx-filter-popover-btn--primary");
+  assert.ok(applyBtn, "Apply button should exist");
+  applyBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  assert.ok(emittedQuery, "Query should be emitted after clicking Apply");
+  assert.equal(emittedQuery.filter?.status, "Probation", "Query filter should be Probation");
+  assert.equal(container.querySelector(".tbx-filter-popover"), null, "Popover closes after Apply");
+
+  // Re-open status filter popover
+  const statusFilterBtnActive = container.querySelectorAll(".tbx-col-filter-btn")[1];
+  statusFilterBtnActive.dispatchEvent(new MockMouseEvent("click"));
+  popover = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover, "Status filter popover should re-open");
+
+  // Click Clear button
+  const clearBtn = popover.querySelector(".tbx-filter-popover-btn");
+  assert.ok(clearBtn, "Clear button should exist");
+  clearBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(emittedQuery.filter?.status, undefined, "Filter should be cleared after clicking Clear");
+  assert.equal(container.querySelector(".tbx-filter-popover"), null, "Popover closes after Clear");
+
+  // Re-open and test direct 1-click option selection
+  const statusFilterBtn2 = container.querySelectorAll(".tbx-col-filter-btn")[1];
+  statusFilterBtn2.dispatchEvent(new MockMouseEvent("click"));
+  popover = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover, "Status filter popover should re-open for option test");
+  const options2 = popover.querySelectorAll(".tbx-filter-option");
+  options2[2].dispatchEvent(new MockMouseEvent("click")); // Permanent
+  assert.equal(emittedQuery.filter?.status, "Permanent", "Filter should be Permanent after clicking option");
+  assert.equal(container.querySelector(".tbx-filter-popover"), null, "Popover closes after option click");
+
+  // Re-open and test outside click dismisses
+  const statusFilterBtn3 = container.querySelectorAll(".tbx-col-filter-btn")[1];
+  statusFilterBtn3.dispatchEvent(new MockMouseEvent("click"));
+  assert.ok(container.querySelector(".tbx-filter-popover"), "Popover open before outside click");
+
+  const ptDownOutside = new MockMouseEvent("pointerdown");
+  ptDownOutside.target = document.body;
+  document.dispatchEvent(ptDownOutside);
+  assert.equal(container.querySelector(".tbx-filter-popover"), null, "Popover should close on outside click");
 
   handle.destroy();
 });

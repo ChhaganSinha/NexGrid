@@ -38,6 +38,12 @@ test("cell values are read by column id", () => {
   assert.equal(getCellValue({ id: "missing" }, row), undefined);
 });
 
+test("cell values fall back to case-insensitive property match", () => {
+  const row = { Status: "Permanent", employeeName: "Ada" };
+  assert.equal(getCellValue({ accessorKey: "status" }, row), "Permanent");
+  assert.equal(getCellValue({ accessorKey: "EmployeeName" }, row), "Ada");
+});
+
 test("sorting is on by default and opt-out", () => {
   assert.equal(isSortable({ accessorKey: "name" }), true);
   assert.equal(isSortable({ accessorKey: "name", enableSorting: false }), false);

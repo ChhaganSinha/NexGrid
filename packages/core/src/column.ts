@@ -119,7 +119,14 @@ export function getCellValue<TData, TRender>(
 ): unknown {
   const field = getColumnId(col);
   if (!field) return undefined;
-  return (row as Record<string, unknown>)[field];
+  const record = row as Record<string, unknown>;
+  const val = record[field];
+  if (val !== undefined) return val;
+  const lower = field.toLowerCase();
+  for (const k of Object.keys(record)) {
+    if (k.toLowerCase() === lower) return record[k];
+  }
+  return undefined;
 }
 
 /**

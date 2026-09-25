@@ -68,6 +68,7 @@ import {
   type ExportFormat,
   type PagedResponse,
   type TableXColumn,
+  type TableXLocale,
   type QueryState,
   type SortSpec,
 } from "@nexgrid/core";
@@ -146,6 +147,268 @@ const DENSITY_LABEL_KEY = {
  * />
  * ```
  */
+interface ReactColumnFilterPopoverProps<TData, TRender> {
+  id: string;
+  col: TableXColumn<TData, TRender>;
+  meta: NonNullable<TableXColumn<TData, TRender>["meta"]>;
+  title: string;
+  activeFilter?: string;
+  locale: TableXLocale;
+  onApply: (val: string | undefined) => void;
+  onClose: () => void;
+}
+
+function ReactColumnFilterPopover<TData, TRender>({
+  meta,
+  title,
+  activeFilter,
+  locale,
+  onApply,
+  onClose,
+}: ReactColumnFilterPopoverProps<TData, TRender>): React.JSX.Element {
+  const [selectedVal, setSelectedVal] = React.useState<string>(activeFilter ?? "");
+  const [searchTerm, setSearchTerm] = React.useState<string>(activeFilter ?? "");
+  const [fromVal, setFromVal] = React.useState<string>(() => {
+    if (meta.filterType === "date-range" && activeFilter) {
+      return activeFilter.split("..")[0] || "";
+    }
+    return "";
+  });
+  const [toVal, setToVal] = React.useState<string>(() => {
+    if (meta.filterType === "date-range" && activeFilter) {
+      return activeFilter.split("..")[1] || "";
+    }
+    return "";
+  });
+  const [minVal, setMinVal] = React.useState<string>(() => {
+    if (meta.filterType === "number-range" && activeFilter) {
+      return activeFilter.split("..")[0] || "";
+    }
+    return "";
+  });
+  const [maxVal, setMaxVal] = React.useState<string>(() => {
+    if (meta.filterType === "number-range" && activeFilter) {
+      return activeFilter.split("..")[1] || "";
+    }
+    return "";
+  });
+
+  if (meta.filterType === "date-range") {
+    return (
+      <div
+        className="tbx-filter-popover"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="tbx-range-inputs">
+          <input
+            type="date"
+            className="tbx-range-input"
+            value={fromVal}
+            aria-label="From date"
+            onChange={(e) => setFromVal(e.target.value)}
+          />
+          <span className="tbx-range-sep">to</span>
+          <input
+            type="date"
+            className="tbx-range-input"
+            value={toVal}
+            aria-label="To date"
+            onChange={(e) => setToVal(e.target.value)}
+          />
+        </div>
+        <div className="tbx-filter-popover-actions">
+          <button
+            type="button"
+            className="tbx-filter-popover-btn"
+            onClick={() => {
+              onApply(undefined);
+              onClose();
+            }}
+          >
+            <RotateCcwIcon className="tbx-icon" />
+            <span>{locale.clearFilter}</span>
+          </button>
+          <button
+            type="button"
+            className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+            onClick={() => {
+              const f = fromVal.trim();
+              const t = toVal.trim();
+              onApply(!f && !t ? undefined : `${f}..${t}`);
+              onClose();
+            }}
+          >
+            <CheckIcon className="tbx-icon" />
+            <span>{locale.applyFilter}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (meta.filterType === "number-range") {
+    return (
+      <div
+        className="tbx-filter-popover"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="tbx-range-inputs">
+          <input
+            type="number"
+            className="tbx-range-input"
+            placeholder="Min"
+            value={minVal}
+            aria-label="Minimum"
+            onChange={(e) => setMinVal(e.target.value)}
+          />
+          <span className="tbx-range-sep">to</span>
+          <input
+            type="number"
+            className="tbx-range-input"
+            placeholder="Max"
+            value={maxVal}
+            aria-label="Maximum"
+            onChange={(e) => setMaxVal(e.target.value)}
+          />
+        </div>
+        <div className="tbx-filter-popover-actions">
+          <button
+            type="button"
+            className="tbx-filter-popover-btn"
+            onClick={() => {
+              onApply(undefined);
+              onClose();
+            }}
+          >
+            <RotateCcwIcon className="tbx-icon" />
+            <span>{locale.clearFilter}</span>
+          </button>
+          <button
+            type="button"
+            className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+            onClick={() => {
+              const mi = minVal.trim();
+              const ma = maxVal.trim();
+              onApply(!mi && !ma ? undefined : `${mi}..${ma}`);
+              onClose();
+            }}
+          >
+            <CheckIcon className="tbx-icon" />
+            <span>{locale.applyFilter}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const placeholder =
+    meta.filterPlaceholder ||
+    formatMessage(locale.filterColumnPlaceholder, { column: title });
+
+  const filterOptions = meta.filterOptions;
+  const filteredOpts = filterOptions
+    ? filterOptions.filter(
+        (opt) =>
+          !searchTerm || opt.toLowerCase().includes(searchTerm.toLowerCase().trim())
+      )
+    : [];
+
+  return (
+    <div
+      className="tbx-filter-popover"
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        autoFocus
+        type={meta.filterType === "date" ? "date" : meta.filterType === "number" ? "number" : "text"}
+        className="tbx-filter-popover-input"
+        value={searchTerm}
+        placeholder={placeholder}
+        aria-label={`Filter ${title}`}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          setSelectedVal(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const val = (selectedVal || searchTerm).trim();
+            onApply(val || undefined);
+            onClose();
+          } else if (e.key === "Escape") {
+            onClose();
+          }
+        }}
+      />
+      {filterOptions && filterOptions.length > 0 ? (
+        <div className="tbx-filter-popover-options">
+          <div
+            className={`tbx-filter-option ${!selectedVal ? "tbx-filter-option--selected" : ""}`}
+            onClick={() => {
+              setSelectedVal("");
+              setSearchTerm("");
+              onApply(undefined);
+              onClose();
+            }}
+          >
+            {locale.filterAll}
+          </div>
+          {filteredOpts.map((opt) => {
+            const isSelected = selectedVal.toLowerCase() === opt.toLowerCase();
+            return (
+              <div
+                key={opt}
+                className={`tbx-filter-option ${isSelected ? "tbx-filter-option--selected" : ""}`}
+                onClick={() => {
+                  setSelectedVal(opt);
+                  setSearchTerm(opt);
+                  onApply(opt);
+                  onClose();
+                }}
+              >
+                {opt}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      <div className="tbx-filter-popover-actions">
+        <button
+          type="button"
+          className="tbx-filter-popover-btn"
+          onClick={() => {
+            setSelectedVal("");
+            setSearchTerm("");
+            onApply(undefined);
+            onClose();
+          }}
+        >
+          <RotateCcwIcon className="tbx-icon" />
+          <span>{locale.clearFilter}</span>
+        </button>
+        <button
+          type="button"
+          className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+          onClick={() => {
+            const val = (selectedVal || searchTerm).trim();
+            onApply(val || undefined);
+            onClose();
+          }}
+        >
+          <CheckIcon className="tbx-icon" />
+          <span>{locale.applyFilter}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const {
     columns,
@@ -262,6 +525,27 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+
+  React.useEffect(() => {
+    if (!openFilterCol) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".tbx-col-filter-wrap") && !target?.closest(".tbx-filter-popover")) {
+        setOpenFilterCol(null);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenFilterCol(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openFilterCol]);
 
   // ---- Client-side dataset ------------------------------------------------
   //
@@ -765,7 +1049,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     const sorted = sortable && sortItem !== undefined;
     const title = getColumnTitle(col) || id;
     const meta = col.meta;
-    const activeFilter = query.filter?.[id];
+    const filterField = meta?.serverFilterField || id;
+    const activeFilter = query.filter?.[filterField] ?? query.filter?.[id];
     const isFilterActive = activeFilter !== undefined && activeFilter !== "";
 
     const customWidth = colWidths[id];
@@ -937,60 +1222,22 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               </button>
 
               {openFilterCol === id ? (
-                <div
-                  className="tbx-filter-popover"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* The placeholder is only a last-resort accessible name, and
-                      it disappears the moment the user types. Name it outright. */}
-                  <input
-                    autoFocus
-                    type="text"
-                    className="tbx-filter-popover-input"
-                    defaultValue={activeFilter ?? ""}
-                    placeholder={`Filter by ${title}...`}
-                    aria-label={`Filter by ${title}`}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const val = (e.currentTarget as HTMLInputElement).value.trim();
-                        setOpenFilterCol(null);
-                        onQueryChange(withFilter(query, id, val || undefined));
-                      } else if (e.key === "Escape") {
-                        setOpenFilterCol(null);
-                      }
-                    }}
-                  />
-                  <div className="tbx-filter-popover-actions">
-                    <button
-                      type="button"
-                      className="tbx-filter-popover-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenFilterCol(null);
-                        onQueryChange(withFilter(query, id, undefined));
-                      }}
-                    >
-                      <RotateCcwIcon className="tbx-icon" />
-                      <span>{locale.clearFilter}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const parent = (e.currentTarget as HTMLElement).closest(".tbx-filter-popover");
-                        const inputEl = parent?.querySelector("input") as HTMLInputElement | null;
-                        const val = inputEl?.value.trim();
-                        setOpenFilterCol(null);
-                        onQueryChange(withFilter(query, id, val || undefined));
-                      }}
-                    >
-                      <CheckIcon className="tbx-icon" />
-                      <span>{locale.applyFilter}</span>
-                    </button>
-                  </div>
-                </div>
+                <ReactColumnFilterPopover
+                  id={id}
+                  col={col}
+                  meta={meta ?? {}}
+                  title={title}
+                  activeFilter={activeFilter}
+                  locale={locale}
+                  onApply={(val) => {
+                    let nextQuery = withFilter(query, filterField, val);
+                    if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
+                      nextQuery = withFilter(nextQuery, id, undefined);
+                    }
+                    onQueryChange(nextQuery);
+                  }}
+                  onClose={() => setOpenFilterCol(null)}
+                />
               ) : null}
             </div>
           ) : null}
@@ -1336,7 +1583,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           ) : null}
           {Object.entries(query.filter ?? {}).map(([key, val]) => {
             if (val === undefined || val === "") return null;
-            const col = leafCols.find((c) => getColumnId(c) === key);
+            const col = leafCols.find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
             const title = col ? getColumnTitle(col) || key : key;
             return (
               <div key={key} className="tbx-filter-pill">

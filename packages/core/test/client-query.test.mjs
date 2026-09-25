@@ -61,6 +61,22 @@ test("queryClientData performs column filtering", () => {
   );
 });
 
+test("queryClientData performs case-insensitive column filter key matching", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: { Department: "Marketing" },
+  };
+  const result = queryClientData(TEST_DATA, query);
+  assert.equal(result.total, 3);
+  assert.equal(result.items.length, 3);
+  assert.deepEqual(
+    result.items.map((i) => i.name),
+    ["Bob Jones", "Evan Wright", "Julia Roberts"],
+  );
+});
+
 test("queryClientData performs numeric and percentage column filtering", () => {
   const query = {
     page: 1,

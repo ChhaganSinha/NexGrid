@@ -785,7 +785,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </button>
 
                     @if (openFilterColumn === header.id) {
-                      <div class="tbx-filter-popover" (click)="$event.stopPropagation()">
+                      <div class="tbx-filter-popover" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
                         <input
                           #filterInput
                           type="text"
@@ -799,7 +799,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                             <div
                               class="tbx-filter-option"
                               [class.tbx-filter-option--selected]="!header.activeFilter"
-                              (click)="applyColumnFilter(header.id, undefined)"
+                              (click)="filterInput.value = ''; applyColumnFilter(header.id, undefined)"
                             >
                               {{ strings.filterAll }}
                             </div>
@@ -807,7 +807,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                               <div
                                 class="tbx-filter-option"
                                 [class.tbx-filter-option--selected]="header.activeFilter === opt"
-                                (click)="applyColumnFilter(header.id, opt)"
+                                (click)="filterInput.value = opt; applyColumnFilter(header.id, opt)"
                               >
                                 {{ opt }}
                               </div>
@@ -818,7 +818,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                           <button
                             type="button"
                             class="tbx-filter-popover-btn"
-                            (click)="applyColumnFilter(header.id, undefined)"
+                            (click)="filterInput.value = ''; applyColumnFilter(header.id, undefined)"
                           >
                             <svg
                               class="tbx-icon"
@@ -1656,8 +1656,15 @@ export class TableXComponent<TData>
   }
 
   protected applyColumnFilter(id: string, value: string | undefined): void {
+    const cols = flattenColumns(this.columns);
+    const col = cols.find((c) => getColumnId(c) === id);
+    const filterField = col?.meta?.serverFilterField || id;
     this.openFilterColumn = null;
-    this.emitQuery(withFilter(this.query, id, value));
+    let nextQuery = withFilter(this.query, filterField, value);
+    if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
+      nextQuery = withFilter(nextQuery, id, undefined);
+    }
+    this.emitQuery(nextQuery);
   }
 
   protected onResizePointerDown(id: string, header: NexGridHeaderView, event: PointerEvent): void {
@@ -1756,7 +1763,7 @@ export class TableXComponent<TData>
     );
     for (const [key, val] of Object.entries(filters)) {
       if (val === undefined || val === "") continue;
-      const col = cols.find((c) => getColumnId(c) === key);
+      const col = cols.find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
       const title = col ? (getColumnTitle(col) || key) : key;
       entries.push({ key, title, val: String(val) });
     }
@@ -2064,7 +2071,8 @@ export class TableXComponent<TData>
     const sortOrder = this.query.sort.length > 1 && sortIndex >= 0 ? sortIndex + 1 : null;
     const customWidth = this.columnWidths[id];
     const width = customWidth !== undefined ? customWidth : (column.meta?.width ?? null);
-    const activeFilter = this.query.filter?.[id];
+    const filterField = column.meta?.serverFilterField || id;
+    const activeFilter = this.query.filter?.[filterField] ?? this.query.filter?.[id];
     return {
       key,
       id,

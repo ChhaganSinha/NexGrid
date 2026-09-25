@@ -165,7 +165,17 @@ function matchesFilterValue(val: unknown, filterVal: string): boolean {
       if (!filterVal) continue;
       if (allowedFields && !allowedFields.includes(key as keyof TData & string)) continue;
       matching = matching.filter((row) => {
-        const val = (row as Record<string, unknown>)[key];
+        const record = row as Record<string, unknown>;
+        let val = record[key];
+        if (val === undefined) {
+          const lowerKey = key.toLowerCase();
+          for (const k of Object.keys(record)) {
+            if (k.toLowerCase() === lowerKey) {
+              val = record[k];
+              break;
+            }
+          }
+        }
         return matchesFilterValue(val, filterVal);
       });
     }

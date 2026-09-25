@@ -659,7 +659,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
     }
     if (this.openFilterColumn !== null) {
-      if (!(target instanceof Node && this.root.querySelector(".tbx-col-filter-wrap")?.contains(target))) {
+      const el = target instanceof Element ? target : (target as Node)?.parentElement;
+      const isInside = el
+        ? Boolean(el.closest(".tbx-col-filter-wrap") || el.closest(".tbx-filter-popover"))
+        : false;
+      if (!isInside) {
         this.openFilterColumn = null;
         this.render();
       }
@@ -1139,7 +1143,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const filters = this.query.filter ?? {};
     for (const [key, val] of Object.entries(filters)) {
       if (val === undefined || val === "") continue;
-      const col = this.leafCols().find((c) => getColumnId(c) === key);
+      const col = this.leafCols().find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
       const title = col ? (getColumnTitle(col) || key) : key;
       const pill = el("div", { class: "tbx-filter-pill" }, [
         el("span", { class: "tbx-filter-pill-label", text: `${title}:` }),
@@ -1697,7 +1701,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     if (filterable) {
-      const activeFilter = this.query.filter?.[id];
+      const filterField = meta.serverFilterField || id;
+      const activeFilter = this.query.filter?.[filterField] ?? this.query.filter?.[id];
       const isFilterActive = activeFilter !== undefined && activeFilter !== "";
       const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
       const filterBtn = el(
@@ -2227,13 +2232,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
     currentValue?: string,
   ): HTMLElement {
     const popover = el("div", { class: "tbx-filter-popover" });
+    popover.addEventListener("pointerdown", (e) => e.stopPropagation());
+    popover.addEventListener("mousedown", (e) => e.stopPropagation());
     popover.addEventListener("click", (e) => e.stopPropagation());
 
     const title = getColumnTitle(column) || id;
+    const filterField = meta.serverFilterField || id;
     const apply = (valToApply?: string) => {
       const val = (valToApply !== undefined ? valToApply : "").trim();
       this.openFilterColumn = null;
-      this.applyQuery(withFilter(this.query, id, val || undefined));
+      let nextQuery = withFilter(this.query, filterField, val || undefined);
+      if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
+        nextQuery = withFilter(nextQuery, id, undefined);
+      }
+      this.applyQuery(nextQuery);
     };
 
     // 1. Date Range Filter
@@ -2263,13 +2275,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
         class: "tbx-filter-popover-btn",
         attrs: { type: "button" },
       }, [rotateCcwIcon(), el("span", { text: this.locale.clearFilter })]);
-      clearBtn.addEventListener("click", () => apply(""));
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        apply("");
+      });
 
       const applyBtn = el("button", {
         class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
         attrs: { type: "button" },
       }, [checkIcon(), el("span", { text: this.locale.applyFilter })]);
-      applyBtn.addEventListener("click", () => {
+      applyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const from = fromInput.value.trim();
         const to = toInput.value.trim();
         if (!from && !to) apply("");
@@ -2309,13 +2325,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
         class: "tbx-filter-popover-btn",
         attrs: { type: "button" },
       }, [rotateCcwIcon(), el("span", { text: this.locale.clearFilter })]);
-      clearBtn.addEventListener("click", () => apply(""));
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        apply("");
+      });
 
       const applyBtn = el("button", {
         class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
         attrs: { type: "button" },
       }, [checkIcon(), el("span", { text: this.locale.applyFilter })]);
-      applyBtn.addEventListener("click", () => {
+      applyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const min = minInput.value.trim();
         const max = maxInput.value.trim();
         if (!min && !max) apply("");
@@ -2331,12 +2351,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     // 3. Text / Dropdown filter
     const placeholder = meta.filterPlaceholder || formatMessage(this.locale.filterColumnPlaceholder, { column: title });
 
+    let selectedVal: string = (currentValue ?? "").trim();
+
     const input = el("input", {
       class: "tbx-filter-popover-input",
       attrs: {
         type: meta.filterType === "date" ? "date" : meta.filterType === "number" ? "number" : "text",
         placeholder: placeholder,
-        value: currentValue ?? "",
+        value: selectedVal,
         "aria-label": `Filter ${title}`,
       },
     }) as HTMLInputElement;
@@ -2349,7 +2371,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     input.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        apply(input.value);
+        const valToApply = selectedVal !== undefined && selectedVal !== "" ? selectedVal : input.value;
+        apply(valToApply);
       } else if (e.key === "Escape") {
         e.preventDefault();
         this.openFilterColumn = null;
@@ -2366,11 +2389,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
         replaceChildren(optionsWrap, []);
         const term = filterTerm.trim().toLowerCase();
 
+        const isAllSelected = !selectedVal;
         const allOption = el("div", {
-          class: !currentValue ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+          class: isAllSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
           text: this.locale.filterAll,
         });
-        allOption.addEventListener("click", () => {
+        allOption.addEventListener("click", (e) => {
+          e.stopPropagation();
+          selectedVal = "";
+          input.value = "";
           apply("");
         });
         optionsWrap.appendChild(allOption);
@@ -2380,12 +2407,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
         );
 
         for (const opt of filtered) {
-          const isSelected = currentValue === opt;
+          const isSelected = selectedVal.toLowerCase() === opt.toLowerCase();
           const optEl = el("div", {
             class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
             text: opt,
           });
-          optEl.addEventListener("click", () => {
+          optEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectedVal = opt;
+            input.value = opt;
             apply(opt);
           });
           optionsWrap.appendChild(optEl);
@@ -2394,6 +2424,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
       renderOptions(input.value);
       input.addEventListener("input", () => {
+        selectedVal = input.value;
         renderOptions(input.value);
       });
 
@@ -2412,6 +2443,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     clearBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       input.value = "";
+      selectedVal = "";
       apply("");
     });
     actions.appendChild(clearBtn);
@@ -2426,7 +2458,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     );
     applyBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      apply(input.value);
+      const valToApply = selectedVal !== undefined && selectedVal !== "" ? selectedVal : input.value;
+      apply(valToApply);
     });
     actions.appendChild(applyBtn);
 
