@@ -81,3 +81,16 @@ test("fromODataResponse maps OData payload to PagedResponse", () => {
   assert.equal(result.items.length, 2);
   assert.equal(result.items[0].name, "Alice");
 });
+
+test("toODataParams ignores field identifiers with injection characters", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [{ field: "name; drop table", dir: "asc" }],
+    filter: { "status eq 'active' or 1 eq 1": "evil" },
+  };
+  const params = toODataParams(query);
+  assert.equal(params.$orderby, undefined);
+  assert.equal(params.$filter, undefined);
+});
+

@@ -189,11 +189,24 @@ function matchesFilterValue(val: unknown, filterVal: string): boolean {
       ? sorts.filter((s) => allowedSorts.includes(s.field as keyof TData & string))
       : sorts;
 
+    const getSortValue = (record: Record<string, unknown>, field: string): unknown => {
+      if (field === "__proto__" || field === "constructor" || field === "prototype") {
+        return undefined;
+      }
+      const val = record[field];
+      if (val !== undefined) return val;
+      const lower = field.toLowerCase();
+      for (const k of Object.keys(record)) {
+        if (k.toLowerCase() === lower) return record[k];
+      }
+      return undefined;
+    };
+
     if (activeSorts.length > 0) {
       matching.sort((left, right) => {
         for (const sort of activeSorts) {
-          const leftVal = (left as Record<string, unknown>)[sort.field];
-          const rightVal = (right as Record<string, unknown>)[sort.field];
+          const leftVal = getSortValue(left as Record<string, unknown>, sort.field);
+          const rightVal = getSortValue(right as Record<string, unknown>, sort.field);
           const result = compareValues(leftVal, rightVal);
           if (result !== 0) {
             return sort.dir === "desc" ? -result : result;

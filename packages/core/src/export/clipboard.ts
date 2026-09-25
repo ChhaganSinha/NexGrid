@@ -2,9 +2,15 @@
 
 import type { ExportColumn } from "./columns.js";
 
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const IS_NUMERIC = /^-?\d+(\.\d+)?$/;
+
 function tsvCell(raw: string | number | null | undefined): string {
   if (raw === null || raw === undefined) return "";
   let text = String(raw);
+  if (!IS_NUMERIC.test(text.trim()) && FORMULA_PREFIX.test(text)) {
+    text = `'${text}`;
+  }
   // Replace internal tabs and newlines with spaces so each cell stays in its row/column
   return text.replace(/[\t\r\n]+/g, " ");
 }

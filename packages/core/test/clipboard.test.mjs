@@ -23,3 +23,20 @@ test("toTsv writes header row and tab-separated values", () => {
   assert.equal(lines[1], "1\tAlice Johnson\t95");
   assert.equal(lines[2], "2\tBob Smith\t85");
 });
+
+test("toTsv neutralizes formula injection triggers", () => {
+  const columns = toExportColumns([
+    { accessorKey: "cmd", header: "Command" },
+  ]);
+
+  const rows = [
+    { cmd: "=cmd|'/C calc'!A0" },
+    { cmd: "@SUM(1+1)" },
+  ];
+
+  const tsv = toTsv(rows, columns);
+  const lines = tsv.split("\n");
+  assert.equal(lines[1], "'=cmd|'/C calc'!A0");
+  assert.equal(lines[2], "'@SUM(1+1)");
+});
+

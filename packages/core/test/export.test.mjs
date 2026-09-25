@@ -160,3 +160,24 @@ test("every export menu destination is named by ExportFormat", () => {
   // union must not drift apart.
   assert.deepEqual([...EXPORT_FORMATS], ["excel", "csv", "clipboard"]);
 });
+
+test("Excel export neutralizes formula prefixes and adds mso text format", () => {
+  const html = toExcelHtml({
+    filename: "x",
+    caption: "Users",
+    rows: [{ name: '=HYPERLINK("http://evil")', email: "@SUM(1+1)" }],
+    columns,
+  });
+
+  assert.ok(html.includes("'=HYPERLINK"));
+  assert.ok(html.includes("'@SUM"));
+  assert.ok(html.includes('mso-number-format:"\\@"'));
+});
+
+test("CSV export preserves legitimate negative numbers without quoting", () => {
+  const numCol = [{ header: "Balance", value: (r) => r.balance }];
+  const csv = toCsv([{ balance: -150.5 }], numCol);
+  const cell = csv.split("\r\n")[1];
+  assert.equal(cell, "-150.5");
+});
+

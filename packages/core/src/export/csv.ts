@@ -15,14 +15,17 @@ import { downloadBlob } from "./download.js";
 
 const NEEDS_QUOTING = /[",\r\n]/;
 const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const IS_NUMERIC = /^-?\d+(\.\d+)?$/;
 
 function cell(raw: string | number | null | undefined): string {
   if (raw === null || raw === undefined) return "";
   let text = String(raw);
 
   // Neutralize a leading formula trigger by prefixing a single quote, which
-  // spreadsheets treat as "this is text". The visible value is unchanged.
-  if (FORMULA_PREFIX.test(text)) text = `'${text}`;
+  // spreadsheets treat as "this is text". Genuine numeric literals (e.g. -50) are preserved.
+  if (!IS_NUMERIC.test(text.trim()) && FORMULA_PREFIX.test(text)) {
+    text = `'${text}`;
+  }
 
   if (NEEDS_QUOTING.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;

@@ -56,6 +56,16 @@ export interface ExcelExportOptions<T> {
   serialHeader?: string;
 }
 
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const IS_NUMERIC = /^-?\d+(\.\d+)?$/;
+
+function sanitizeExcelCell(text: string): string {
+  if (text === "—") return text;
+  if (IS_NUMERIC.test(text.trim())) return text;
+  if (FORMULA_PREFIX.test(text)) return `'${text}`;
+  return text;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -100,8 +110,11 @@ export function toExcelHtml<T>(options: ExcelExportOptions<T>): string {
       const cells = columns.map((col) => {
         const raw = col.value(row);
         const text = raw === null || raw === undefined || raw === "" ? "—" : String(raw);
+        const safeText = sanitizeExcelCell(text);
+        const isNum = IS_NUMERIC.test(text.trim());
+        const numFormat = isNum ? "" : 'mso-number-format:"\\@"; ';
         const style = badgeStyle(text, badgeRules);
-        return `<td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-size: 12px; ${style}">${escapeHtml(text)}</td>`;
+        return `<td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-size: 12px; ${numFormat}${style}">${escapeHtml(safeText)}</td>`;
       });
       return (
         `<tr style="background-color: ${bg};">` +

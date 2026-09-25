@@ -71,11 +71,16 @@ export function parseQuery(input: string | URLSearchParams): QueryState {
 
   const q = params.get("q") ?? undefined;
 
+  const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
   let filter: Record<string, string> | undefined;
   for (const [key, value] of params.entries()) {
     const match = /^filter\[(.+)\]$/.exec(key);
     if (match && match[1]) {
-      (filter ??= {})[match[1]] = value;
+      const field = match[1];
+      if (!DANGEROUS_KEYS.has(field)) {
+        (filter ??= {})[field] = value;
+      }
     }
   }
 

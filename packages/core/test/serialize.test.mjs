@@ -94,3 +94,12 @@ test("buildQueryUrl respects an endpoint that already has parameters", () => {
     "an existing query string is preserved with & rather than a second ?",
   );
 });
+
+test("parseQuery ignores dangerous keys like __proto__ and constructor", () => {
+  const parsed = parseQuery("filter[__proto__]=polluted&filter[constructor]=evil&filter[status]=Active");
+  assert.equal(parsed.filter.__proto__, Object.prototype);
+  assert.equal(parsed.filter.constructor, Object);
+  assert.equal(parsed.filter.status, "Active");
+  assert.equal(Object.keys(parsed.filter).length, 1);
+});
+

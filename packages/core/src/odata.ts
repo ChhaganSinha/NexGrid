@@ -56,13 +56,20 @@ export function toODataParams(
     params.$expand = options.expand.join(",");
   }
 
+  const SAFE_ODATA_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_./]*$/;
+
   // 1. Order by ($orderby=Name asc, CreatedAt desc)
   if (query.sort && query.sort.length > 0) {
-    const orderbyParts = query.sort.map((s) => {
+    const orderbyParts: string[] = [];
+    for (const s of query.sort) {
       const field = options?.fieldMap?.[s.field] ?? s.field;
-      return `${field} ${s.dir}`;
-    });
-    params.$orderby = orderbyParts.join(", ");
+      if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
+      const dir = s.dir === "desc" ? "desc" : "asc";
+      orderbyParts.push(`${field} ${dir}`);
+    }
+    if (orderbyParts.length > 0) {
+      params.$orderby = orderbyParts.join(", ");
+    }
   }
 
   // 2. Filter & Search ($filter=...)
@@ -77,6 +84,7 @@ export function toODataParams(
     for (const [key, value] of Object.entries(query.filter)) {
       if (!value) continue;
       const field = options?.fieldMap?.[key] ?? key;
+      if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
       const escapedVal = value.replace(/'/g, "''");
       filterClauses.push(`${field} eq '${escapedVal}'`);
     }
@@ -86,10 +94,12 @@ export function toODataParams(
   const term = (query.q || "").trim();
   if (term && options?.searchableFields && options.searchableFields.length > 0) {
     const escapedTerm = term.replace(/'/g, "''").toLowerCase();
-    const searchClauses = options.searchableFields.map((field) => {
+    const searchClauses: string[] = [];
+    for (const field of options.searchableFields) {
       const prop = options?.fieldMap?.[field] ?? field;
-      return `contains(tolower(${prop}), '${escapedTerm}')`;
-    });
+      if (!SAFE_ODATA_IDENTIFIER.test(prop)) continue;
+      searchClauses.push(`contains(tolower(${prop}), '${escapedTerm}')`);
+    }
     if (searchClauses.length > 0) {
       filterClauses.push(`(${searchClauses.join(" or ")})`);
     }

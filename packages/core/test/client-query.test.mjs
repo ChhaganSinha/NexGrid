@@ -243,3 +243,19 @@ test("a column whose id is a display slug is still searchable by its field", () 
   });
   assert.deepEqual(result.items.map((r) => r.fullName), ["Alice"]);
 });
+
+test("queryClientData sorts case-insensitively across property names and ignores prototype keys", () => {
+  const rows = [
+    { id: 1, FullName: "Charlie" },
+    { id: 2, FullName: "Alice" },
+    { id: 3, FullName: "Bob" },
+  ];
+  // Sort with lowercase 'fullname' against PascalCase 'FullName'
+  const result = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "fullname", dir: "asc" }] });
+  assert.deepEqual(result.items.map((r) => r.FullName), ["Alice", "Bob", "Charlie"]);
+
+  // Sort with prototype keys shouldn't throw or corrupt
+  const protoResult = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "__proto__", dir: "asc" }] });
+  assert.equal(protoResult.items.length, 3);
+});
+
