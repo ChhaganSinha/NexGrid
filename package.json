@@ -4,7 +4,7 @@
   "private": true,
   "description": "TableX \u2014 a professional, server-driven data grid for React, Angular, vanilla JS, and ASP.NET Core.",
   "license": "MIT",
-  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
+  "author": "Chhagan Sinha",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ChhaganSinha/NexGrid.git"

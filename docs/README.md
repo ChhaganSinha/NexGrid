@@ -115,6 +115,5 @@ Building a custom renderer or extending TableX? Review [`adapter-spec.md`](adapt
 ## 👨‍💻 Author & Maintainer
 
 **Chhagan Sinha**  
-- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 

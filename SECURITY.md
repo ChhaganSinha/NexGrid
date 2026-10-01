@@ -10,7 +10,7 @@
 
 Please **do not** open a public issue for security vulnerabilities.
 
-Report privately via GitHub's *Security → Report a vulnerability* on this repository, or email **Chhagan Sinha** directly at [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com). Include:
+Report privately via GitHub's *Security → Report a vulnerability* on this repository. Include:
 
 - affected package(s) and version(s)
 - a description of the issue and its impact

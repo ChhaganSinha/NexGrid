@@ -502,7 +502,6 @@ round-trip it through the URL and make grid state shareable.
 ## Author & Maintainer
 
 **Chhagan Sinha**  
-- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 
 ---

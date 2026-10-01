@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "description": "Zero-dependency vanilla JS/DOM renderer for TableX \u2014 the professional, server-driven data grid. Also powers TableX.AspNetCore.",
   "license": "MIT",
-  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
+  "author": "Chhagan Sinha",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",

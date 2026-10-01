@@ -540,7 +540,6 @@ and produces a package with no browser payload.
 ## Author & Maintainer
 
 **Chhagan Sinha**  
-- Email: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 
 ---

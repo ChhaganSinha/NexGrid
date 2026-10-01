@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "description": "Framework-agnostic engine for TableX: server-driven query contract, grid state helpers, CSV/Excel export, and the shared theme.",
   "license": "MIT",
-  "author": "Chhagan Sinha <sinhachhagan@outlook.com>",
+  "author": "Chhagan Sinha",
   "homepage": "https://github.com/ChhaganSinha/NexGrid#readme",
   "repository": {
     "type": "git",

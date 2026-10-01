@@ -66,7 +66,6 @@ Add the `tbx-dark` class on the grid root (or an ancestor) for dark mode, or
 ## Author & Maintainer
 
 **Chhagan Sinha**  
-- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 
 ## License

@@ -439,7 +439,6 @@ one and that the sort cycle stays `asc → desc → cleared` across every adapte
 ## Author & Maintainer
 
 **Chhagan Sinha**  
-- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 
 ## License

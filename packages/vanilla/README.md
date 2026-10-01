@@ -375,7 +375,6 @@ onQueryChange: (next) => {
 ## Author & Maintainer
 
 **Chhagan Sinha**  
-- 📧 Contact: [sinhachhagan@outlook.com](mailto:sinhachhagan@outlook.com)  
 - 🐙 GitHub: [@ChhaganSinha](https://github.com/ChhaganSinha)
 
 ---
