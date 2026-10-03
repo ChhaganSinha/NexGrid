@@ -80,13 +80,34 @@ export function toODataParams(
   }
 
   // Column filters: filter[status]=Active -> Status eq 'Active'
+  // Range filters: filter[age]=18..65 -> Age ge 18 and Age le 65
   if (query.filter) {
     for (const [key, value] of Object.entries(query.filter)) {
       if (!value) continue;
       const field = options?.fieldMap?.[key] ?? key;
       if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
-      const escapedVal = value.replace(/'/g, "''");
-      filterClauses.push(`${field} eq '${escapedVal}'`);
+      if (value.includes("..")) {
+        const [minStr, maxStr] = value.split("..");
+        const parts: string[] = [];
+        if (minStr !== undefined && minStr.trim() !== "") {
+          const trimmedMin = minStr.trim();
+          const isNum = !isNaN(Number(trimmedMin));
+          const escapedMin = isNum ? trimmedMin : `'${trimmedMin.replace(/'/g, "''")}'`;
+          parts.push(`${field} ge ${escapedMin}`);
+        }
+        if (maxStr !== undefined && maxStr.trim() !== "") {
+          const trimmedMax = maxStr.trim();
+          const isNum = !isNaN(Number(trimmedMax));
+          const escapedMax = isNum ? trimmedMax : `'${trimmedMax.replace(/'/g, "''")}'`;
+          parts.push(`${field} le ${escapedMax}`);
+        }
+        if (parts.length > 0) {
+          filterClauses.push(parts.join(" and "));
+        }
+      } else {
+        const escapedVal = value.replace(/'/g, "''");
+        filterClauses.push(`${field} eq '${escapedVal}'`);
+      }
     }
   }
 

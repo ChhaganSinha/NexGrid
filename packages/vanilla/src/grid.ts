@@ -485,6 +485,22 @@ class NexGridController<TData> implements TableXHandle<TData> {
     // ---- Global listeners --------------------------------------------------
     this.addGlobalListener(document, "pointerdown", this.handleDocumentPointerDown);
     this.addGlobalListener(document, "keydown", this.handleDocumentKeyDown);
+    if (typeof window !== "undefined") {
+      this.addGlobalListener(window, "scroll", (e: Event) => {
+        if (this.openFilterColumn !== null) {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest?.(".tbx-filter-popover-options")) return;
+          this.openFilterColumn = null;
+          this.render();
+        }
+      });
+      this.addGlobalListener(window, "resize", () => {
+        if (this.openFilterColumn !== null) {
+          this.openFilterColumn = null;
+          this.render();
+        }
+      });
+    }
 
     container.appendChild(this.root);
     this.render();
@@ -582,6 +598,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // =========================================================================
 
   private addGlobalListener(target: EventTarget, type: string, handler: EventListener): void {
+    if (!target || typeof (target as unknown as { addEventListener?: unknown }).addEventListener !== "function") return;
     target.addEventListener(type, handler);
     this.globalListeners.push({ target, type, handler });
   }
@@ -1465,7 +1482,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         this.menuItem(
           "menuitem",
           "menu:columns:reset",
-          [el("span", { class: "tbx-menu-item--reset", text: "Reset to default view" })],
+          [rotateCcwIcon(), el("span", { class: "tbx-menu-item--reset", text: this.locale.resetView || "Reset to default view" })],
           () => {
             this.resetState();
             this.setOpenMenu(null);
@@ -1776,7 +1793,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
       filterWrap.appendChild(filterBtn);
 
       if (this.openFilterColumn === id) {
-        filterWrap.appendChild(this.buildColumnFilterPopover(id, column, meta, activeFilter));
+        const popover = this.buildColumnFilterPopover(id, column, meta, activeFilter);
+        filterWrap.appendChild(popover);
+        this.positionFilterPopover(popover, filterBtn);
       }
       inner.appendChild(filterWrap);
     }
@@ -2516,6 +2535,33 @@ class NexGridController<TData> implements TableXHandle<TData> {
     popover.appendChild(actions);
 
     return popover;
+  }
+
+  private positionFilterPopover(popover: HTMLElement, btn: HTMLElement): void {
+    if (typeof window === "undefined" || typeof btn.getBoundingClientRect !== "function") return;
+    const btnRect = btn.getBoundingClientRect();
+    if (!btnRect || (btnRect.width === 0 && btnRect.height === 0 && btnRect.top === 0)) {
+      return;
+    }
+    const popoverRect = popover.getBoundingClientRect();
+    const margin = 6;
+    let top = btnRect.bottom + margin;
+    const popoverHeight = popoverRect.height || 220;
+    if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
+      top = btnRect.top - popoverHeight - margin;
+    }
+    const popoverWidth = popoverRect.width || 240;
+    let left = btnRect.right - popoverWidth;
+    if (left < 12) {
+      left = Math.max(12, btnRect.left);
+    }
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+    }
+    popover.style.position = "fixed";
+    popover.style.top = `${Math.round(top)}px`;
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.zIndex = "1000";
   }
 
   private buildRowCheckbox(id: string, selected: boolean, focusKey: string): HTMLInputElement {

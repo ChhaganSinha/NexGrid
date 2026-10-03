@@ -82,6 +82,23 @@ test("fromODataResponse maps OData payload to PagedResponse", () => {
   assert.equal(result.items[0].name, "Alice");
 });
 
+test("toODataParams builds ge and le clauses for range filter syntax", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: {
+      age: "18..65",
+      created: "2025-01-01..2025-12-31",
+      minOnly: "100..",
+    },
+  };
+  const params = toODataParams(query);
+  assert.ok(params.$filter.includes("age ge 18 and age le 65"));
+  assert.ok(params.$filter.includes("created ge '2025-01-01' and created le '2025-12-31'"));
+  assert.ok(params.$filter.includes("minOnly ge 100"));
+});
+
 test("toODataParams ignores field identifiers with injection characters", () => {
   const query = {
     page: 1,

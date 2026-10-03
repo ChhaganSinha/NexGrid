@@ -193,9 +193,47 @@ function ReactColumnFilterPopover<TData, TRender>({
     return "";
   });
 
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+  const [fixedStyle, setFixedStyle] = React.useState<React.CSSProperties | null>(null);
+
+  React.useLayoutEffect(() => {
+    const el = popoverRef.current;
+    if (!el || typeof window === "undefined") return;
+    const btn = el.parentElement?.querySelector(".tbx-col-filter-btn") as HTMLElement | null;
+    if (!btn || typeof btn.getBoundingClientRect !== "function") return;
+    const btnRect = btn.getBoundingClientRect();
+    if (btnRect.width === 0 && btnRect.height === 0 && btnRect.top === 0) {
+      return;
+    }
+    const popoverRect = el.getBoundingClientRect();
+    const margin = 6;
+    let top = btnRect.bottom + margin;
+    const popoverHeight = popoverRect.height || 220;
+    if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
+      top = btnRect.top - popoverHeight - margin;
+    }
+    const popoverWidth = popoverRect.width || 240;
+    let left = btnRect.right - popoverWidth;
+    if (left < 12) {
+      left = Math.max(12, btnRect.left);
+    }
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+    }
+
+    setFixedStyle({
+      position: "fixed",
+      top: `${Math.round(top)}px`,
+      left: `${Math.round(left)}px`,
+      zIndex: 1000,
+    });
+  }, []);
+
   if (meta.filterType === "date-range") {
     return (
       <div
+        ref={popoverRef}
+        style={fixedStyle ?? undefined}
         className="tbx-filter-popover"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -251,6 +289,8 @@ function ReactColumnFilterPopover<TData, TRender>({
   if (meta.filterType === "number-range") {
     return (
       <div
+        ref={popoverRef}
+        style={fixedStyle ?? undefined}
         className="tbx-filter-popover"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -319,6 +359,8 @@ function ReactColumnFilterPopover<TData, TRender>({
 
   return (
     <div
+      ref={popoverRef}
+      style={fixedStyle ?? undefined}
       className="tbx-filter-popover"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
@@ -539,11 +581,22 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         setOpenFilterCol(null);
       }
     };
+    const onScrollOrResize = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.(".tbx-filter-popover-options")) {
+        return;
+      }
+      setOpenFilterCol(null);
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
     };
   }, [openFilterCol]);
 

@@ -279,7 +279,20 @@ const SEARCH_DEBOUNCE_MS = 350;
                     role="menuitem"
                     (click)="resetView()"
                   >
-                    <span>Reset to default view</span>
+                    <svg
+                      class="tbx-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                    <span>{{ strings.resetView }}</span>
                   </button>
                 }
               </div>
@@ -785,7 +798,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </button>
 
                     @if (openFilterColumn === header.id) {
-                      <div class="tbx-filter-popover" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+                      <div class="tbx-filter-popover" [style]="filterPopoverStyles" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
                         <input
                           #filterInput
                           type="text"
@@ -1375,6 +1388,7 @@ export class TableXComponent<TData>
   protected currentDensity: Density = "default";
   protected openMenu: "columns" | "density" | "export" | null = null;
   protected openFilterColumn: string | null = null;
+  protected filterPopoverStyles: Record<string, string> | null = null;
   protected columnWidths: Record<string, number> = {};
   protected isExporting = false;
   protected searchText = "";
@@ -1652,6 +1666,38 @@ export class TableXComponent<TData>
   protected toggleFilterPopover(id: string, event: Event): void {
     event.stopPropagation();
     this.openFilterColumn = this.openFilterColumn === id ? null : id;
+    if (this.openFilterColumn === id) {
+      const btn = (event.currentTarget || event.target) as HTMLElement | null;
+      if (btn && typeof btn.getBoundingClientRect === "function") {
+        const btnRect = btn.getBoundingClientRect();
+        if (btnRect.width > 0) {
+          const margin = 6;
+          let top = btnRect.bottom + margin;
+          const popoverHeight = 220;
+          if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
+            top = btnRect.top - popoverHeight - margin;
+          }
+          const popoverWidth = 240;
+          let left = btnRect.right - popoverWidth;
+          if (left < 12) {
+            left = Math.max(12, btnRect.left);
+          }
+          if (left + popoverWidth > window.innerWidth - 12) {
+            left = Math.max(12, window.innerWidth - popoverWidth - 12);
+          }
+          this.filterPopoverStyles = {
+            position: "fixed",
+            top: `${Math.round(top)}px`,
+            left: `${Math.round(left)}px`,
+            "z-index": "1000",
+          };
+        } else {
+          this.filterPopoverStyles = null;
+        }
+      }
+    } else {
+      this.filterPopoverStyles = null;
+    }
     this.recompute();
   }
 
@@ -1660,6 +1706,7 @@ export class TableXComponent<TData>
     const col = cols.find((c) => getColumnId(c) === id);
     const filterField = col?.meta?.serverFilterField || id;
     this.openFilterColumn = null;
+    this.filterPopoverStyles = null;
     let nextQuery = withFilter(this.query, filterField, value);
     if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
       nextQuery = withFilter(nextQuery, id, undefined);

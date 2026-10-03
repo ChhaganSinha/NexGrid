@@ -579,8 +579,10 @@
   position: absolute;
   top: calc(100% + 6px);
   inset-inline-start: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 208px;
+  max-width: min(280px, calc(100vw - 24px));
+  box-sizing: border-box;
   padding: 6px;
   background: var(--tbx-card);
   border: 1px solid var(--tbx-border);
@@ -588,12 +590,30 @@
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
-/* Re-anchored to the trigger's inline END edge (the export menu, which sits
-   last in the toolbar and would otherwise overflow the container). */
-.tbx-menu--end {
+/* Re-anchored to the trigger's inline END edge (the export menu, or the
+   last menu in the toolbar which would otherwise overflow the container). */
+.tbx-menu--end,
+.tbx-toolbar-group--end > .tbx-menu-wrap:last-child .tbx-menu {
   inset-inline-start: auto;
   inset-inline-end: 0;
+  min-width: 208px;
+}
+
+.tbx-menu--end {
   min-width: 224px;
+}
+
+@media (max-width: 639px) {
+  /* On mobile, toolbar items wrap and align to start */
+  .tbx-toolbar-group--end .tbx-menu {
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+  }
+  /* When multiple items exist, anchor the last one to the end to prevent right overflow */
+  .tbx-toolbar-group--end > .tbx-menu-wrap:last-child:not(:first-child) .tbx-menu {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
 }
 
 .tbx-menu-label {
@@ -891,7 +911,7 @@
   position: absolute;
   top: calc(100% + 6px);
   inset-inline-end: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 200px;
   max-width: min(280px, calc(100vw - 24px));
   background: var(--tbx-card);
@@ -900,6 +920,11 @@
   box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   padding: 8px;
   text-align: start;
+}
+
+/* Fallback: Ensure table container expands if filter popover is rendered in normal table flow */
+.tbx-table-wrap:has(.tbx-filter-popover) {
+  min-height: 260px;
 }
 
 .tbx-filter-popover-input {
