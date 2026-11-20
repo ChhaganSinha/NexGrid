@@ -1406,7 +1406,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       }
     } else if (format === "excel") {
       const count = downloadExcel({
-        filename: prefix,
+        filename: timestampedFilename(prefix),
         caption,
         rows: exportRows,
         columns: exportColumns,

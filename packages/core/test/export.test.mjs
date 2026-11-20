@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import {
   toCsv,
   toExcelHtml,
+  toXlsxBytes,
+  excelColName,
   toExportColumns,
   getCellText,
   DEFAULT_BADGE_RULES,
@@ -179,5 +181,107 @@ test("CSV export preserves legitimate negative numbers without quoting", () => {
   const csv = toCsv([{ balance: -150.5 }], numCol);
   const cell = csv.split("\r\n")[1];
   assert.equal(cell, "-150.5");
+});
+
+function readStoredZipEntries(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const decoder = new TextDecoder();
+  const files = new Map();
+  let offset = 0;
+  while (offset + 4 <= bytes.length) {
+    const sig = view.getUint32(offset, true);
+    if (sig !== 0x04034b50) break;
+    const compMethod = view.getUint16(offset + 8, true);
+    assert.equal(compMethod, 0, "Uses Store (0) method");
+    const compSize = view.getUint32(offset + 18, true);
+    const uncompSize = view.getUint32(offset + 22, true);
+    assert.equal(compSize, uncompSize);
+    const nameLen = view.getUint16(offset + 26, true);
+    const extraLen = view.getUint16(offset + 28, true);
+    const name = decoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLen));
+    const dataStart = offset + 30 + nameLen + extraLen;
+    const content = decoder.decode(bytes.subarray(dataStart, dataStart + compSize));
+    files.set(name, content);
+    offset = dataStart + compSize;
+  }
+  return files;
+}
+
+test("excelColName maps 0-based indices to Excel A..Z, AA..ZZ, AAA column coordinates", () => {
+  assert.equal(excelColName(0), "A");
+  assert.equal(excelColName(25), "Z");
+  assert.equal(excelColName(26), "AA");
+  assert.equal(excelColName(51), "AZ");
+  assert.equal(excelColName(52), "BA");
+  assert.equal(excelColName(701), "ZZ");
+  assert.equal(excelColName(702), "AAA");
+});
+
+test("toXlsxBytes generates a valid OpenXML .xlsx ZIP workbook with typed numbers, badges, frozen header, and formula defense", () => {
+  const xlsxCols = [
+    { header: "Code", value: (r) => r.code },
+    { header: "Name", value: (r) => r.name },
+    { header: "Score", value: (r) => r.score },
+    { header: "Status", value: (r) => r.status },
+  ];
+
+  const bytes = toXlsxBytes({
+    filename: "students_export",
+    caption: "Students / Q4 [2026]: Full Report With Extra Long Sheet Title",
+    rows: [
+      { code: "0042", name: "Ada <script>&", score: 95.5, status: "Active" },
+      { code: "0043", name: '=HYPERLINK("http://evil")', score: -12, status: "Pending" },
+      { code: null, name: "", score: "88", status: "Inactive" },
+    ],
+    columns: xlsxCols,
+  });
+
+  // 1. Valid ZIP local header ("PK\x03\x04") and EOCD ("PK\x05\x06" atbytes.length - 22)
+  assert.equal(bytes[0], 0x50);
+  assert.equal(bytes[1], 0x4b);
+  assert.equal(bytes[2], 0x03);
+  assert.equal(bytes[3], 0x04);
+  const eocdOffset = bytes.length - 22;
+  assert.equal(bytes[eocdOffset], 0x50);
+  assert.equal(bytes[eocdOffset + 1], 0x4b);
+  assert.equal(bytes[eocdOffset + 2], 0x05);
+  assert.equal(bytes[eocdOffset + 3], 0x06);
+
+  // 2. All 6 required OpenXML parts exist
+  const parts = readStoredZipEntries(bytes);
+  assert.deepEqual(
+    [...parts.keys()],
+    [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "xl/workbook.xml",
+      "xl/_rels/workbook.xml.rels",
+      "xl/styles.xml",
+      "xl/worksheets/sheet1.xml",
+    ],
+  );
+
+  // 3. Workbook sheet name strips forbidden chars (/, [, ], :) and truncates to <= 31 chars
+  const workbookXml = parts.get("xl/workbook.xml");
+  const sheetNameMatch = workbookXml.match(/<sheet name="([^"]+)"/);
+  assert.ok(sheetNameMatch);
+  assert.ok(sheetNameMatch[1].length <= 31);
+  assert.ok(!/[\\/*?:[\]]/.test(sheetNameMatch[1]));
+
+  // 4. Styles contain ARGB badge colors (Active -> #dcfce7 -> FFDCFCE7)
+  const stylesXml = parts.get("xl/styles.xml");
+  assert.ok(stylesXml.includes("FFDCFCE7"));
+  assert.ok(stylesXml.includes("FF15803D"));
+
+  // 5. Worksheet has frozen header pane, preserves leading-zero string "0042", emits numbers as t="n", escapes XML, and neutralizes formulas
+  const sheetXml = parts.get("xl/worksheets/sheet1.xml");
+  assert.ok(sheetXml.includes('state="frozen"'));
+  assert.ok(sheetXml.includes(">0042</t>"), "Leading-zero code stays inlineStr so Excel does not strip 00");
+  assert.ok(sheetXml.includes('t="n"><v>95.5</v></c>'), "Numeric values emit native numeric cells");
+  assert.ok(sheetXml.includes('t="n"><v>-12</v></c>'), "Negative numbers emit native numeric cells");
+  assert.ok(sheetXml.includes('t="n"><v>88</v></c>'), "Strict numeric strings emit native numeric cells");
+  assert.ok(sheetXml.includes("Ada &lt;script&gt;&amp;"), "Escapes XML entities");
+  assert.ok(sheetXml.includes("&apos;=HYPERLINK"), "Neutralizes formula injection with leading quote");
+  assert.ok(sheetXml.includes(">—</t>"), "Null/empty cells render em dash");
 });
 

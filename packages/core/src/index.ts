@@ -106,6 +106,11 @@ export {
 } from "./export/excel.js";
 export type { ExcelBadgeRule, ExcelExportOptions } from "./export/excel.js";
 export {
+  toXlsxBytes,
+  downloadXlsx,
+  excelColName,
+} from "./export/xlsx.js";
+export {
   downloadBlob,
   timestampedFilename,
   filePrefixFromCaption,

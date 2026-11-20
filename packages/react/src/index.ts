@@ -84,5 +84,8 @@ export {
   // Localization
   DEFAULT_LOCALE,
   resolveLocale,
+  // Native .xlsx export
+  toXlsxBytes,
+  downloadXlsx,
 } from "@nexgrid/core";
 export type { ClientQueryOptions, FilterMatchOptions } from "@nexgrid/core";

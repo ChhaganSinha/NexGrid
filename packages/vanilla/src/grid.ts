@@ -1037,7 +1037,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     if (format === "excel") {
       const count = downloadExcel({
-        filename: prefix,
+        filename: timestampedFilename(prefix),
         caption: this.caption,
         rows,
         columns,

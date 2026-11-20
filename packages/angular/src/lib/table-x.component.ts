@@ -3083,7 +3083,7 @@ export class TableXComponent<TData>
 
     if (format === "excel") {
       const count = downloadExcel<TData>({
-        filename: prefix,
+        filename: timestampedFilename(prefix),
         caption: this.caption,
         rows,
         columns: exportColumns,

@@ -8,6 +8,7 @@
 
 import type { ExportColumn } from "./columns.js";
 import { downloadBlob } from "./download.js";
+import { downloadXlsx } from "./xlsx.js";
 
 /** A value-based styling rule: any cell whose text matches gets badge styling. */
 export interface ExcelBadgeRule {
@@ -44,7 +45,7 @@ export const DEFAULT_BADGE_RULES: readonly ExcelBadgeRule[] = [
 ];
 
 export interface ExcelExportOptions<T> {
-  /** File name without extension (`.xls` is appended). */
+  /** File name without extension (`.xlsx` is appended by default, or `.xls` when `format: "xls"`). */
   filename: string;
   /** Sheet name / document title. */
   caption: string;
@@ -54,6 +55,8 @@ export interface ExcelExportOptions<T> {
   badgeRules?: readonly ExcelBadgeRule[];
   /** Header text for the automatic serial-number column. Default `"S.No."`. */
   serialHeader?: string;
+  /** Workbook format: `"xlsx"` (default native OpenXML) or `"xls"` (legacy MSO HTML). */
+  format?: "xlsx" | "xls";
 }
 
 const FORMULA_PREFIX = /^[=+\-@\t\r]/;
@@ -163,13 +166,19 @@ export function toExcelHtml<T>(options: ExcelExportOptions<T>): string {
 }
 
 /**
- * Build and download the formatted workbook. No-ops outside the browser.
+ * Build and download the formatted workbook (`.xlsx` native OpenXML by default,
+ * or `.xls` HTML when `format: "xls"`). No-ops outside the browser.
  * Returns the row count so the caller can report the result.
  */
 export function downloadExcel<T>(options: ExcelExportOptions<T>): number {
-  const html = toExcelHtml(options);
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-  const name = options.filename.endsWith(".xls") ? options.filename : `${options.filename}.xls`;
-  if (!downloadBlob(name, blob)) return 0;
-  return options.rows.length;
+  if (options.format === "xls" || options.filename.toLowerCase().endsWith(".xls")) {
+    const html = toExcelHtml(options);
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const name = options.filename.toLowerCase().endsWith(".xls")
+      ? options.filename
+      : `${options.filename}.xls`;
+    if (!downloadBlob(name, blob)) return 0;
+    return options.rows.length;
+  }
+  return downloadXlsx(options);
 }
