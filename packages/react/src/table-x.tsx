@@ -1274,14 +1274,63 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   // ---- Selection -----------------------------------------------------------
 
+  const [allAcrossSelected, setAllAcrossSelected] = React.useState(false);
+  const filterSignature = React.useMemo(
+    () => JSON.stringify([query.q ?? "", query.filter ?? {}]),
+    [query.q, query.filter],
+  );
+  const prevFilterSigRef = React.useRef(filterSignature);
+  React.useEffect(() => {
+    if (prevFilterSigRef.current !== filterSignature) {
+      prevFilterSigRef.current = filterSignature;
+      if (allAcrossSelected) {
+        setAllAcrossSelected(false);
+        onSelectionChange?.(Array.from(selectedIds), false);
+      }
+    }
+  }, [filterSignature, allAcrossSelected, selectedIds, onSelectionChange]);
+
   const isSingleSelect = selectionMode === "single";
   const allPageSelected =
-    pageRowIds.length > 0 && pageRowIds.every((id) => selectedIds.has(id));
+    allAcrossSelected || (pageRowIds.length > 0 && pageRowIds.every((id) => selectedIds.has(id)));
   const somePageSelected =
     !allPageSelected && pageRowIds.some((id) => selectedIds.has(id));
+  const effectiveSelectedCount = allAcrossSelected
+    ? Math.max(total, selectedIds.size)
+    : selectedIds.size;
+
+  const deselectAll = (): void => {
+    setSelectedIds(new Set<string>());
+    setAllAcrossSelected(false);
+    onSelectionChange?.([], false);
+  };
+
+  const selectAllAcrossPages = (): void => {
+    if (isSingleSelect) return;
+    const next = new Set(selectedIds);
+    const clientFullData = allData ?? (isClientSide ? data : undefined);
+    if (clientFullData && clientFullData.length > 0) {
+      const full = queryClientData(clientFullData, query, {
+        ...clientQueryOptions,
+        paginate: false,
+      });
+      for (const row of full.items) {
+        next.add(getRowId(row));
+      }
+    } else {
+      for (const id of pageRowIds) next.add(id);
+    }
+    setSelectedIds(next);
+    setAllAcrossSelected(true);
+    onSelectionChange?.(Array.from(next), true);
+  };
 
   const toggleSelectAll = (): void => {
     if (isSingleSelect) return;
+    if (allAcrossSelected) {
+      deselectAll();
+      return;
+    }
     const next = new Set(selectedIds);
     if (allPageSelected) {
       for (const id of pageRowIds) next.delete(id);
@@ -1289,26 +1338,31 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       for (const id of pageRowIds) next.add(id);
     }
     setSelectedIds(next);
+    setAllAcrossSelected(false);
     onSelectionChange?.(Array.from(next), false);
   };
 
   const toggleSelectRow = (id: string): void => {
-    const next = isSingleSelect
-      ? selectedIds.has(id)
-        ? new Set<string>()
-        : new Set([id])
-      : new Set(selectedIds);
-    if (!isSingleSelect) {
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+    if (isSingleSelect) {
+      const next = selectedIds.has(id) ? new Set<string>() : new Set([id]);
+      setSelectedIds(next);
+      setAllAcrossSelected(false);
+      onSelectionChange?.(Array.from(next), false);
+      return;
     }
+    const next = new Set(selectedIds);
+    if (allAcrossSelected) {
+      for (const pageId of pageRowIds) next.add(pageId);
+      next.delete(id);
+      setSelectedIds(next);
+      setAllAcrossSelected(false);
+      onSelectionChange?.(Array.from(next), false);
+      return;
+    }
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setSelectedIds(next);
     onSelectionChange?.(Array.from(next), false);
-  };
-
-  const deselectAll = (): void => {
-    setSelectedIds(new Set<string>());
-    onSelectionChange?.([], false);
   };
 
   const toggleExpandRow = (id: string): void => {
@@ -1412,6 +1466,10 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   };
 
   const handleBulkExport = async (format: ExportFormat): Promise<void> => {
+    if (allAcrossSelected) {
+      await handleExport(format);
+      return;
+    }
     const pool = allData ?? (isClientSide ? data : rows);
     const selectedRows = pool.filter((r) => selectedIds.has(getRowId(r)));
     if (selectedRows.length > 0) {
@@ -2214,6 +2272,47 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         );
       })() : null}
 
+      {/* ── SELECT ALL ACROSS PAGES BANNER ──────────────────────────────── */}
+      {enableSelection &&
+      !isSingleSelect &&
+      !isLoading &&
+      pageRowIds.length > 0 &&
+      ((allPageSelected && total > pageRowIds.length) || allAcrossSelected) ? (
+        <div className="tbx-select-all-banner" role="status" aria-live="polite">
+          {allAcrossSelected ? (
+            <>
+              <span className="tbx-select-all-banner-text">
+                {formatMessage(locale.allAcrossPagesSelected, {
+                  total: total.toLocaleString(),
+                })}
+              </span>
+              <button
+                type="button"
+                className="tbx-select-all-banner-btn"
+                onClick={deselectAll}
+              >
+                {locale.clearSelection}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="tbx-select-all-banner-text">
+                All <strong>{pageRowIds.length.toLocaleString()}</strong> records on this page are selected.
+              </span>
+              <button
+                type="button"
+                className="tbx-select-all-banner-btn"
+                onClick={selectAllAcrossPages}
+              >
+                {formatMessage(locale.selectAllAcrossPages, {
+                  total: total.toLocaleString(),
+                })}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
       <div ref={tableWrapRef} className="tbx-table-wrap">
         <table className="tbx-table" aria-label={caption}>
@@ -2341,7 +2440,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             ) : (
               rows.map((row, index) => {
                 const id = pageRowIds[index] ?? String(index);
-                const isSelected = selectedIds.has(id);
+                const isSelected = allAcrossSelected || selectedIds.has(id);
                 const isExpanded = expandedRows.has(id);
 
                 return (
@@ -2721,7 +2820,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         ) : (
           rows.map((row, index) => {
             const id = pageRowIds[index] ?? String(index);
-            const isSelected = selectedIds.has(id);
+            const isSelected = allAcrossSelected || selectedIds.has(id);
 
             return (
               <div
@@ -2781,9 +2880,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       </div>
 
       {/* ── BULK ACTIONS FLOATING BAR ───────────────────────────────────── */}
-      {enableSelection && enableBulkActions !== false && selectedIds.size > 0 ? (
+      {enableSelection && enableBulkActions !== false && effectiveSelectedCount > 0 ? (
         <div className="tbx-bulk-bar" role="region" aria-label="Bulk actions">
-          <span className="tbx-bulk-badge">{selectedIds.size} selected</span>
+          <span className="tbx-bulk-badge">
+            {formatMessage(locale.selectedBadge, { count: effectiveSelectedCount.toLocaleString() })}
+          </span>
           <div className="tbx-bulk-actions">
             {isExportVisible ? (
               <>
@@ -2831,9 +2932,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 total: <strong className="tbx-range-total">{total.toLocaleString()}</strong>,
               })}
             </span>
-            {selectedIds.size > 0 ? (
+            {effectiveSelectedCount > 0 ? (
               <span className="tbx-selected-badge">
-                {formatMessage(locale.selectedBadge, { count: selectedIds.size })}
+                {formatMessage(locale.selectedBadge, { count: effectiveSelectedCount.toLocaleString() })}
               </span>
             ) : null}
           </div>

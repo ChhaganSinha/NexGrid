@@ -53,8 +53,7 @@ export interface TableXSelectionChange {
   /** Ids of every selected row, across pages, in selection order. */
   ids: string[];
   /**
-   * Reserved for a future "select every row matching the query" affordance.
-   * Always `false` today.
+   * `true` when the user activates "Select all matching records" across all pages.
    */
   allAcrossSelected: boolean;
 }

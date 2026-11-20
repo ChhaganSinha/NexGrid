@@ -102,8 +102,8 @@ export interface TableXProps<TData> {
   enableColumnResize?: boolean;
   /**
    * Called with every selected row id after each change.
-   * `allAcrossSelected` is reserved for a future "select all matching rows"
-   * affordance and is always `false` today.
+   * `allAcrossSelected` is `true` when the user clicks "Select all matching records"
+   * in the cross-page selection banner.
    */
   onSelectionChange?: (selectedIds: string[], allAcrossSelected: boolean) => void;
 

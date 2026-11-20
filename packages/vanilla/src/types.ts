@@ -180,8 +180,8 @@ export interface TableXOptions<TData> {
   showFilterPills?: boolean;
   /**
    * Called with the running selection whenever it changes.
-   * `allAcrossSelected` is always `false` today — the argument is reserved for
-   * a future "select every matching row across all pages" affordance.
+   * `allAcrossSelected` is `true` when the user clicks "Select all {total} matching records"
+   * in the cross-page selection banner.
    */
   onSelectionChange?: (selectedIds: string[], allAcrossSelected: boolean) => void;
   /** Called when a row (or its mobile card) is clicked. Adds a pointer cursor. */
@@ -255,6 +255,8 @@ export interface TableXHandle<TData> {
   getQuery(): QueryState;
   /** Ids of the currently selected rows, in selection order. */
   getSelection(): string[];
+  /** True when "Select all matching records across all pages" is active. */
+  isAllAcrossSelected(): boolean;
   /** Set the dataset (updates in-memory data in client mode, or current page in server mode). */
   setData(data: TData[]): void;
   /** Tear down: detach the grid and remove every listener it registered. */

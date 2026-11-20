@@ -1260,6 +1260,83 @@ test("multi-select checkbox column filter and column header quick actions (sort,
   handle.destroy();
 });
 
+test("select all across all pages banner sets allAcrossSelected, populates matching IDs, and resets on filter or clear", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const items = Array.from({ length: 25 }, (_, i) => ({
+    id: String(i + 1),
+    name: `Student ${i + 1}`,
+    dept: i % 2 === 0 ? "CS" : "Math",
+  }));
+
+  let lastEvent = null;
+  const handle = createTableX(container, {
+    caption: "Select All Across Pages Test",
+    columns: [
+      { accessorKey: "name", header: "Name" },
+      { accessorKey: "dept", header: "Department" },
+    ],
+    data: items,
+    clientSidePagination: true,
+    enableSelection: true,
+    onSelectionChange: (ids, allAcrossSelected) => {
+      lastEvent = { ids, allAcrossSelected };
+    },
+  });
+
+  const banner = container.querySelector(".tbx-select-all-banner");
+  assert.ok(banner);
+  assert.equal(banner.style.display, "none", "Banner is hidden initially");
+
+  // 1. Check header Select-All on page 1 (10 rows out of 25)
+  const headerCheckbox = container.querySelector('[data-tbx-focus="select-all"]');
+  assert.ok(headerCheckbox);
+  headerCheckbox.checked = true;
+  headerCheckbox.dispatchEvent(new MockEvent("change"));
+
+  assert.equal(handle.getSelection().length, 10);
+  assert.equal(handle.isAllAcrossSelected(), false);
+  assert.equal(lastEvent.allAcrossSelected, false);
+  assert.equal(banner.style.display, "flex", "Banner appears when full page is selected and total > pageSize");
+  const selectAllAcrossBtn = banner.querySelector(".tbx-select-all-banner-btn");
+  assert.ok(selectAllAcrossBtn.textContent.includes("25"), "Button names total matching records (25)");
+
+  // 2. Click "Select all 25 matching records"
+  selectAllAcrossBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.isAllAcrossSelected(), true);
+  assert.equal(handle.getSelection().length, 25, "All 25 matching rows across all pages are selected");
+  assert.equal(lastEvent.allAcrossSelected, true);
+  assert.equal(lastEvent.ids.length, 25);
+  assert.ok(container.querySelector(".tbx-bulk-badge").textContent.includes("25"));
+
+  // 3. Navigating to page 2 keeps allAcrossSelected = true
+  container.querySelector('[data-tbx-focus="page-next"]').dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.isAllAcrossSelected(), true, "Page navigation preserves cross-page selection");
+
+  // 4. Clicking "Clear selection" resets everything
+  const clearBtn = banner.querySelector(".tbx-select-all-banner-btn");
+  assert.ok(clearBtn.textContent.includes("Clear"));
+  clearBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.isAllAcrossSelected(), false);
+  assert.equal(handle.getSelection().length, 0);
+  assert.equal(banner.style.display, "none");
+
+  // 5. Re-select all across pages, then change filter -> resets allAcrossSelected to false
+  const headerCheckbox2 = container.querySelector('[data-tbx-focus="select-all"]');
+  headerCheckbox2.checked = true;
+  headerCheckbox2.dispatchEvent(new MockEvent("change"));
+  banner.querySelector(".tbx-select-all-banner-btn").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.isAllAcrossSelected(), true);
+
+  handle.update({
+    query: { ...handle.getQuery(), page: 1, filter: { dept: "CS" } },
+  });
+  assert.equal(handle.isAllAcrossSelected(), false, "Changing filter resets allAcrossSelected");
+
+  handle.destroy();
+});
+
 
 
 

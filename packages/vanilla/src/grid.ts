@@ -175,6 +175,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private density: Density;
   private hidden: Record<string, boolean>;
   private readonly selected = new Set<string>();
+  private allAcrossSelected = false;
   private isLoading: boolean;
   private isError: boolean;
   private isExporting = false;
@@ -224,6 +225,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private readonly rowsSelect: HTMLSelectElement | null = null;
   private readonly jumpInput: HTMLInputElement | null = null;
   private readonly filterPillsBar: HTMLDivElement;
+  private readonly selectAllBanner: HTMLDivElement;
   private expandedRows = new Set<string>();
   private editingCell: { rowId: string; columnId: string } | null = null;
   private draggedColumnId: string | null = null;
@@ -294,6 +296,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     this.filterPillsBar = el("div", { class: "tbx-filter-pills-bar", style: { display: "none" } });
+    this.selectAllBanner = el("div", {
+      class: "tbx-select-all-banner",
+      attrs: { role: "status", "aria-live": "polite" },
+      style: { display: "none" },
+    });
 
     // ---- Root -------------------------------------------------------------
     const rootClasses = ["tbx-root"];
@@ -565,7 +572,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (patch.total !== undefined && !this.isClientSide) this.total = patch.total;
     if (patch.query !== undefined) {
       queryChanged = !queryEquals(patch.query, this.query);
+      const filterChanged = this.filterFingerprint(patch.query) !== this.filterFingerprint(this.query);
       this.query = patch.query;
+      if (filterChanged && this.allAcrossSelected) {
+        this.allAcrossSelected = false;
+        this.emitSelection();
+      }
       if (this.isClientSide && patch.data === undefined) {
         const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
         this.data = paged.items;
@@ -613,6 +625,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   getSelection(): string[] {
     return Array.from(this.selected);
+  }
+
+  isAllAcrossSelected(): boolean {
+    return this.allAcrossSelected;
   }
 
   destroy(): void {
@@ -750,12 +766,21 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // Query mutations — every one of them routed through a core reducer
   // =========================================================================
 
+  private filterFingerprint(q: QueryState): string {
+    return JSON.stringify([q.q ?? "", q.filter ?? {}]);
+  }
+
   private applyQuery(next: QueryState): void {
     if (queryEquals(next, this.query)) {
       this.render();
       return;
     }
+    const filterChanged = this.filterFingerprint(next) !== this.filterFingerprint(this.query);
     this.query = next;
+    if (filterChanged && this.allAcrossSelected) {
+      this.allAcrossSelected = false;
+      this.emitSelection();
+    }
     if (this.options.endpoint !== undefined) {
       this.options.onQueryChange?.(next);
       void this.fetchFromEndpoint();
@@ -964,6 +989,33 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return;
     }
 
+    await this.exportRowsWithFormat(format, rows);
+  }
+
+  private async runBulkExport(format: "excel" | "csv"): Promise<void> {
+    if (this.isExporting) return;
+    if (this.allAcrossSelected) {
+      await this.runExport(format);
+      return;
+    }
+    const pool = this.options.allData ?? (this.isClientSide ? this.rawClientData : this.data);
+    const selectedRows = pool.filter((r) => this.selected.has(this.rowId(r)));
+    if (selectedRows.length > 0) {
+      await this.exportRowsWithFormat(format, selectedRows);
+      return;
+    }
+    await this.runExport(format);
+  }
+
+  private async exportRowsWithFormat(
+    format: "excel" | "csv" | "clipboard",
+    rows: readonly TData[],
+  ): Promise<void> {
+    if (rows.length === 0) {
+      this.notify("error", this.locale.exportNoData);
+      return;
+    }
+
     const columns = toExportColumns(this.visibleCols(), {
       yes: this.locale.booleanYes,
       no: this.locale.booleanNo,
@@ -1041,25 +1093,70 @@ class NexGridController<TData> implements TableXHandle<TData> {
     return this.options.selectionMode === "single";
   }
 
+  private isRowSelected(id: string): boolean {
+    return this.allAcrossSelected || this.selected.has(id);
+  }
+
+  private effectiveSelectedCount(): number {
+    return this.allAcrossSelected ? Math.max(this.total, this.selected.size) : this.selected.size;
+  }
+
+  private selectAllAcrossPages(): void {
+    if (this.isSingleSelection()) return;
+    this.allAcrossSelected = true;
+    const pool = this.options.allData ?? (this.isClientSide ? this.rawClientData : undefined);
+    if (pool && pool.length > 0) {
+      const full = queryClientData(pool, this.query, this.clientQueryOptions({ paginate: false }));
+      for (const row of full.items) {
+        this.selected.add(this.rowId(row));
+      }
+    } else {
+      for (const id of this.pageRowIds()) {
+        this.selected.add(id);
+      }
+    }
+    this.emitSelection();
+    this.render();
+  }
+
+  private clearAllSelection(): void {
+    this.selected.clear();
+    this.allAcrossSelected = false;
+    this.emitSelection();
+    this.render();
+  }
+
   private toggleSelectAll(): void {
     if (this.isSingleSelection()) return;
+    if (this.allAcrossSelected) {
+      this.clearAllSelection();
+      return;
+    }
     const ids = this.pageRowIds();
     const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
     for (const id of ids) {
       if (allSelected) this.selected.delete(id);
       else this.selected.add(id);
     }
+    this.allAcrossSelected = false;
     this.emitSelection();
     this.render();
   }
 
   private toggleSelectRow(id: string): void {
     if (this.isSingleSelection()) {
+      this.allAcrossSelected = false;
       if (this.selected.has(id)) this.selected.clear();
       else {
         this.selected.clear();
         this.selected.add(id);
       }
+    } else if (this.allAcrossSelected) {
+      for (const pageId of this.pageRowIds()) {
+        this.selected.add(pageId);
+      }
+      this.selected.delete(id);
+      this.allAcrossSelected = false;
     } else {
       if (this.selected.has(id)) this.selected.delete(id);
       else this.selected.add(id);
@@ -1069,7 +1166,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   }
 
   private emitSelection(): void {
-    this.options.onSelectionChange?.(Array.from(this.selected), false);
+    this.options.onSelectionChange?.(Array.from(this.selected), this.allAcrossSelected);
   }
 
   // =========================================================================
@@ -1109,6 +1206,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.mount("grid");
     this.renderToolbar();
     this.renderFilterPills();
+    this.renderSelectAllBanner();
     this.renderHead();
     this.renderFilterPopover();
     this.renderBody();
@@ -1162,7 +1260,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const children: HTMLElement[] = [];
       if (this.options.showToolbar !== false) children.push(this.toolbar);
       if (this.options.showFilterPills !== false) children.push(this.filterPillsBar);
-      children.push(this.tableWrap, this.cards);
+      children.push(this.selectAllBanner, this.tableWrap, this.cards);
       if (this.options.showFooter !== false) children.push(this.footer);
       replaceChildren(this.root, children);
     }
@@ -1726,8 +1824,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
         row1Cells.push(el("th", { class: thClasses.join(" "), style: thStyle, attrs }));
       } else {
         const ids = this.pageRowIds();
-        const allSelected = ids.length > 0 && ids.every((id) => this.selected.has(id));
-        const someSelected = ids.some((id) => this.selected.has(id));
+        const allSelected =
+          this.allAcrossSelected || (ids.length > 0 && ids.every((id) => this.selected.has(id)));
+        const someSelected = !allSelected && ids.some((id) => this.selected.has(id));
         const checkbox = el("input", {
           class: "tbx-checkbox",
           attrs: {
@@ -2176,7 +2275,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     colSpan: number,
   ): HTMLTableRowElement | HTMLTableRowElement[] {
     const id = this.rowId(row);
-    const selected = this.selected.has(id);
+    const selected = this.isRowSelected(id);
     const isExpanded = this.expandedRows.has(id);
     const clickable = this.options.onRowClick !== undefined;
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
@@ -2381,42 +2480,107 @@ class NexGridController<TData> implements TableXHandle<TData> {
     replaceChildren(this.tfoot, [el("tr", { class: "tbx-summary-row" }, cells)]);
   }
 
+  private renderSelectAllBanner(): void {
+    const ids = this.pageRowIds();
+    const allPageSelected =
+      this.allAcrossSelected || (ids.length > 0 && ids.every((id) => this.selected.has(id)));
+    const show =
+      this.selectionEnabled() &&
+      !this.isSingleSelection() &&
+      !this.isLoading &&
+      ids.length > 0 &&
+      ((allPageSelected && this.total > ids.length) || this.allAcrossSelected);
+
+    if (!show) {
+      this.selectAllBanner.style.display = "none";
+      replaceChildren(this.selectAllBanner, []);
+      return;
+    }
+
+    this.selectAllBanner.style.display = "flex";
+
+    if (this.allAcrossSelected) {
+      const textSpan = el("span", {
+        class: "tbx-select-all-banner-text",
+        text: formatMessage(
+          this.locale.allAcrossPagesSelected ??
+            "All {total} matching records across all pages are selected.",
+          {
+            total: this.total.toLocaleString(),
+          },
+        ),
+      });
+      const clearBtn = el("button", {
+        class: "tbx-select-all-banner-btn",
+        attrs: { type: "button" },
+        text: this.locale.clearSelection ?? "Clear selection",
+      });
+      clearBtn.addEventListener("click", () => this.clearAllSelection());
+      replaceChildren(this.selectAllBanner, [textSpan, clearBtn]);
+    } else {
+      const textSpan = el("span", { class: "tbx-select-all-banner-text" }, [
+        "All ",
+        el("strong", { text: ids.length.toLocaleString() }),
+        " records on this page are selected.",
+      ]);
+      const selectAllBtn = el("button", {
+        class: "tbx-select-all-banner-btn",
+        attrs: { type: "button" },
+        text: formatMessage(
+          this.locale.selectAllAcrossPages ?? "Select all {total} matching records",
+          {
+            total: this.total.toLocaleString(),
+          },
+        ),
+      });
+      selectAllBtn.addEventListener("click", () => this.selectAllAcrossPages());
+      replaceChildren(this.selectAllBanner, [textSpan, selectAllBtn]);
+    }
+  }
+
   // ---- Bulk Actions Bar ----------------------------------------------------
 
   private renderBulkBar(): void {
-    if (this.selected.size === 0 || this.options.enableBulkActions === false) {
+    const count = this.effectiveSelectedCount();
+    if (count === 0 || this.options.enableBulkActions === false) {
       if (this.bulkBar.parentElement) this.bulkBar.remove();
       return;
     }
 
     const badge = el("span", {
       class: "tbx-bulk-badge",
-      text: `${this.selected.size} selected`,
+      text: formatMessage(this.locale.selectedBadge, { count: count.toLocaleString() }),
     });
 
     const actions = el("div", { class: "tbx-bulk-actions" });
 
-    const excelBtn = el(
-      "button",
-      { class: "tbx-bulk-btn", attrs: { type: "button" } },
-      [fileSpreadsheetIcon("tbx-icon--excel"), el("span", { text: "Export Excel" })],
-    );
-    excelBtn.addEventListener("click", () => void this.runExport("excel"));
-    actions.appendChild(excelBtn);
+    if (this.options.enableExport !== false && this.options.showExportButton !== false) {
+      const excelBtn = el(
+        "button",
+        { class: "tbx-bulk-btn", attrs: { type: "button" } },
+        [
+          fileSpreadsheetIcon("tbx-icon--excel"),
+          el("span", { text: this.locale.exportExcelButton ?? "Export Excel" }),
+        ],
+      );
+      excelBtn.addEventListener("click", () => void this.runBulkExport("excel"));
+      actions.appendChild(excelBtn);
 
-    const csvBtn = el(
-      "button",
-      { class: "tbx-bulk-btn", attrs: { type: "button" } },
-      [fileTextIcon("tbx-icon--csv"), el("span", { text: "Export CSV" })],
-    );
-    csvBtn.addEventListener("click", () => void this.runExport("csv"));
-    actions.appendChild(csvBtn);
+      const csvBtn = el(
+        "button",
+        { class: "tbx-bulk-btn", attrs: { type: "button" } },
+        [
+          fileTextIcon("tbx-icon--csv"),
+          el("span", { text: this.locale.exportCsvButton ?? "Export CSV" }),
+        ],
+      );
+      csvBtn.addEventListener("click", () => void this.runBulkExport("csv"));
+      actions.appendChild(csvBtn);
+    }
 
     if (this.options.bulkActions) {
       const custom = this.options.bulkActions(Array.from(this.selected), () => {
-        this.selected.clear();
-        this.emitSelection();
-        this.render();
+        this.clearAllSelection();
       });
       if (typeof custom === "string") actions.appendChild(el("span", { text: custom }));
       else if (custom) actions.appendChild(custom);
@@ -2431,9 +2595,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       [xIcon("tbx-icon")],
     );
     closeBtn.addEventListener("click", () => {
-      this.selected.clear();
-      this.emitSelection();
-      this.render();
+      this.clearAllSelection();
     });
 
     replaceChildren(this.bulkBar, [badge, actions, closeBtn]);
@@ -3346,7 +3508,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     cols: readonly TableXVanillaColumn<TData>[],
   ): HTMLDivElement {
     const id = this.rowId(row);
-    const selected = this.selected.has(id);
+    const selected = this.isRowSelected(id);
     const clickable = this.options.onRowClick !== undefined;
 
     const classes = ["tbx-card"];
@@ -3416,11 +3578,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const rangeChildren: ElementChild[] = [sentence];
-    if (this.selected.size > 0) {
+    const selectedTotal = this.effectiveSelectedCount();
+    if (selectedTotal > 0) {
       rangeChildren.push(
         el("span", {
           class: "tbx-selected-badge",
-          text: formatMessage(this.locale.selectedBadge, { count: this.selected.size }),
+          text: formatMessage(this.locale.selectedBadge, { count: selectedTotal.toLocaleString() }),
         }),
       );
     }

@@ -2401,9 +2401,51 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+/* ---- Select All Across Pages Banner ---- */
+.tbx-select-all-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--tbx-fg);
+  background: color-mix(in srgb, var(--tbx-primary) 8%, var(--tbx-card));
+  border: 1px solid color-mix(in srgb, var(--tbx-primary) 24%, var(--tbx-border));
+  border-radius: 8px;
+}
+
+.tbx-select-all-banner-text strong {
+  font-weight: 600;
+}
+
+.tbx-select-all-banner-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--tbx-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tbx-select-all-banner-btn:hover {
+  opacity: 0.85;
+}
+
+.tbx-select-all-banner-btn:focus-visible {
+  outline: 2px solid var(--tbx-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 /* ---- Print Optimization ---- */
 @media print {
   .tbx-toolbar,
+  .tbx-select-all-banner,
   .tbx-bulk-bar,
   .tbx-footer,
   .tbx-col-filter-wrap,

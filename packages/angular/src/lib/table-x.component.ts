@@ -719,6 +719,32 @@ const SEARCH_DEBOUNCE_MS = 350;
         </div>
       }
 
+      @if (showSelectAllBanner) {
+        <div class="tbx-select-all-banner" role="status" aria-live="polite">
+          @if (allAcrossSelected) {
+            <span class="tbx-select-all-banner-text">{{ allAcrossBannerMessage }}</span>
+            <button
+              type="button"
+              class="tbx-select-all-banner-btn"
+              (click)="deselectAll()"
+            >
+              {{ strings.clearSelection || 'Clear selection' }}
+            </button>
+          } @else {
+            <span class="tbx-select-all-banner-text">
+              All <strong>{{ rows.length }}</strong> records on this page are selected.
+            </span>
+            <button
+              type="button"
+              class="tbx-select-all-banner-btn"
+              (click)="selectAllAcrossPages()"
+            >
+              {{ selectAllAcrossBannerButton }}
+            </button>
+          }
+        </div>
+      }
+
       <div class="tbx-table-wrap">
         <table class="tbx-table" [attr.aria-label]="caption">
           <thead>
@@ -1990,6 +2016,10 @@ export class TableXComponent<TData>
   protected selectedCount = 0;
   protected allPageSelected = false;
   protected somePageSelected = false;
+  protected allAcrossSelected = false;
+  protected showSelectAllBanner = false;
+  protected selectAllAcrossBannerButton = "";
+  protected allAcrossBannerMessage = "";
   protected bulkActionsContext: TableXBulkActionsTemplateContext = {
     $implicit: [],
     selectedIds: [],
@@ -2046,6 +2076,7 @@ export class TableXComponent<TData>
   private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
   private hasBoundQuery = false;
+  private lastFilterSignature = "";
   private selectedIds: ReadonlySet<string> = new Set<string>();
   private expandedRowIds = new Set<string>();
   private headerPointer: {
@@ -2770,36 +2801,77 @@ export class TableXComponent<TData>
 
   protected toggleSelectAll(): void {
     if (this.selectionMode === "single") return;
+    if (this.allAcrossSelected) {
+      this.deselectAll();
+      return;
+    }
     const next = new Set(this.selectedIds);
     if (this.allPageSelected) {
       for (const row of this.rows) next.delete(row.id);
     } else {
       for (const row of this.rows) next.add(row.id);
     }
+    this.allAcrossSelected = false;
+    this.applySelection(next);
+  }
+
+  protected selectAllAcrossPages(): void {
+    if (this.selectionMode === "single") return;
+    const next = new Set(this.selectedIds);
+    const pool = this.allData ?? (this.isClientMode ? this.data : undefined);
+    if (pool && pool.length > 0) {
+      const rawColumns =
+        this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+      const leafCols = flattenColumns(rawColumns);
+      const searchFields =
+        this.searchableFields && this.searchableFields.length > 0
+          ? this.searchableFields
+          : (searchableColumnIds(leafCols, this.hiddenColumns as Record<string, boolean>) as (keyof TData & string)[]);
+      const full = queryClientData(pool, this.query, {
+        paginate: false,
+        columns: rawColumns,
+        ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+      });
+      for (const item of full.items) {
+        next.add(this.getRowId(item));
+      }
+    } else {
+      for (const row of this.rows) next.add(row.id);
+    }
+    this.allAcrossSelected = true;
     this.applySelection(next);
   }
 
   protected toggleRow(row: NexGridRowView<TData>): void {
     if (this.selectionMode === "single") {
+      this.allAcrossSelected = false;
       if (this.selectedIds.has(row.id)) this.applySelection(new Set());
       else this.applySelection(new Set([row.id]));
       return;
     }
     const next = new Set(this.selectedIds);
+    if (this.allAcrossSelected) {
+      for (const pageRow of this.rows) next.add(pageRow.id);
+      next.delete(row.id);
+      this.allAcrossSelected = false;
+      this.applySelection(next);
+      return;
+    }
     if (next.has(row.id)) next.delete(row.id);
     else next.add(row.id);
     this.applySelection(next);
   }
 
   protected deselectAll(): void {
-    if (this.selectedIds.size === 0) return;
+    if (this.selectedIds.size === 0 && !this.allAcrossSelected) return;
+    this.allAcrossSelected = false;
     this.applySelection(new Set());
   }
 
   private applySelection(next: Set<string>): void {
     this.selectedIds = next;
     this.recompute();
-    this.selectionChange.emit({ ids: Array.from(next), allAcrossSelected: false });
+    this.selectionChange.emit({ ids: Array.from(next), allAcrossSelected: this.allAcrossSelected });
   }
 
   // ---------------------------------------------------------------------
@@ -2940,6 +3012,10 @@ export class TableXComponent<TData>
   // ---------------------------------------------------------------------
 
   protected async runBulkExport(format: "excel" | "csv"): Promise<void> {
+    if (this.allAcrossSelected) {
+      await this.runExport(format);
+      return;
+    }
     const pool = this.allData ?? (this.isClientMode ? this.data : this.rows.map((r) => r.data));
     const selectedRows = pool.filter((r) => this.selectedIds.has(this.getRowId(r)));
     if (selectedRows.length > 0) {
@@ -3386,13 +3462,22 @@ export class TableXComponent<TData>
     const displayData = clientPaged ? clientPaged.items : this.data;
     const effectiveTotal = clientPaged ? clientPaged.total : (this.total ?? this.data.length);
 
+    const filterSig = JSON.stringify([this.query.q ?? "", this.query.filter ?? {}]);
+    if (this.lastFilterSignature !== "" && this.lastFilterSignature !== filterSig) {
+      if (this.allAcrossSelected) {
+        this.allAcrossSelected = false;
+        this.selectionChange.emit({ ids: Array.from(this.selectedIds), allAcrossSelected: false });
+      }
+    }
+    this.lastFilterSignature = filterSig;
+
     const page = Math.max(1, Math.trunc(this.query.page));
     const pageSize = this.query.pageSize;
     const rowKeys = new Set<string>();
 
     this.rows = displayData.map((row, rowIndex) => {
       const id = this.getRowId(row);
-      const selected = this.selectedIds.has(id);
+      const selected = this.allAcrossSelected || this.selectedIds.has(id);
       const expanded = this.hasExpandColumn && this.expandedRowIds.has(id);
       const expandedText =
         expanded && !this.expandedRowSlot && this.renderExpandedRow
@@ -3512,12 +3597,31 @@ export class TableXComponent<TData>
       total: range.total.toLocaleString(),
     });
 
-    this.selectedCount = this.selectedIds.size;
-    this.selectedBadge = formatMessage(strings.selectedBadge, { count: this.selectedCount });
+    this.selectedCount = this.allAcrossSelected
+      ? Math.max(effectiveTotal, this.selectedIds.size)
+      : this.selectedIds.size;
+    this.selectedBadge = formatMessage(strings.selectedBadge, {
+      count: this.selectedCount.toLocaleString(),
+    });
     this.allPageSelected =
-      this.rows.length > 0 && this.rows.every((row) => this.selectedIds.has(row.id));
+      this.allAcrossSelected ||
+      (this.rows.length > 0 && this.rows.every((row) => this.selectedIds.has(row.id)));
     this.somePageSelected =
       !this.allPageSelected && this.rows.some((row) => this.selectedIds.has(row.id));
+    this.showSelectAllBanner =
+      this.enableSelection &&
+      this.selectionMode !== "single" &&
+      !this.isLoading &&
+      this.rows.length > 0 &&
+      ((this.allPageSelected && effectiveTotal > this.rows.length) || this.allAcrossSelected);
+    this.selectAllAcrossBannerButton = formatMessage(
+      strings.selectAllAcrossPages ?? "Select all {total} matching records",
+      { total: effectiveTotal.toLocaleString() },
+    );
+    this.allAcrossBannerMessage = formatMessage(
+      strings.allAcrossPagesSelected ?? "All {total} matching records across all pages are selected.",
+      { total: effectiveTotal.toLocaleString() },
+    );
     const selectedList = Array.from(this.selectedIds);
     this.bulkActionsContext = {
       $implicit: selectedList,
