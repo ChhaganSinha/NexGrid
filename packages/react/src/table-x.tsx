@@ -26,6 +26,7 @@ import {
   downloadExcel,
   fetchAllPages,
   filePrefixFromCaption,
+  formatFilterPillValue,
   formatMessage,
   getColumnId,
   getColumnTitle,
@@ -38,12 +39,16 @@ import {
   isExportable,
   isFilterable,
   isHideable,
+  isMultiSelectFilter,
   isPageSize,
   isPinned,
   isSortable,
+  isStructuralColumn,
+  parseMultiFilterValues,
   primarySort,
   resolveLocale,
   serialNumber,
+  serializeMultiFilterValues,
   timestampedFilename,
   toExportColumns,
   totalPagesFor,
@@ -52,6 +57,7 @@ import {
   withPage,
   withPageSize,
   withSearch,
+  withSort,
   withToggledSort,
   withToggledMultiSort,
   copyToClipboard,
@@ -155,26 +161,55 @@ interface ReactColumnFilterPopoverProps<TData, TRender> {
   meta: NonNullable<TableXColumn<TData, TRender>["meta"]>;
   title: string;
   activeFilter?: string;
-  locale: TableXLocale;
+  filterable: boolean;
+  enableColumnMenu: boolean;
+  sortable: boolean;
+  activeSortDir: "asc" | "desc" | null;
+  currentPin: "left" | "right" | false;
+  canHide: boolean;
+  locale: Required<TableXLocale>;
   rootRef: React.RefObject<HTMLDivElement | null>;
   tableWrapRef: React.RefObject<HTMLDivElement | null>;
   onApply: (val: string | undefined) => void;
+  onSortDir: (dir: "asc" | "desc" | null) => void;
+  onPin: (side: "left" | "right" | "none") => void;
+  onHide: () => void;
   onClose: () => void;
 }
 
 function ReactColumnFilterPopover<TData, TRender>({
   id,
+  col,
   meta,
   title,
   activeFilter,
+  filterable,
+  enableColumnMenu,
+  sortable,
+  activeSortDir,
+  currentPin,
+  canHide,
   locale,
   rootRef,
   tableWrapRef,
   onApply,
+  onSortDir,
+  onPin,
+  onHide,
   onClose,
 }: ReactColumnFilterPopoverProps<TData, TRender>): React.JSX.Element {
+  const isMultiSelect = isMultiSelectFilter(col) && Boolean(meta.filterOptions && meta.filterOptions.length > 0);
   const [selectedVal, setSelectedVal] = React.useState<string>(activeFilter ?? "");
-  const [searchTerm, setSearchTerm] = React.useState<string>(activeFilter ?? "");
+  const [searchTerm, setSearchTerm] = React.useState<string>(() =>
+    isMultiSelect ? "" : (activeFilter ?? ""),
+  );
+  const [selectedMulti, setSelectedMulti] = React.useState<ReadonlySet<string>>(() => {
+    if (!isMultiSelect || !meta.filterOptions) return new Set<string>();
+    const tokens = parseMultiFilterValues(activeFilter, true).map((t) => t.toLowerCase());
+    return new Set(
+      meta.filterOptions.filter((opt) => tokens.includes(opt.trim().toLowerCase())),
+    );
+  });
   const [hasTyped, setHasTyped] = React.useState<boolean>(false);
   const [fromVal, setFromVal] = React.useState<string>(() => {
     if (meta.filterType === "date-range" && activeFilter) {
@@ -294,6 +329,111 @@ function ReactColumnFilterPopover<TData, TRender>({
     };
   }, [tableWrapRef, updatePosition]);
 
+  const isPinCapable = !isStructuralColumn(col) && id !== "";
+  const hasQuickActions = enableColumnMenu && (sortable || isPinCapable || canHide);
+  const quickActionsNode = hasQuickActions ? (
+    <>
+      <div className="tbx-col-menu-actions">
+        {sortable ? (
+          <>
+            <button
+              type="button"
+              data-col-action="sort-asc"
+              className={`tbx-col-menu-btn ${activeSortDir === "asc" ? "tbx-col-menu-btn--active" : ""}`}
+              onClick={() => {
+                onSortDir(activeSortDir === "asc" ? null : "asc");
+                onClose();
+              }}
+            >
+              <ArrowUpIcon className="tbx-icon" />
+              <span>{locale.sortAscending}</span>
+            </button>
+            <button
+              type="button"
+              data-col-action="sort-desc"
+              className={`tbx-col-menu-btn ${activeSortDir === "desc" ? "tbx-col-menu-btn--active" : ""}`}
+              onClick={() => {
+                onSortDir(activeSortDir === "desc" ? null : "desc");
+                onClose();
+              }}
+            >
+              <ArrowDownIcon className="tbx-icon" />
+              <span>{locale.sortDescending}</span>
+            </button>
+          </>
+        ) : null}
+        {isPinCapable && currentPin !== "left" ? (
+          <button
+            type="button"
+            data-col-action="pin-left"
+            className="tbx-col-menu-btn"
+            onClick={() => {
+              onPin("left");
+              onClose();
+            }}
+          >
+            <span>{locale.pinLeft}</span>
+          </button>
+        ) : null}
+        {isPinCapable && currentPin !== "right" ? (
+          <button
+            type="button"
+            data-col-action="pin-right"
+            className="tbx-col-menu-btn"
+            onClick={() => {
+              onPin("right");
+              onClose();
+            }}
+          >
+            <span>{locale.pinRight}</span>
+          </button>
+        ) : null}
+        {isPinCapable && (currentPin === "left" || currentPin === "right") ? (
+          <button
+            type="button"
+            data-col-action="unpin"
+            className="tbx-col-menu-btn tbx-col-menu-btn--active"
+            onClick={() => {
+              onPin("none");
+              onClose();
+            }}
+          >
+            <span>{locale.unpinColumn}</span>
+          </button>
+        ) : null}
+        {canHide ? (
+          <button
+            type="button"
+            data-col-action="hide"
+            className="tbx-col-menu-btn"
+            onClick={() => {
+              onHide();
+              onClose();
+            }}
+          >
+            <span>{locale.hideColumn}</span>
+          </button>
+        ) : null}
+      </div>
+      {filterable ? <div className="tbx-col-menu-sep" /> : null}
+    </>
+  ) : null;
+
+  if (!filterable) {
+    return (
+      <div
+        ref={popoverRef}
+        style={popoverStyle}
+        className="tbx-filter-popover"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {quickActionsNode}
+      </div>
+    );
+  }
+
   if (meta.filterType === "date-range") {
     const applyDateRange = () => {
       const f = fromVal.trim();
@@ -319,6 +459,7 @@ function ReactColumnFilterPopover<TData, TRender>({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
+        {quickActionsNode}
         <div className="tbx-range-inputs">
           <input
             ref={primaryInputRef}
@@ -389,6 +530,7 @@ function ReactColumnFilterPopover<TData, TRender>({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
+        {quickActionsNode}
         <div className="tbx-range-inputs">
           <input
             ref={primaryInputRef}
@@ -436,6 +578,117 @@ function ReactColumnFilterPopover<TData, TRender>({
     );
   }
 
+  if (isMultiSelect && meta.filterOptions && meta.filterOptions.length > 0) {
+    const placeholder =
+      meta.filterPlaceholder ||
+      formatMessage(locale.filterColumnPlaceholder, { column: title });
+    const term = searchTerm.trim().toLowerCase();
+    const filteredMulti = meta.filterOptions.filter(
+      (opt) => !term || opt.toLowerCase().includes(term),
+    );
+    const submitMulti = () => {
+      const ordered = meta.filterOptions!.filter((opt) => selectedMulti.has(opt));
+      onApply(serializeMultiFilterValues(ordered));
+      onClose();
+    };
+    const toggleOpt = (opt: string) => {
+      setSelectedMulti((prev) => {
+        const next = new Set(prev);
+        if (next.has(opt)) next.delete(opt);
+        else next.add(opt);
+        return next;
+      });
+    };
+
+    return (
+      <div
+        ref={popoverRef}
+        style={popoverStyle}
+        className="tbx-filter-popover"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {quickActionsNode}
+        <input
+          ref={primaryInputRef}
+          type="text"
+          className="tbx-filter-popover-input"
+          value={searchTerm}
+          placeholder={placeholder}
+          aria-label={`Filter ${title}`}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitMulti();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+        />
+        <div className="tbx-filter-popover-options" role="listbox" aria-multiselectable="true">
+          <div
+            className={`tbx-filter-option ${selectedMulti.size === 0 ? "tbx-filter-option--selected" : ""}`}
+            onClick={() => setSelectedMulti(new Set())}
+          >
+            {locale.filterAll}
+          </div>
+          {filteredMulti.length === 0 ? (
+            <div className="tbx-filter-empty">No matching options</div>
+          ) : (
+            filteredMulti.map((opt) => {
+              const checked = selectedMulti.has(opt);
+              return (
+                <div
+                  key={opt}
+                  role="option"
+                  aria-selected={checked}
+                  className={`tbx-filter-option ${checked ? "tbx-filter-option--selected" : ""}`}
+                  onClick={() => toggleOpt(opt)}
+                >
+                  <input
+                    type="checkbox"
+                    className="tbx-filter-option-check"
+                    checked={checked}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleOpt(opt)}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                  <span>{opt}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="tbx-filter-popover-actions">
+          <button
+            type="button"
+            className="tbx-filter-popover-btn"
+            onClick={() => {
+              setSelectedMulti(new Set());
+              onApply(undefined);
+              onClose();
+            }}
+          >
+            <RotateCcwIcon className="tbx-icon" />
+            <span>{locale.clearFilter}</span>
+          </button>
+          <button
+            type="button"
+            className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+            onClick={submitMulti}
+          >
+            <CheckIcon className="tbx-icon" />
+            <span>{locale.applyFilter}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const placeholder =
     meta.filterPlaceholder ||
     formatMessage(locale.filterColumnPlaceholder, { column: title });
@@ -459,6 +712,7 @@ function ReactColumnFilterPopover<TData, TRender>({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
+      {quickActionsNode}
       <input
         ref={primaryInputRef}
         type={meta.filterType === "date" ? "date" : meta.filterType === "number" ? "number" : "text"}
@@ -571,6 +825,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableSelection = false,
     selectionMode = "multi",
     enableColumnFilters = true,
+    enableColumnMenu,
     enableColumnResize = true,
     onSelectionChange,
     enableSearch = true,
@@ -677,6 +932,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+  const [pinnedCols, setPinnedCols] = React.useState<Record<string, "left" | "right" | "none">>({});
   const resizeCleanupRef = React.useRef<(() => void) | null>(null);
   const editInputRef = React.useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
@@ -772,6 +1028,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     if (persisted) {
       if (persisted.density) setDensity(persisted.density);
       if (persisted.columnWidths) setColWidths(persisted.columnWidths);
+      if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
+        setPinnedCols(persisted.pinnedColumns);
+      }
       if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
         const hiddenMap: Record<string, boolean> = {};
         for (const col of flattenColumns(columns)) {
@@ -819,8 +1078,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       columnWidths: colWidths,
       columnOrder: colList.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
+      pinnedColumns: pinnedCols,
     });
-  }, [storageKey, hydratedKey, density, hiddenCols, colList, colWidths]);
+  }, [storageKey, hydratedKey, density, hiddenCols, colList, colWidths, pinnedCols]);
 
   const columnsMenu = useDropdown();
   const densityMenu = useDropdown();
@@ -832,6 +1092,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     }
     setDensity(initialDensity);
     setColWidths({});
+    setPinnedCols({});
     setColList(columns);
     setHiddenCols(initialHiddenColumns(flattenColumns(columns)));
     columnsMenu.close();
@@ -926,7 +1187,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     const rightOffsets = new Map<string, number>();
     let currentLeft = 0;
     let lastLeftPinnedId: string | null = null;
-    const hasLeftPinned = visibleCols.some((c) => c.meta?.pinned === "left");
+    const hasLeftPinned = visibleCols.some((c) => isPinned(c, pinnedCols) === "left");
 
     if (hasLeftPinned) {
       if (renderExpandedRow) {
@@ -949,7 +1210,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
       for (const col of visibleCols) {
         const id = getColumnId(col);
-        const pin = col.meta?.pinned;
+        const pin = isPinned(col, pinnedCols);
         const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
         if (pin === "left") {
           leftOffsets.set(id, currentLeft);
@@ -965,7 +1226,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       const col = visibleCols[i];
       if (!col) continue;
       const id = getColumnId(col);
-      const pin = col.meta?.pinned;
+      const pin = isPinned(col, pinnedCols);
       const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
@@ -1414,8 +1675,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           isGroupChild ? "tbx-th--grouped-child" : undefined,
           enableColumnReorder && !isGroupChild ? "tbx-th--draggable" : undefined,
           draggedColId === id ? "tbx-th--dragging" : undefined,
-          isPinned(col) === "left" ? "tbx-th--pinned-left" : undefined,
-          isPinned(col) === "right" ? "tbx-th--pinned-right" : undefined,
+          isPinned(col, pinnedCols) === "left" ? "tbx-th--pinned-left" : undefined,
+          isPinned(col, pinnedCols) === "right" ? "tbx-th--pinned-right" : undefined,
           lastLeftPinnedId === id ? "tbx-pinned-border-left" : undefined,
           firstRightPinnedId === id ? "tbx-pinned-border-right" : undefined,
         ]
@@ -1469,7 +1730,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             </span>
           ) : null}
 
-          {isFilterable(col, enableColumnFilters) ? (
+          {isFilterable(col, enableColumnFilters) ||
+          (!isStructuralColumn(col) && id !== "" && enableColumnMenu === true) ? (
             <div
               className="tbx-col-filter-wrap"
               draggable={false}
@@ -1870,7 +2132,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             return (
               <div key={key} className="tbx-filter-pill">
                 <span className="tbx-filter-pill-label">{title}:</span>
-                <span className="tbx-filter-pill-val">{String(val)}</span>
+                <span className="tbx-filter-pill-val">{formatFilterPillValue(String(val))}</span>
                 <button
                   type="button"
                   className="tbx-filter-pill-remove"
@@ -1896,29 +2158,61 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         </div>
       ) : null}
 
-      {activeFilterPopoverCol ? (
-        <ReactColumnFilterPopover
-          key={`${getColumnId(activeFilterPopoverCol)}:${activeFilterPopoverVal ?? ""}`}
-          id={getColumnId(activeFilterPopoverCol)}
-          col={activeFilterPopoverCol}
-          meta={activeFilterPopoverCol.meta ?? {}}
-          title={getColumnTitle(activeFilterPopoverCol) || getColumnId(activeFilterPopoverCol)}
-          activeFilter={activeFilterPopoverVal}
-          locale={locale}
-          rootRef={rootRef}
-          tableWrapRef={tableWrapRef}
-          onApply={(val) => {
-            const colId = getColumnId(activeFilterPopoverCol);
-            const filterField = getFilterField(activeFilterPopoverCol);
-            let nextQuery = withFilter(query, filterField, val);
-            if (filterField !== colId && nextQuery.filter?.[colId] !== undefined) {
-              nextQuery = withFilter(nextQuery, colId, undefined);
-            }
-            onQueryChange(nextQuery);
-          }}
-          onClose={() => setOpenFilterCol(null)}
-        />
-      ) : null}
+      {activeFilterPopoverCol ? (() => {
+        const popId = getColumnId(activeFilterPopoverCol);
+        const popSortField = getSortField(activeFilterPopoverCol);
+        const popSortable = isSortable(activeFilterPopoverCol) && enableSorting !== false;
+        const popSortDir =
+          query.sort.find(
+            (s) =>
+              s.field.toLowerCase() === popSortField.toLowerCase() ||
+              s.field.toLowerCase() === popId.toLowerCase(),
+          )?.dir ?? null;
+        const popFilterable = isFilterable(activeFilterPopoverCol, enableColumnFilters);
+        const popPin = isPinned(activeFilterPopoverCol, pinnedCols);
+        const popCanHide = isHideable(activeFilterPopoverCol) && isColumnsVisible && visible.length > 1;
+        return (
+          <ReactColumnFilterPopover
+            key={`${popId}:${activeFilterPopoverVal ?? ""}`}
+            id={popId}
+            col={activeFilterPopoverCol}
+            meta={activeFilterPopoverCol.meta ?? {}}
+            title={getColumnTitle(activeFilterPopoverCol) || popId}
+            activeFilter={activeFilterPopoverVal}
+            filterable={popFilterable}
+            enableColumnMenu={enableColumnMenu !== false}
+            sortable={popSortable}
+            activeSortDir={popSortDir}
+            currentPin={popPin}
+            canHide={popCanHide}
+            locale={locale}
+            rootRef={rootRef}
+            tableWrapRef={tableWrapRef}
+            onApply={(val) => {
+              const filterField = getFilterField(activeFilterPopoverCol);
+              let nextQuery = withFilter(query, filterField, val);
+              if (filterField !== popId && nextQuery.filter?.[popId] !== undefined) {
+                nextQuery = withFilter(nextQuery, popId, undefined);
+              }
+              onQueryChange(nextQuery);
+            }}
+            onSortDir={(dir) => {
+              if (dir === null) {
+                onQueryChange({ ...query, sort: [], page: 1 });
+              } else {
+                onQueryChange(withSort(query, popSortField, dir));
+              }
+            }}
+            onPin={(side) => {
+              setPinnedCols((prev) => ({ ...prev, [popId]: side }));
+            }}
+            onHide={() => {
+              setHiddenCols((prev) => ({ ...prev, [popId]: true }));
+            }}
+            onClose={() => setOpenFilterCol(null)}
+          />
+        );
+      })() : null}
 
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
       <div ref={tableWrapRef} className="tbx-table-wrap">

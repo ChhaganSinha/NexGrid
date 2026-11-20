@@ -119,7 +119,18 @@ export function toODataParams(
       if (trimmedVal === "..") continue;
       const field = options?.fieldMap?.[key] ?? key;
       if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
-      if (trimmedVal.includes("..")) {
+      if (trimmedVal.includes("|")) {
+        const orParts = trimmedVal
+          .split("|")
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+          .map((t) => `${field} eq ${formatODataComparableLiteral(t)}`);
+        if (orParts.length === 1) {
+          filterClauses.push(orParts[0]!);
+        } else if (orParts.length > 1) {
+          filterClauses.push(`(${orParts.join(" or ")})`);
+        }
+      } else if (trimmedVal.includes("..")) {
         const [minStr, maxStr] = trimmedVal.split("..");
         const parts: string[] = [];
         if (minStr !== undefined && minStr.trim() !== "") {

@@ -31,6 +31,8 @@ export interface FilterMatchOptions {
   exact?: boolean;
   /** Column filter input type hint. */
   filterType?: TableXColumnMeta["filterType"];
+  /** Whether comma-separated values should also be treated as multi-select OR tokens. */
+  multiSelect?: boolean;
   /** Allowed discrete option values for the column. */
   filterOptions?: readonly string[];
 }
@@ -167,9 +169,32 @@ export function matchesFilterValue(
 
   const filterType = hint?.filterType;
   const filterOptions = hint?.filterOptions;
+  const isMultiSelect = filterType === "multi-select" || hint?.multiSelect === true;
+
+  // 0. Multi-select OR tokens: "Active|Pending" (or "Active,Pending" when multi-select is active)
+  if (
+    filterVal.includes("|") ||
+    (isMultiSelect && filterVal.includes(",") && !filterVal.includes(".."))
+  ) {
+    const sep = filterVal.includes("|") ? "|" : ",";
+    const tokens = filterVal
+      .split(sep)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    if (tokens.length === 0) return true;
+    const singleHint: FilterMatchOptions = {
+      ...hint,
+      filterType: filterType === "multi-select" ? "select" : filterType,
+      multiSelect: false,
+    };
+    return tokens.some((token) => matchesFilterValue(val, token, singleHint));
+  }
+
   const isDiscreteSelect =
     hint?.exact === true ||
     filterType === "select" ||
+    filterType === "multi-select" ||
+    isMultiSelect ||
     Boolean(
       filterOptions &&
         filterOptions.length > 0 &&
@@ -448,6 +473,7 @@ export function queryClientData<TData>(
           col?.meta
             ? {
                 filterType: col.meta.filterType,
+                multiSelect: col.meta.multiSelectFilter,
                 filterOptions: col.meta.filterOptions,
               }
             : undefined,

@@ -4,9 +4,14 @@ import assert from "node:assert/strict";
 import {
   compareValues,
   defaultQuery,
+  formatFilterPillValue,
+  isMultiSelectFilter,
+  isPinned,
   matchesFilterValue,
+  parseMultiFilterValues,
   queryClientData,
   searchableColumnIds,
+  serializeMultiFilterValues,
 } from "../dist/index.js";
 
 const TEST_DATA = [
@@ -352,4 +357,40 @@ test("queryClientData resolves columns metadata (slug id + accessorKey, accessor
 
   assert.deepEqual(res.items.map((r) => r.fullName), ["Alice", "Bob"]);
 });
+
+test("multi-select OR filters, serialization helpers, and runtime pinnedOverrides work end-to-end", () => {
+  const multiCol = {
+    accessorKey: "department",
+    meta: { filterType: "multi-select", filterOptions: ["Engineering", "Marketing", "Sales", "HR"] },
+  };
+  assert.equal(isMultiSelectFilter(multiCol), true);
+  assert.deepEqual(parseMultiFilterValues("Marketing|HR", multiCol), ["Marketing", "HR"]);
+  assert.equal(serializeMultiFilterValues(["Marketing", "HR"], ["Engineering", "Marketing", "Sales", "HR"]), "Marketing|HR");
+  assert.equal(serializeMultiFilterValues(["Sales"]), "Sales");
+  assert.equal(formatFilterPillValue("Marketing|HR", multiCol), "Marketing, HR");
+
+  // Preserves thousands commas in numeric filters
+  assert.equal(formatFilterPillValue("$1,200"), "$1,200");
+
+  // OR matching in queryClientData
+  const res = queryClientData(
+    TEST_DATA,
+    {
+      page: 1,
+      pageSize: 25,
+      sort: [],
+      filter: { department: "Marketing|HR" },
+    },
+    { columns: [multiCol] },
+  );
+  assert.equal(res.total, 4); // 3 Marketing + 1 HR
+  assert.ok(res.items.every((r) => r.department === "Marketing" || r.department === "HR"));
+
+  // Runtime pinnedOverrides override static meta.pinned
+  const staticLeft = { id: "name", meta: { pinned: "left" } };
+  assert.equal(isPinned(staticLeft), "left");
+  assert.equal(isPinned(staticLeft, { name: "right" }), "right");
+  assert.equal(isPinned(staticLeft, { name: "none" }), false);
+});
+
 

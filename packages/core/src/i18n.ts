@@ -59,6 +59,24 @@ export interface TableXLocale {
   exportExcelButton?: string;
   /** Direct CSV export button label. */
   exportCsvButton?: string;
+  /** Column menu: Sort ascending. */
+  sortAscending?: string;
+  /** Column menu: Sort descending. */
+  sortDescending?: string;
+  /** Column menu: Pin left. */
+  pinLeft?: string;
+  /** Column menu: Pin right. */
+  pinRight?: string;
+  /** Column menu: Unpin column. */
+  unpinColumn?: string;
+  /** Column menu: Hide column. */
+  hideColumn?: string;
+  /** Select-all across pages banner prompt (`All {pageCount} rows on this page are selected.`). */
+  selectAllAcrossPages?: string;
+  /** Select-all across pages active message (`All {total} matching rows across all pages are selected.`). */
+  allAcrossPagesSelected?: string;
+  /** Clear selection link label. */
+  clearSelection?: string;
 }
 export type NexGridLocale = TableXLocale;
 
@@ -111,6 +129,15 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
   resetView: "Reset to default view",
   exportExcelButton: "Export Excel",
   exportCsvButton: "Export CSV",
+  sortAscending: "Sort ascending",
+  sortDescending: "Sort descending",
+  pinLeft: "Pin left",
+  pinRight: "Pin right",
+  unpinColumn: "Unpin column",
+  hideColumn: "Hide column",
+  selectAllAcrossPages: "Select all {total} matching records",
+  allAcrossPagesSelected: "All {total} matching records across all pages are selected.",
+  clearSelection: "Clear selection",
 };
 
 /**
@@ -126,6 +153,15 @@ export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXL
     resetView: partial.resetView ?? DEFAULT_LOCALE.resetView,
     exportExcelButton: partial.exportExcelButton ?? DEFAULT_LOCALE.exportExcelButton,
     exportCsvButton: partial.exportCsvButton ?? DEFAULT_LOCALE.exportCsvButton,
+    sortAscending: partial.sortAscending ?? DEFAULT_LOCALE.sortAscending,
+    sortDescending: partial.sortDescending ?? DEFAULT_LOCALE.sortDescending,
+    pinLeft: partial.pinLeft ?? DEFAULT_LOCALE.pinLeft,
+    pinRight: partial.pinRight ?? DEFAULT_LOCALE.pinRight,
+    unpinColumn: partial.unpinColumn ?? DEFAULT_LOCALE.unpinColumn,
+    hideColumn: partial.hideColumn ?? DEFAULT_LOCALE.hideColumn,
+    selectAllAcrossPages: partial.selectAllAcrossPages ?? DEFAULT_LOCALE.selectAllAcrossPages,
+    allAcrossPagesSelected: partial.allAcrossPagesSelected ?? DEFAULT_LOCALE.allAcrossPagesSelected,
+    clearSelection: partial.clearSelection ?? DEFAULT_LOCALE.clearSelection,
   };
 }
 

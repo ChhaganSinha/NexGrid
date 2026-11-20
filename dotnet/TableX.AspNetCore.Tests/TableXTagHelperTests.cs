@@ -21,6 +21,7 @@ public class TableXTagHelperTests
             MaxExportRows = 5000,
             EnableColumnReorder = true,
             EnableColumnResize = true,
+            EnableColumnMenu = true,
             EnableSummaryRow = true,
             EnableBulkActions = true,
             ShowFilterPills = true,
@@ -45,6 +46,8 @@ public class TableXTagHelperTests
                 EditType = "Select",
                 EditOptions = "Active, Pending, Suspended",
                 Filterable = true,
+                FilterType = "MultiSelect",
+                MultiSelectFilter = true,
                 FilterOptions = "Active,Pending,Suspended",
             },
             new()
@@ -80,6 +83,7 @@ public class TableXTagHelperTests
         Assert.Equal("split", root.GetProperty("exportMode").GetString());
         Assert.Equal(5000, root.GetProperty("maxExportRows").GetInt32());
         Assert.True(root.GetProperty("enableColumnReorder").GetBoolean());
+        Assert.True(root.GetProperty("enableColumnMenu").GetBoolean());
         Assert.True(root.GetProperty("enableSummaryRow").GetBoolean());
 
         var cols = root.GetProperty("columns");
@@ -91,6 +95,8 @@ public class TableXTagHelperTests
         var statusMeta = cols[1].GetProperty("meta");
         Assert.True(statusMeta.GetProperty("editable").GetBoolean());
         Assert.Equal("select", statusMeta.GetProperty("editType").GetString());
+        Assert.Equal("multi-select", statusMeta.GetProperty("filterType").GetString());
+        Assert.True(statusMeta.GetProperty("multiSelectFilter").GetBoolean());
         Assert.Equal(["Active", "Pending", "Suspended"], statusMeta.GetProperty("editOptions").EnumerateArray().Select(e => e.GetString()!).ToArray());
 
         var scoreMeta = cols[2].GetProperty("meta");

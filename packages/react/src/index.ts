@@ -54,6 +54,10 @@ export {
   compareValues,
   getSortField,
   getFilterField,
+  isMultiSelectFilter,
+  parseMultiFilterValues,
+  serializeMultiFilterValues,
+  formatFilterPillValue,
   // Building and reading a query (REST & OData v4)
   defaultQuery,
   parseQuery,

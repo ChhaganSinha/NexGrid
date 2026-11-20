@@ -187,4 +187,32 @@ public class TableXQueryableExtensionsTests
         Assert.Equal(4, res.Total);
         Assert.Equal(["Alice Johnson", "Evan Wright", "Charlie Brown", "Bob Smith"], res.Items.Select(s => s.Name).ToArray());
     }
+
+    [Fact]
+    public void ToPagedResponse_MultiSelectPipeFilter_CombinesEnumAndStringTokensWithOr()
+    {
+        var enumOrQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["status"] = "Active|Pending" },
+        };
+
+        var enumRes = _students.AsQueryable().ToPagedResponse(enumOrQuery, options => options
+            .Filterable("status", s => s.Status));
+
+        // Alice (Active), Bob (Pending), Charlie (Active)
+        Assert.Equal(3, enumRes.Total);
+        Assert.All(enumRes.Items, s => Assert.True(s.Status is StudentStatus.Active or StudentStatus.Pending));
+
+        var stringOrQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["department"] = "marketing|sales" },
+        };
+
+        var stringRes = _students.AsQueryable().ToPagedResponse(stringOrQuery, options => options
+            .Filterable(s => s.Department));
+
+        // Bob (Marketing) + Diana (Sales)
+        Assert.Equal(2, stringRes.Total);
+        Assert.Equal(["Bob Smith", "Diana Prince"], stringRes.Items.Select(s => s.Name).ToArray());
+    }
 }

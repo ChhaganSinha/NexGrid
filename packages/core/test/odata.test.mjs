@@ -132,3 +132,21 @@ test("toODataParams handles booleans, comparison operators, and ignores empty ra
   assert.ok(!params.$filter.includes("emptyRange"));
 });
 
+test("toODataParams builds OR group for pipe-delimited multi-select filters", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: {
+      status: "Active|Pending",
+      dept: "Sales",
+    },
+  };
+  const params = toODataParams(query, {
+    fieldMap: { status: "Status", dept: "Department" },
+  });
+  assert.ok(params.$filter.includes("(Status eq 'Active' or Status eq 'Pending')"));
+  assert.ok(params.$filter.includes("Department eq 'Sales'"));
+});
+
+

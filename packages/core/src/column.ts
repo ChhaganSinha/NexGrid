@@ -45,8 +45,17 @@ export interface TableXColumnMeta {
   serverFilterable?: boolean;
   /** The key the API expects in `filter[<key>]` when it differs from the column id. */
   serverFilterField?: string;
-  /** Filter input type: 'text' (default), 'select', 'number', 'number-range', 'date', 'date-range'. */
-  filterType?: "text" | "select" | "number" | "number-range" | "date" | "date-range";
+  /** Filter input type: 'text' (default), 'select', 'multi-select', 'number', 'number-range', 'date', 'date-range'. */
+  filterType?:
+    | "text"
+    | "select"
+    | "multi-select"
+    | "number"
+    | "number-range"
+    | "date"
+    | "date-range";
+  /** Enable multi-select checkbox picker when `filterOptions` is supplied. */
+  multiSelectFilter?: boolean;
   /** Allowed values for a filterable column (renders a picker dropdown/list). */
   filterOptions?: readonly string[];
   /** Custom placeholder for the filter input. */
@@ -340,11 +349,59 @@ export function isFilterable<TData, TRender>(
   return globalFilterable;
 }
 
-/** Check if column is pinned to left or right. */
+/** Check if column is pinned to left or right (honoring runtime user overrides when supplied). */
 export function isPinned<TData, TRender>(
   col: TableXColumn<TData, TRender>,
+  pinnedOverrides?: Readonly<Record<string, "left" | "right" | "none">>,
 ): "left" | "right" | false {
+  if (pinnedOverrides) {
+    const override = pinnedOverrides[getColumnId(col)];
+    if (override === "none") return false;
+    if (override === "left" || override === "right") return override;
+  }
   return col.meta?.pinned || false;
+}
+
+/** Check if a column uses a multi-select checkbox filter picker. */
+export function isMultiSelectFilter<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+): boolean {
+  return col.meta?.filterType === "multi-select" || col.meta?.multiSelectFilter === true;
+}
+
+/** Split a wire filter string (`"Active|Pending"` or multi-select `"Active,Pending"`) into trimmed tokens. */
+export function parseMultiFilterValues(
+  raw: string | undefined,
+  allowCommaFallback = false,
+): string[] {
+  if (!raw || !raw.trim()) return [];
+  const sep = raw.includes("|") ? "|" : allowCommaFallback && raw.includes(",") ? "," : null;
+  if (!sep) return [raw.trim()];
+  return raw
+    .split(sep)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+/** Serialize selected multi-filter option tokens into the wire token (`undefined` when empty). */
+export function serializeMultiFilterValues(values: Iterable<string>): string | undefined {
+  const cleaned = Array.from(values)
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (cleaned.length === 0) return undefined;
+  return cleaned.join("|");
+}
+
+/** Format a raw filter wire token for human-readable display in filter pills. */
+export function formatFilterPillValue(raw: string): string {
+  if (raw.includes("|")) {
+    return raw
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+  return raw;
 }
 
 /** Check if column has inline editing enabled. */

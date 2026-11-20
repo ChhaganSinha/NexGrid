@@ -29,6 +29,7 @@ import {
   downloadExcel,
   fetchAllPages,
   filePrefixFromCaption,
+  formatFilterPillValue,
   formatMessage,
   getCellText,
   getCellValue,
@@ -43,13 +44,17 @@ import {
   isExportable,
   isFilterable,
   isHideable,
+  isMultiSelectFilter,
   isPageSize,
   isPinned,
   isSortable,
+  isStructuralColumn,
+  parseMultiFilterValues,
   primarySort,
   resolveLocale,
   searchableColumnIds,
   serialNumber,
+  serializeMultiFilterValues,
   timestampedFilename,
   toExportColumns,
   totalPagesFor,
@@ -58,6 +63,7 @@ import {
   withPage,
   withPageSize,
   withSearch,
+  withSort,
   withToggledMultiSort,
   withToggledSort,
   clearGridState,
@@ -185,6 +191,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     dropped: boolean;
   } | null = null;
   private readonly columnWidths: Record<string, number> = {};
+  private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
   private focusMenuOnRender = false;
   private mounted: "grid" | "error" | null = null;
   private destroyed = false;
@@ -246,6 +253,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
       if (persisted) {
         if (persisted.density) this.density = persisted.density;
         if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
+        if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
+          this.pinnedColumns = { ...persisted.pinnedColumns };
+        }
         if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
           const hiddenMap: Record<string, boolean> = {};
           for (const col of flattenColumns(this.columns)) {
@@ -1169,6 +1179,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       columnWidths: { ...this.columnWidths },
       columnOrder: this.columns.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
+      pinnedColumns: { ...this.pinnedColumns },
     });
   }
 
@@ -1180,6 +1191,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     for (const key of Object.keys(this.columnWidths)) {
       delete this.columnWidths[key];
     }
+    this.pinnedColumns = {};
     this.columns = [...this.options.columns];
     this.hidden = initialHiddenColumns(this.leafCols());
     if (this.isClientSide) {
@@ -1253,7 +1265,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const title = col ? (getColumnTitle(col) || key) : key;
       const pill = el("div", { class: "tbx-filter-pill" }, [
         el("span", { class: "tbx-filter-pill-label", text: `${title}:` }),
-        el("span", { class: "tbx-filter-pill-val", text: String(val) }),
+        el("span", { class: "tbx-filter-pill-val", text: formatFilterPillValue(String(val)) }),
       ]);
       const removeBtn = el("button", {
         class: "tbx-filter-pill-remove",
@@ -1622,7 +1634,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const rightOffsets = new Map<string, number>();
     let currentLeft = 0;
     let lastLeftPinnedId: string | null = null;
-    const hasLeftPinned = visibleCols.some((c) => c.meta?.pinned === "left");
+    const hasLeftPinned = visibleCols.some((c) => isPinned(c, this.pinnedColumns) === "left");
 
     if (hasLeftPinned) {
       if (this.options.renderExpandedRow) {
@@ -1645,7 +1657,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
       for (const col of visibleCols) {
         const id = getColumnId(col);
-        const pin = col.meta?.pinned;
+        const pin = isPinned(col, this.pinnedColumns);
         const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
         if (pin === "left") {
           leftOffsets.set(id, currentLeft);
@@ -1661,7 +1673,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const col = visibleCols[i];
       if (!col) continue;
       const id = getColumnId(col);
-      const pin = col.meta?.pinned;
+      const pin = isPinned(col, this.pinnedColumns);
       const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
@@ -1850,7 +1862,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
       inner.appendChild(iconWrap);
     }
 
-    if (filterable) {
+    const showMenuTrigger =
+      filterable ||
+      (!isStructuralColumn(column) && id !== "" && this.options.enableColumnMenu === true);
+
+    if (showMenuTrigger) {
       const activeFilter = this.getColumnActiveFilter(column);
       const isFilterActive = activeFilter !== undefined && activeFilter.trim() !== "";
       const isFilterOpen = this.openFilterColumn === id;
@@ -1921,7 +1937,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       thStyle.textAlign = meta.align;
     }
 
-    const pinned = isPinned(column);
+    const pinned = isPinned(column, this.pinnedColumns);
     if (pinned === "left" && leftOffsets.has(id)) {
       thClasses.push("tbx-th--pinned-left");
       thStyle.left = `${leftOffsets.get(id)}px`;
@@ -2457,7 +2473,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const id = getColumnId(col);
     const activeFilter = this.getColumnActiveFilter(col);
-    const cacheKey = `${id}:${activeFilter ?? ""}`;
+    const sortField = getSortField(col);
+    const sortDir =
+      this.query.sort.find(
+        (s) =>
+          s.field.toLowerCase() === sortField.toLowerCase() ||
+          s.field.toLowerCase() === id.toLowerCase(),
+      )?.dir ?? "";
+    const pinState = isPinned(col, this.pinnedColumns) || "none";
+    const cacheKey = `${id}:${activeFilter ?? ""}:${sortDir}:${pinState}`;
 
     if (
       this.mountedFilterPopoverKey === cacheKey &&
@@ -2538,6 +2562,263 @@ class NexGridController<TData> implements TableXHandle<TData> {
         }
       }, 10);
     };
+
+    const filterable = isFilterable(column, this.options.enableColumnFilters !== false);
+
+    // 0. Quick Column Actions (Sort Asc/Desc, Pin Left/Right/Unpin, Hide Column)
+    if (this.options.enableColumnMenu !== false) {
+      const quickWrap = el("div", { class: "tbx-col-menu-actions" });
+      let hasQuickItems = false;
+
+      const sortable = isSortable(column) && this.options.enableSorting !== false;
+      const sortField = getSortField(column);
+      const activeSortDir =
+        this.query.sort.find(
+          (s) =>
+            s.field.toLowerCase() === sortField.toLowerCase() ||
+            s.field.toLowerCase() === id.toLowerCase(),
+        )?.dir ?? null;
+
+      const makeMenuBtn = (
+        actionKey: string,
+        label: string,
+        iconNode: SVGSVGElement | null,
+        active: boolean,
+        onClick: () => void,
+      ) => {
+        const btn = el(
+          "button",
+          {
+            class: active ? "tbx-col-menu-btn tbx-col-menu-btn--active" : "tbx-col-menu-btn",
+            attrs: { type: "button", "data-col-action": actionKey },
+          },
+          iconNode ? [iconNode, el("span", { text: label })] : [el("span", { text: label })],
+        );
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onClick();
+        });
+        quickWrap.appendChild(btn);
+        hasQuickItems = true;
+      };
+
+      if (sortable) {
+        makeMenuBtn(
+          "sort-asc",
+          this.locale.sortAscending ?? "Sort ascending",
+          arrowUpIcon("tbx-icon"),
+          activeSortDir === "asc",
+          () => {
+            this.openFilterColumn = null;
+            const next =
+              activeSortDir === "asc"
+                ? { ...this.query, sort: [], page: 1 }
+                : withSort(this.query, sortField, "asc");
+            this.applyQuery(next);
+          },
+        );
+        makeMenuBtn(
+          "sort-desc",
+          this.locale.sortDescending ?? "Sort descending",
+          arrowDownIcon("tbx-icon"),
+          activeSortDir === "desc",
+          () => {
+            this.openFilterColumn = null;
+            const next =
+              activeSortDir === "desc"
+                ? { ...this.query, sort: [], page: 1 }
+                : withSort(this.query, sortField, "desc");
+            this.applyQuery(next);
+          },
+        );
+      }
+
+      if (!isStructuralColumn(column) && id !== "") {
+        const currentPin = isPinned(column, this.pinnedColumns);
+        if (currentPin !== "left") {
+          makeMenuBtn("pin-left", this.locale.pinLeft ?? "Pin left", null, false, () => {
+            this.pinnedColumns = { ...this.pinnedColumns, [id]: "left" };
+            this.openFilterColumn = null;
+            this.saveState();
+            this.render();
+          });
+        }
+        if (currentPin !== "right") {
+          makeMenuBtn("pin-right", this.locale.pinRight ?? "Pin right", null, false, () => {
+            this.pinnedColumns = { ...this.pinnedColumns, [id]: "right" };
+            this.openFilterColumn = null;
+            this.saveState();
+            this.render();
+          });
+        }
+        if (currentPin === "left" || currentPin === "right") {
+          makeMenuBtn("unpin", this.locale.unpinColumn ?? "Unpin column", null, true, () => {
+            this.pinnedColumns = { ...this.pinnedColumns, [id]: "none" };
+            this.openFilterColumn = null;
+            this.saveState();
+            this.render();
+          });
+        }
+      }
+
+      const canHide =
+        isHideable(column) &&
+        this.options.enableColumns !== false &&
+        this.options.showColumnsButton !== false &&
+        this.visibleCols().length > 1;
+      if (canHide) {
+        makeMenuBtn("hide", this.locale.hideColumn ?? "Hide column", null, false, () => {
+          this.hidden = { ...this.hidden, [id]: true };
+          this.openFilterColumn = null;
+          if (this.isClientSide) {
+            this.rawClientSideSync();
+          }
+          this.saveState();
+          this.render();
+        });
+      }
+
+      if (hasQuickItems) {
+        popover.appendChild(quickWrap);
+        if (filterable) {
+          popover.appendChild(el("div", { class: "tbx-col-menu-sep" }));
+        }
+      }
+    }
+
+    if (!filterable) {
+      return popover;
+    }
+
+    // 0b. Multi-Select Checkbox Filter
+    if (isMultiSelectFilter(column) && meta.filterOptions && meta.filterOptions.length > 0) {
+      const placeholder =
+        meta.filterPlaceholder ||
+        formatMessage(this.locale.filterColumnPlaceholder, { column: title });
+      const initialTokens = parseMultiFilterValues(currentValue, true).map((t) => t.toLowerCase());
+      const selectedSet = new Set<string>(
+        meta.filterOptions.filter((opt) => initialTokens.includes(opt.trim().toLowerCase())),
+      );
+
+      const searchInput = el("input", {
+        class: "tbx-filter-popover-input",
+        attrs: {
+          type: "text",
+          placeholder,
+          value: "",
+          "aria-label": `Filter ${title}`,
+        },
+      }) as HTMLInputElement;
+      searchInput.value = "";
+      focusSafely(searchInput);
+
+      const submitMulti = () => {
+        const ordered = meta.filterOptions!.filter((opt) => selectedSet.has(opt));
+        apply(serializeMultiFilterValues(ordered) ?? "");
+      };
+
+      searchInput.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitMulti();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closePopover();
+        }
+      });
+
+      popover.appendChild(searchInput);
+
+      const optionsWrap = el("div", { class: "tbx-filter-popover-options" });
+      const renderMultiOptions = (termRaw: string) => {
+        replaceChildren(optionsWrap, []);
+        const term = termRaw.trim().toLowerCase();
+
+        const isAllSelected = selectedSet.size === 0;
+        const allOpt = el("div", {
+          class: isAllSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+          text: this.locale.filterAll,
+        });
+        allOpt.addEventListener("click", (e) => {
+          e.stopPropagation();
+          selectedSet.clear();
+          renderMultiOptions(searchInput.value);
+        });
+        optionsWrap.appendChild(allOpt);
+
+        const filtered = meta.filterOptions!.filter(
+          (opt) => !term || opt.toLowerCase().includes(term),
+        );
+        if (filtered.length === 0) {
+          optionsWrap.appendChild(
+            el("div", { class: "tbx-filter-empty", text: "No matching options" }),
+          );
+          return;
+        }
+
+        for (const opt of filtered) {
+          const isChecked = selectedSet.has(opt);
+          const cb = el("input", {
+            class: "tbx-filter-option-check",
+            attrs: { type: "checkbox", tabindex: -1, "aria-hidden": "true" },
+          }) as HTMLInputElement;
+          cb.checked = isChecked;
+          cb.addEventListener("click", (e) => e.stopPropagation());
+          cb.addEventListener("change", (e) => {
+            e.stopPropagation();
+            if (cb.checked) selectedSet.add(opt);
+            else selectedSet.delete(opt);
+            renderMultiOptions(searchInput.value);
+          });
+          const optEl = el(
+            "div",
+            {
+              class: isChecked ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+              attrs: { role: "option", "aria-selected": String(isChecked) },
+            },
+            [cb, el("span", { text: opt })],
+          );
+          optEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (selectedSet.has(opt)) selectedSet.delete(opt);
+            else selectedSet.add(opt);
+            renderMultiOptions(searchInput.value);
+          });
+          optionsWrap.appendChild(optEl);
+        }
+      };
+
+      renderMultiOptions("");
+      searchInput.addEventListener("input", () => {
+        renderMultiOptions(searchInput.value);
+      });
+      popover.appendChild(optionsWrap);
+
+      const actionsWrap = el("div", { class: "tbx-filter-popover-actions" });
+      const clearBtn = el(
+        "button",
+        { class: "tbx-filter-popover-btn", attrs: { type: "button" } },
+        [rotateCcwIcon(), el("span", { text: this.locale.clearFilter })],
+      );
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectedSet.clear();
+        apply("");
+      });
+      const applyBtn = el(
+        "button",
+        { class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary", attrs: { type: "button" } },
+        [checkIcon(), el("span", { text: this.locale.applyFilter })],
+      );
+      applyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        submitMulti();
+      });
+      actionsWrap.appendChild(clearBtn);
+      actionsWrap.appendChild(applyBtn);
+      popover.appendChild(actionsWrap);
+      return popover;
+    }
 
     // 1. Date Range Filter
     if (meta.filterType === "date-range") {

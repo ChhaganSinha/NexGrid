@@ -70,7 +70,7 @@ public class TableXColumn : ComponentBase
     [Parameter]
     public string? SortField { get; set; }
 
-    /// <summary>Filter UI type (<c>text</c>, <c>select</c>, <c>number</c>, <c>date</c>, <c>number-range</c>, <c>date-range</c>).</summary>
+    /// <summary>Filter UI type (<c>text</c>, <c>select</c>, <c>multi-select</c>, <c>number</c>, <c>date</c>, <c>number-range</c>, <c>date-range</c>).</summary>
     [Parameter]
     public string? FilterType { get; set; }
 
@@ -81,6 +81,10 @@ public class TableXColumn : ComponentBase
     /// <summary>Comma-separated allowed filter values (e.g. <c>"Active,Pending,Suspended"</c>).</summary>
     [Parameter]
     public string? FilterOptions { get; set; }
+
+    /// <summary>Render <see cref="FilterOptions"/> as multi-select checkboxes combined with OR (<c>Active|Pending</c>).</summary>
+    [Parameter]
+    public bool? MultiSelectFilter { get; set; }
 
     /// <summary>Sticky horizontal pin side (<see cref="TableXColumnPin.Left"/> or <see cref="TableXColumnPin.Right"/>).</summary>
     [Parameter]
@@ -130,6 +134,7 @@ public class TableXColumn : ComponentBase
             FilterType = TableXConfigSerializer.NormalizeFilterType(FilterType),
             FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
+            MultiSelectFilter = MultiSelectFilter,
             Aggregation = TableXConfigSerializer.ToToken(Aggregation),
             AggregationLabel = string.IsNullOrWhiteSpace(AggregationLabel) ? null : AggregationLabel,
             Editable = Editable,

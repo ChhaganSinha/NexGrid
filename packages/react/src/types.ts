@@ -96,6 +96,8 @@ export interface TableXProps<TData> {
   selectionMode?: "multi" | "single";
   /** Enable column-level filter menus on column headers. Default `true` (or per-column). */
   enableColumnFilters?: boolean;
+  /** Show quick column actions (Sort Asc/Desc, Pin Left/Right/Unpin, Hide) inside the column `⋮` popover. Default `true`. */
+  enableColumnMenu?: boolean;
   /** Enable dragging column borders to resize columns. Default `true`. */
   enableColumnResize?: boolean;
   /**

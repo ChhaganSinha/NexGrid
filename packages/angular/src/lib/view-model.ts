@@ -38,14 +38,31 @@ export interface TableXHeaderView {
   minWidth?: number | null;
   /** Whether the column has a server-filterable menu. */
   serverFilterable?: boolean;
+  /** Whether the header `⋮` menu trigger button should be rendered. */
+  showMenuTrigger?: boolean;
   /** Input type for column filter popover. */
-  filterType?: "text" | "select" | "number" | "number-range" | "date" | "date-range";
+  filterType?:
+    | "text"
+    | "select"
+    | "multi-select"
+    | "number"
+    | "number-range"
+    | "date"
+    | "date-range";
+  /** Whether multi-select checkbox mode is active for this column's filter options. */
+  multiSelectFilter?: boolean;
   /** Custom placeholder for column filter input. */
   filterPlaceholder?: string;
   /** Preset options if defined on column metadata. */
   filterOptions?: readonly string[];
   /** The current filter value applied to this column, if any. */
   activeFilter?: string;
+  /** Current pin state for quick column menu actions. */
+  pinState?: "left" | "right" | false;
+  /** Whether the column can be pinned/unpinned from the quick menu. */
+  canPin?: boolean;
+  /** Whether the column can be hidden from the quick menu. */
+  canHide?: boolean;
   /** Whether this header cell represents a column group. */
   isGroup?: boolean;
   /** Column span for group headers. */

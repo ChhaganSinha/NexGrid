@@ -120,7 +120,7 @@ public class TableXColumnTagHelper : TagHelper
     public string? SortField { get; set; }
 
     /// <summary>
-    /// Filter UI type: <c>text</c>, <c>select</c>, <c>number</c>, <c>date</c>,
+    /// Filter UI type: <c>text</c>, <c>select</c>, <c>multi-select</c>, <c>number</c>, <c>date</c>,
     /// <c>number-range</c>, or <c>date-range</c>.
     /// </summary>
     [HtmlAttributeName("filter-type")]
@@ -136,6 +136,12 @@ public class TableXColumnTagHelper : TagHelper
     /// </summary>
     [HtmlAttributeName("filter-options")]
     public string? FilterOptions { get; set; }
+
+    /// <summary>
+    /// Render <see cref="FilterOptions"/> as multi-select checkboxes combined with OR (<c>Active|Pending</c>).
+    /// </summary>
+    [HtmlAttributeName("multi-select-filter")]
+    public bool? MultiSelectFilter { get; set; }
 
     /// <summary>
     /// Sticky horizontal pin position: <c>Left</c> or <c>Right</c>, matched case-insensitively.
@@ -212,6 +218,7 @@ public class TableXColumnTagHelper : TagHelper
             FilterType = TableXConfigSerializer.NormalizeFilterType(FilterType),
             FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
+            MultiSelectFilter = MultiSelectFilter,
             Aggregation = TableXConfigSerializer.ToToken(
                 TableXAttribute.ParseEnum<TableXAggregation>(Aggregation, TagName, "aggregation")),
             AggregationLabel = string.IsNullOrWhiteSpace(AggregationLabel) ? null : AggregationLabel,

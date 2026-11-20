@@ -112,6 +112,7 @@ internal static class TableXConfigSerializer
         {
             "numberrange" => "number-range",
             "daterange" => "date-range",
+            "multiselect" => "multi-select",
             _ => normalized,
         };
     }
@@ -148,6 +149,8 @@ internal sealed class TableXConfig
     public string? SelectionMode { get; set; }
 
     public bool? EnableColumnFilters { get; set; }
+
+    public bool? EnableColumnMenu { get; set; }
 
     public bool? EnableColumnResize { get; set; }
 
@@ -258,6 +261,8 @@ internal sealed class TableXColumnMetaConfig
 
     public IReadOnlyList<string>? FilterOptions { get; set; }
 
+    public bool? MultiSelectFilter { get; set; }
+
     public string? Aggregation { get; set; }
 
     public string? AggregationLabel { get; set; }
@@ -284,6 +289,7 @@ internal sealed class TableXColumnMetaConfig
         FilterType is not null ||
         FilterPlaceholder is not null ||
         FilterOptions is not null ||
+        MultiSelectFilter is not null ||
         Aggregation is not null ||
         AggregationLabel is not null ||
         Editable is not null ||

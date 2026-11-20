@@ -135,6 +135,10 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("enable-column-filters")]
     public bool? EnableColumnFilters { get; set; }
 
+    /// <summary>Show column header quick-action menu items (sort, pin, hide).</summary>
+    [HtmlAttributeName("enable-column-menu")]
+    public bool? EnableColumnMenu { get; set; }
+
     /// <summary>Enable dragging column borders to resize columns. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-column-resize")]
     public bool? EnableColumnResize { get; set; }
@@ -352,6 +356,7 @@ public class TableXTagHelper : TagHelper
         SelectionMode = TableXConfigSerializer.ToToken(
             TableXAttribute.ParseEnum<TableXSelectionMode>(SelectionMode, TagName, "selection-mode")),
         EnableColumnFilters = EnableColumnFilters,
+        EnableColumnMenu = EnableColumnMenu,
         EnableColumnResize = EnableColumnResize,
         EnableColumnReorder = EnableColumnReorder,
         EnableSorting = EnableSorting,

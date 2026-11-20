@@ -58,6 +58,7 @@ import {
   downloadExcel,
   fetchAllPages,
   filePrefixFromCaption,
+  formatFilterPillValue,
   formatMessage,
   getCellValue,
   getColumnId,
@@ -69,14 +70,18 @@ import {
   initialHiddenColumns,
   isEditable,
   isHideable,
+  isMultiSelectFilter,
   isPageSize,
   isPinned,
   isSortable,
+  isStructuralColumn,
   isFilterable,
+  parseMultiFilterValues,
   primarySort,
   resolveLocale,
   searchableColumnIds,
   serialNumber,
+  serializeMultiFilterValues,
   timestampedFilename,
   toExportColumns,
   totalPagesFor,
@@ -85,6 +90,7 @@ import {
   withPage,
   withPageSize,
   withSearch,
+  withSort,
   withToggledSort,
   withToggledMultiSort,
   copyToClipboard,
@@ -780,7 +786,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   </span>
                 }
 
-                @if (header.serverFilterable) {
+                @if (header.showMenuTrigger) {
                   <div
                     class="tbx-col-filter-wrap"
                     draggable="false"
@@ -1205,48 +1211,142 @@ const SEARCH_DEBOUNCE_MS = 350;
           (mousedown)="$event.stopPropagation()"
           (click)="$event.stopPropagation()"
         >
-          @if (activeFilterHeader.filterType === 'date-range' || activeFilterHeader.filterType === 'number-range') {
-            <div class="tbx-range-inputs">
-              <input
-                [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
-                class="tbx-range-input"
-                [value]="filterRangeMin"
-                [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'From' : 'Min'"
-                [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'From date' : 'Minimum'"
-                (input)="onFilterRangeMinInput($event)"
-                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
-                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
-              />
-              <span class="tbx-range-sep">to</span>
-              <input
-                [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
-                class="tbx-range-input"
-                [value]="filterRangeMax"
-                [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'To' : 'Max'"
-                [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'To date' : 'Maximum'"
-                (input)="onFilterRangeMaxInput($event)"
-                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
-                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
-              />
+          @if (enableColumnMenu !== false && (activeFilterHeader.sortable || activeFilterHeader.canPin || activeFilterHeader.canHide)) {
+            <div class="tbx-col-menu-actions">
+              @if (activeFilterHeader.sortable) {
+                <button
+                  type="button"
+                  data-col-action="sort-asc"
+                  class="tbx-col-menu-btn"
+                  [class.tbx-col-menu-btn--active]="activeFilterHeader.sortState === 'asc'"
+                  (click)="applyQuickSort(activeFilterHeader, 'asc')"
+                >
+                  <svg
+                    class="tbx-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m5 12 7-7 7 7" />
+                    <path d="M12 19V5" />
+                  </svg>
+                  <span>{{ strings.sortAscending ?? 'Sort ascending' }}</span>
+                </button>
+                <button
+                  type="button"
+                  data-col-action="sort-desc"
+                  class="tbx-col-menu-btn"
+                  [class.tbx-col-menu-btn--active]="activeFilterHeader.sortState === 'desc'"
+                  (click)="applyQuickSort(activeFilterHeader, 'desc')"
+                >
+                  <svg
+                    class="tbx-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14" />
+                    <path d="m19 12-7 7-7-7" />
+                  </svg>
+                  <span>{{ strings.sortDescending ?? 'Sort descending' }}</span>
+                </button>
+              }
+              @if (activeFilterHeader.canPin && activeFilterHeader.pinState !== 'left') {
+                <button
+                  type="button"
+                  data-col-action="pin-left"
+                  class="tbx-col-menu-btn"
+                  (click)="setColumnPin(activeFilterHeader.id, 'left')"
+                >
+                  <span>{{ strings.pinLeft ?? 'Pin left' }}</span>
+                </button>
+              }
+              @if (activeFilterHeader.canPin && activeFilterHeader.pinState !== 'right') {
+                <button
+                  type="button"
+                  data-col-action="pin-right"
+                  class="tbx-col-menu-btn"
+                  (click)="setColumnPin(activeFilterHeader.id, 'right')"
+                >
+                  <span>{{ strings.pinRight ?? 'Pin right' }}</span>
+                </button>
+              }
+              @if (activeFilterHeader.canPin && (activeFilterHeader.pinState === 'left' || activeFilterHeader.pinState === 'right')) {
+                <button
+                  type="button"
+                  data-col-action="unpin"
+                  class="tbx-col-menu-btn tbx-col-menu-btn--active"
+                  (click)="setColumnPin(activeFilterHeader.id, 'none')"
+                >
+                  <span>{{ strings.unpinColumn ?? 'Unpin column' }}</span>
+                </button>
+              }
+              @if (activeFilterHeader.canHide) {
+                <button
+                  type="button"
+                  data-col-action="hide"
+                  class="tbx-col-menu-btn"
+                  (click)="hideColumnFromMenu(activeFilterHeader.id)"
+                >
+                  <span>{{ strings.hideColumn ?? 'Hide column' }}</span>
+                </button>
+              }
             </div>
-          } @else {
-            <input
-              [type]="activeFilterHeader.filterType === 'date' ? 'date' : activeFilterHeader.filterType === 'number' ? 'number' : 'text'"
-              class="tbx-filter-popover-input"
-              [value]="filterInputText"
-              [placeholder]="activeFilterHeader.filterPlaceholder || ('Filter ' + activeFilterHeader.title + '…')"
-              (input)="onFilterTextInput($event)"
-              (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
-              (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
-            />
-            @if (activeFilterHeader.filterOptions && activeFilterHeader.filterOptions.length > 0) {
-              <div class="tbx-filter-popover-options" role="listbox">
+            @if (activeFilterHeader.serverFilterable) {
+              <div class="tbx-col-menu-sep"></div>
+            }
+          }
+
+          @if (activeFilterHeader.serverFilterable) {
+            @if (activeFilterHeader.filterType === 'date-range' || activeFilterHeader.filterType === 'number-range') {
+              <div class="tbx-range-inputs">
+                <input
+                  [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
+                  class="tbx-range-input"
+                  [value]="filterRangeMin"
+                  [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'From' : 'Min'"
+                  [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'From date' : 'Minimum'"
+                  (input)="onFilterRangeMinInput($event)"
+                  (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                  (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+                />
+                <span class="tbx-range-sep">to</span>
+                <input
+                  [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
+                  class="tbx-range-input"
+                  [value]="filterRangeMax"
+                  [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'To' : 'Max'"
+                  [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'To date' : 'Maximum'"
+                  (input)="onFilterRangeMaxInput($event)"
+                  (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                  (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+                />
+              </div>
+            } @else if (activeFilterHeader.multiSelectFilter && activeFilterHeader.filterOptions && activeFilterHeader.filterOptions.length > 0) {
+              <input
+                type="text"
+                class="tbx-filter-popover-input"
+                [value]="filterInputText"
+                [placeholder]="activeFilterHeader.filterPlaceholder || ('Filter ' + activeFilterHeader.title + '…')"
+                (input)="onFilterTextInput($event)"
+                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+              />
+              <div class="tbx-filter-popover-options" role="listbox" aria-multiselectable="true">
                 <div
                   class="tbx-filter-option"
                   role="option"
-                  [attr.aria-selected]="!filterInputText.trim()"
-                  [class.tbx-filter-option--selected]="!filterInputText.trim()"
-                  (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
+                  [attr.aria-selected]="filterSelectedSet.size === 0"
+                  [class.tbx-filter-option--selected]="filterSelectedSet.size === 0"
+                  (click)="clearMultiFilterSelection()"
                 >
                   {{ strings.filterAll }}
                 </div>
@@ -1254,57 +1354,100 @@ const SEARCH_DEBOUNCE_MS = 350;
                   <div
                     class="tbx-filter-option"
                     role="option"
-                    [attr.aria-selected]="filterInputText === opt"
-                    [class.tbx-filter-option--selected]="filterInputText === opt"
-                    (click)="applyColumnFilter(activeFilterHeader.id, opt)"
+                    [attr.aria-selected]="filterSelectedSet.has(opt)"
+                    [class.tbx-filter-option--selected]="filterSelectedSet.has(opt)"
+                    (click)="toggleMultiFilterOption(opt)"
                   >
-                    {{ opt }}
+                    <input
+                      type="checkbox"
+                      class="tbx-filter-option-check"
+                      [checked]="filterSelectedSet.has(opt)"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleMultiFilterOption(opt)"
+                      tabindex="-1"
+                      aria-hidden="true"
+                    />
+                    <span>{{ opt }}</span>
                   </div>
                 }
               </div>
+            } @else {
+              <input
+                [type]="activeFilterHeader.filterType === 'date' ? 'date' : activeFilterHeader.filterType === 'number' ? 'number' : 'text'"
+                class="tbx-filter-popover-input"
+                [value]="filterInputText"
+                [placeholder]="activeFilterHeader.filterPlaceholder || ('Filter ' + activeFilterHeader.title + '…')"
+                (input)="onFilterTextInput($event)"
+                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+              />
+              @if (activeFilterHeader.filterOptions && activeFilterHeader.filterOptions.length > 0) {
+                <div class="tbx-filter-popover-options" role="listbox">
+                  <div
+                    class="tbx-filter-option"
+                    role="option"
+                    [attr.aria-selected]="!filterInputText.trim()"
+                    [class.tbx-filter-option--selected]="!filterInputText.trim()"
+                    (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
+                  >
+                    {{ strings.filterAll }}
+                  </div>
+                  @for (opt of filteredPopoverOptions; track opt) {
+                    <div
+                      class="tbx-filter-option"
+                      role="option"
+                      [attr.aria-selected]="filterInputText === opt"
+                      [class.tbx-filter-option--selected]="filterInputText === opt"
+                      (click)="applyColumnFilter(activeFilterHeader.id, opt)"
+                    >
+                      {{ opt }}
+                    </div>
+                  }
+                </div>
+              }
             }
+            <div class="tbx-filter-popover-actions">
+              <button
+                type="button"
+                class="tbx-filter-popover-btn"
+                (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
+              >
+                <svg
+                  class="tbx-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                <span>{{ strings.clearFilter }}</span>
+              </button>
+              <button
+                type="button"
+                class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+                (click)="submitActiveFilter()"
+              >
+                <svg
+                  class="tbx-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <span>{{ strings.applyFilter }}</span>
+              </button>
+            </div>
           }
-          <div class="tbx-filter-popover-actions">
-            <button
-              type="button"
-              class="tbx-filter-popover-btn"
-              (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
-            >
-              <svg
-                class="tbx-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-              <span>{{ strings.clearFilter }}</span>
-            </button>
-            <button
-              type="button"
-              class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-              (click)="submitActiveFilter()"
-            >
-              <svg
-                class="tbx-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-              <span>{{ strings.applyFilter }}</span>
-            </button>
-          </div>
         </div>
       }
 
@@ -1617,6 +1760,9 @@ export class TableXComponent<TData>
   /** Enable column-level filter menus on column headers. */
   @Input({ transform: booleanAttribute }) enableColumnFilters = true;
 
+  /** Show quick column actions (Sort Asc/Desc, Pin Left/Right/Unpin, Hide) inside the column `⋮` popover. */
+  @Input({ transform: booleanAttribute }) enableColumnMenu?: boolean;
+
   /** Explicit fields searched by global search (`q`) in client mode. */
   @Input() searchableFields?: (keyof TData & string)[];
 
@@ -1807,6 +1953,7 @@ export class TableXComponent<TData>
   protected filterRangeMin = "";
   protected filterRangeMax = "";
   protected filterHasTyped = false;
+  protected filterSelectedSet: Set<string> = new Set<string>();
   protected filteredPopoverOptions: readonly string[] = [];
   protected columnWidths: Record<string, number> = {};
   protected draggedColumnId: string | null = null;
@@ -1895,6 +2042,7 @@ export class TableXComponent<TData>
   private readonly subscriptions = new Subscription();
 
   private hiddenColumns: Readonly<Record<string, boolean>> = {};
+  private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
   private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
   private hasBoundQuery = false;
@@ -1974,6 +2122,9 @@ export class TableXComponent<TData>
             this.currentDensity = persisted.density;
           }
           if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
+          if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
+            this.pinnedColumns = { ...persisted.pinnedColumns };
+          }
           if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
             const hiddenMap: Record<string, boolean> = {};
             for (const col of flattenColumns(this.columns)) {
@@ -2245,10 +2396,20 @@ export class TableXComponent<TData>
       this.filterRangeMin = parts[0] ?? "";
       this.filterRangeMax = parts[1] ?? "";
       this.filterInputText = "";
+      this.filterSelectedSet = new Set();
+    } else if (header.multiSelectFilter && header.filterOptions && header.filterOptions.length > 0) {
+      const tokens = parseMultiFilterValues(activeVal, true).map((t) => t.toLowerCase());
+      this.filterSelectedSet = new Set(
+        header.filterOptions.filter((opt) => tokens.includes(opt.trim().toLowerCase())),
+      );
+      this.filterInputText = "";
+      this.filterRangeMin = "";
+      this.filterRangeMax = "";
     } else {
       this.filterInputText = activeVal;
       this.filterRangeMin = "";
       this.filterRangeMax = "";
+      this.filterSelectedSet = new Set();
     }
     this.recompute();
     const btn = (event.currentTarget || event.target) as HTMLElement | null;
@@ -2400,6 +2561,43 @@ export class TableXComponent<TData>
     this.filteredPopoverOptions = opts.filter((opt) => opt.toLowerCase().includes(q));
   }
 
+  protected toggleMultiFilterOption(opt: string): void {
+    const next = new Set(this.filterSelectedSet);
+    if (next.has(opt)) next.delete(opt);
+    else next.add(opt);
+    this.filterSelectedSet = next;
+  }
+
+  protected clearMultiFilterSelection(): void {
+    this.filterSelectedSet = new Set();
+  }
+
+  protected applyQuickSort(header: NexGridHeaderView, dir: "asc" | "desc"): void {
+    const sortField = header.sortField || header.id;
+    this.closeFilterPopover();
+    if (header.sortState === dir) {
+      this.emitQuery({ ...this.query, sort: [], page: 1 });
+    } else {
+      this.emitQuery(withSort(this.query, sortField, dir));
+    }
+  }
+
+  protected setColumnPin(id: string, side: "left" | "right" | "none"): void {
+    this.pinnedColumns = { ...this.pinnedColumns, [id]: side };
+    this.closeFilterPopover();
+    this.saveState();
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected hideColumnFromMenu(id: string): void {
+    this.hiddenColumns = { ...this.hiddenColumns, [id]: true };
+    this.closeFilterPopover();
+    this.saveState();
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
   protected submitActiveFilter(): void {
     const header = this.activeFilterHeader;
     if (!header) return;
@@ -2408,6 +2606,11 @@ export class TableXComponent<TData>
       const max = this.filterRangeMax.trim();
       const combined = min || max ? `${min}..${max}` : undefined;
       this.applyColumnFilter(header.id, combined);
+      return;
+    }
+    if (header.multiSelectFilter && header.filterOptions && header.filterOptions.length > 0) {
+      const ordered = header.filterOptions.filter((opt) => this.filterSelectedSet.has(opt));
+      this.applyColumnFilter(header.id, serializeMultiFilterValues(ordered));
       return;
     }
     this.applyColumnFilter(header.id, this.filterInputText.trim() || undefined);
@@ -2500,6 +2703,7 @@ export class TableXComponent<TData>
       columnWidths: { ...this.columnWidths },
       columnOrder: cols.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
+      pinnedColumns: { ...this.pinnedColumns },
     });
   }
 
@@ -2510,6 +2714,7 @@ export class TableXComponent<TData>
     this.density = "default";
     this.currentDensity = "default";
     this.columnWidths = {};
+    this.pinnedColumns = {};
     this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
     this.orderedColumns = [...this.columns];
     this.openMenu = null;
@@ -2539,7 +2744,7 @@ export class TableXComponent<TData>
           getFilterField(c).toLowerCase() === keyLower,
       );
       const title = col ? (getColumnTitle(col) || key) : key;
-      entries.push({ key, title, val: String(val) });
+      entries.push({ key, title, val: formatFilterPillValue(String(val)) });
     }
     return entries;
   }
@@ -2965,9 +3170,14 @@ export class TableXComponent<TData>
     rightOffsets: ReadonlyMap<string, number>,
     lastLeftPinnedId: string | null,
     firstRightPinnedId: string | null,
+    visibleCount: number,
   ): NexGridHeaderView {
     const id = getColumnId(column);
     const effectiveSortable = isSortable(column) && this.enableSorting !== false;
+    const effectiveFilterable = isFilterable(column, this.enableColumnFilters !== false);
+    const isNonStructural = !isStructuralColumn(column) && id !== "";
+    const showMenuTrigger =
+      effectiveFilterable || (isNonStructural && this.enableColumnMenu === true);
     const sortField = getSortField(column);
     const sortFieldLower = sortField.toLowerCase();
     const idLower = id.toLowerCase();
@@ -2996,11 +3206,16 @@ export class TableXComponent<TData>
       sortable: effectiveSortable,
       sortState: direction ?? "none",
       sortOrder,
-      serverFilterable: isFilterable(column, this.enableColumnFilters !== false),
+      serverFilterable: effectiveFilterable,
+      showMenuTrigger,
       filterOptions: column.meta?.filterOptions,
       filterType: column.meta?.filterType,
+      multiSelectFilter: isMultiSelectFilter(column),
       filterPlaceholder: column.meta?.filterPlaceholder,
       activeFilter,
+      pinState: isPinned(column, this.pinnedColumns),
+      canPin: isNonStructural,
+      canHide: isHideable(column) && this.isColumnsVisible && visibleCount > 1,
       ariaSort: !effectiveSortable
         ? null
         : direction === "asc"
@@ -3040,7 +3255,7 @@ export class TableXComponent<TData>
     const rightOffsets = new Map<string, number>();
     let lastLeftPinnedId: string | null = null;
     let currentLeft = 0;
-    const hasLeftPinned = visible.some((c) => isPinned(c) === "left");
+    const hasLeftPinned = visible.some((c) => isPinned(c, this.pinnedColumns) === "left");
 
     if (hasLeftPinned) {
       if (this.hasExpandColumn) {
@@ -3060,7 +3275,7 @@ export class TableXComponent<TData>
       }
       for (const col of visible) {
         const id = getColumnId(col);
-        if (isPinned(col) === "left") {
+        if (isPinned(col, this.pinnedColumns) === "left") {
           const w = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
           leftOffsets.set(id, currentLeft);
           currentLeft += w;
@@ -3075,7 +3290,7 @@ export class TableXComponent<TData>
       const col = visible[i];
       if (!col) continue;
       const id = getColumnId(col);
-      if (isPinned(col) === "right") {
+      if (isPinned(col, this.pinnedColumns) === "right") {
         const w = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
         rightOffsets.set(id, currentRight);
         currentRight += w;
@@ -3103,6 +3318,7 @@ export class TableXComponent<TData>
         rightOffsets,
         lastLeftPinnedId,
         firstRightPinnedId,
+        visible.length,
       ),
     );
 
@@ -3130,6 +3346,7 @@ export class TableXComponent<TData>
           rightOffsets,
           lastLeftPinnedId,
           firstRightPinnedId,
+          visible.length,
         );
       });
 
@@ -3143,6 +3360,7 @@ export class TableXComponent<TData>
           rightOffsets,
           lastLeftPinnedId,
           firstRightPinnedId,
+          visible.length,
         ),
       );
     }

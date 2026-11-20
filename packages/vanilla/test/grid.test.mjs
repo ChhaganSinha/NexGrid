@@ -1160,5 +1160,106 @@ test("pinned offsets honor minWidth and skip pinning serial/select when no data 
   cfg.remove();
 });
 
+test("multi-select checkbox column filter and column header quick actions (sort, pin, unpin, hide)", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "name", header: "Name", meta: { minWidth: 180 } },
+    {
+      accessorKey: "status",
+      header: "Status",
+      meta: {
+        filterType: "multi-select",
+        filterOptions: ["Active", "Pending", "Suspended"],
+      },
+    },
+    { accessorKey: "score", header: "Score" },
+  ];
+
+  const rows = [
+    { id: "1", name: "Alice", status: "Active", score: 91 },
+    { id: "2", name: "Bob", status: "Pending", score: 78 },
+    { id: "3", name: "Charlie", status: "Suspended", score: 85 },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Multi-Select & Quick Menu",
+    columns,
+    data: rows,
+    clientSidePagination: true,
+  });
+
+  const openMenu = (colId) => {
+    const btn = container
+      .querySelectorAll(".tbx-col-filter-btn")
+      .find((b) => b.getAttribute("data-filter-col") === colId);
+    assert.ok(btn, `Menu button for ${colId} should exist`);
+    btn.dispatchEvent(new MockMouseEvent("click"));
+    const pop = container.querySelector(".tbx-filter-popover");
+    assert.ok(pop, `Popover for ${colId} should open`);
+    return pop;
+  };
+
+  // 1. Multi-select checkboxes: check Active and Pending -> Apply -> "Active|Pending"
+  let pop = openMenu("status");
+  const checks = pop.querySelectorAll(".tbx-filter-option-check");
+  assert.equal(checks.length, 3, "Should render 3 multi-select option checkboxes");
+  checks[0].checked = true;
+  checks[0].dispatchEvent(new MockEvent("change"));
+  checks[1].checked = true;
+  checks[1].dispatchEvent(new MockEvent("change"));
+
+  pop.querySelector(".tbx-filter-popover-btn--primary").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.getQuery().filter?.status, "Active|Pending");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 2, "Matches Active OR Pending rows");
+
+  const pill = container.querySelector(".tbx-filter-pill");
+  assert.ok(pill && pill.textContent.includes("Active, Pending"), "Pill formats multi-select values cleanly");
+
+  // 2. Column quick action: Sort Descending on Score
+  pop = openMenu("score");
+  const sortDescBtn = pop
+    .querySelectorAll(".tbx-col-menu-btn")
+    .find((b) => b.getAttribute("data-col-action") === "sort-desc");
+  assert.ok(sortDescBtn, "Sort descending quick action should exist");
+  sortDescBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.deepEqual(handle.getQuery().sort, [{ field: "score", dir: "desc" }]);
+
+  // 3. Column quick action: Pin Left on Name -> adds .tbx-th--pinned-left, then Unpin removes it
+  assert.equal(container.querySelector(".tbx-th--pinned-left"), null);
+  pop = openMenu("name");
+  const pinLeftBtn = pop
+    .querySelectorAll(".tbx-col-menu-btn")
+    .find((b) => b.getAttribute("data-col-action") === "pin-left");
+  assert.ok(pinLeftBtn, "Pin left quick action should exist");
+  pinLeftBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.ok(container.querySelector(".tbx-th--pinned-left"), "Name column becomes sticky left-pinned at runtime");
+
+  pop = openMenu("name");
+  const unpinBtn = pop
+    .querySelectorAll(".tbx-col-menu-btn")
+    .find((b) => b.getAttribute("data-col-action") === "unpin");
+  assert.ok(unpinBtn, "Unpin quick action appears when column is pinned");
+  unpinBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(container.querySelector(".tbx-th--pinned-left"), null, "Column unpins cleanly");
+
+  // 4. Column quick action: Hide Column on Score
+  pop = openMenu("score");
+  const hideBtn = pop
+    .querySelectorAll(".tbx-col-menu-btn")
+    .find((b) => b.getAttribute("data-col-action") === "hide");
+  assert.ok(hideBtn, "Hide column quick action should exist");
+  hideBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(
+    container.querySelectorAll(".tbx-col-filter-btn").some((b) => b.getAttribute("data-filter-col") === "score"),
+    false,
+    "Hidden column is removed from header",
+  );
+
+  handle.destroy();
+});
+
+
 
 

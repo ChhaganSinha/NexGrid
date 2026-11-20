@@ -165,6 +165,12 @@
     public bool? EnableColumnFilters { get; set; }
 
     /// <summary>
+    /// Show column header quick-action menu items (sort, pin, hide).
+    /// </summary>
+    [Parameter]
+    public bool? EnableColumnMenu { get; set; }
+
+    /// <summary>
     /// Enable dragging column borders to resize columns. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
@@ -359,6 +365,7 @@
         EnableSelection = EnableSelection,
         SelectionMode = TableXConfigSerializer.ToToken(SelectionMode),
         EnableColumnFilters = EnableColumnFilters,
+        EnableColumnMenu = EnableColumnMenu,
         EnableColumnResize = EnableColumnResize,
         EnableColumnReorder = EnableColumnReorder,
         EnableSorting = EnableSorting,
