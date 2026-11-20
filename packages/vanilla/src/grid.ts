@@ -194,6 +194,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private requestSeq = 0;
   private inFlight: AbortController | null = null;
   private readonly globalListeners: GlobalListener[] = [];
+  private activeResizeCleanup: (() => void) | null = null;
 
   // ---- Long-lived DOM ------------------------------------------------------
   private readonly root: HTMLDivElement;
@@ -614,6 +615,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     this.inFlight?.abort();
     this.inFlight = null;
+    this.activeResizeCleanup?.();
+    this.activeResizeCleanup = null;
 
     for (const listener of this.globalListeners) {
       listener.target.removeEventListener(listener.type, listener.handler);
@@ -874,11 +877,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
         formatMessage(this.locale.exportFetchingAll, { total: this.total.toLocaleString() }),
       );
       try {
+        const cap = this.options.maxExportRows ?? DEFAULT_ROW_CAP;
         const collected = await fetchAllPages<TData>(
           (page, pageSize) => this.options.fetchPage!(page, pageSize, this.query),
-          this.options.maxExportRows ?? DEFAULT_ROW_CAP,
+          cap,
         );
-        return collected.items;
+        return cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
       } catch {
         this.notify("error", this.locale.exportFetchFailed);
         return this.data;
@@ -899,6 +903,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     );
 
     try {
+      const cap = this.options.maxExportRows ?? DEFAULT_ROW_CAP;
       const collected = await fetchAllPages<TData>(async (page, pageSize) => {
         const pageQuery: QueryState = {
           ...this.query,
@@ -911,8 +916,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
-      }, this.options.maxExportRows ?? DEFAULT_ROW_CAP);
-      return collected.items;
+      }, cap);
+      return cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
     } catch {
       this.notify("error", this.locale.exportFetchFailed);
       return this.data;
@@ -1617,33 +1622,36 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const rightOffsets = new Map<string, number>();
     let currentLeft = 0;
     let lastLeftPinnedId: string | null = null;
+    const hasLeftPinned = visibleCols.some((c) => c.meta?.pinned === "left");
 
-    if (this.options.renderExpandedRow) {
-      leftOffsets.set("__expand", currentLeft);
-      currentLeft += 40;
-      lastLeftPinnedId = "__expand";
-    }
+    if (hasLeftPinned) {
+      if (this.options.renderExpandedRow) {
+        leftOffsets.set("__expand", currentLeft);
+        currentLeft += 40;
+        lastLeftPinnedId = "__expand";
+      }
 
-    if (this.selectionEnabled()) {
-      leftOffsets.set("__select", currentLeft);
-      currentLeft += 44;
-      lastLeftPinnedId = "__select";
-    }
+      if (this.selectionEnabled()) {
+        leftOffsets.set("__select", currentLeft);
+        currentLeft += 44;
+        lastLeftPinnedId = "__select";
+      }
 
-    if (this.showSerial()) {
-      leftOffsets.set("__serial", currentLeft);
-      currentLeft += 56;
-      lastLeftPinnedId = "__serial";
-    }
+      if (this.showSerial()) {
+        leftOffsets.set("__serial", currentLeft);
+        currentLeft += 56;
+        lastLeftPinnedId = "__serial";
+      }
 
-    for (const col of visibleCols) {
-      const id = getColumnId(col);
-      const pin = col.meta?.pinned;
-      const width = this.columnWidths[id] ?? col.meta?.width ?? 140;
-      if (pin === "left") {
-        leftOffsets.set(id, currentLeft);
-        currentLeft += width;
-        lastLeftPinnedId = id;
+      for (const col of visibleCols) {
+        const id = getColumnId(col);
+        const pin = col.meta?.pinned;
+        const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+        if (pin === "left") {
+          leftOffsets.set(id, currentLeft);
+          currentLeft += width;
+          lastLeftPinnedId = id;
+        }
       }
     }
 
@@ -1654,7 +1662,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       if (!col) continue;
       const id = getColumnId(col);
       const pin = col.meta?.pinned;
-      const width = this.columnWidths[id] ?? col.meta?.width ?? 140;
+      const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
         currentRight += width;
@@ -2042,6 +2050,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       handle.addEventListener("pointerdown", (event: PointerEvent) => {
         event.preventDefault();
         event.stopPropagation();
+        this.activeResizeCleanup?.();
         const startX = event.clientX;
         const startWidth = th.getBoundingClientRect ? th.getBoundingClientRect().width : (customWidth ?? meta.width ?? 120);
         const onMove = (e: PointerEvent) => {
@@ -2049,13 +2058,18 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.columnWidths[id] = nextWidth;
           th.style.width = `${nextWidth}px`;
         };
-        const onUp = () => {
+        const cleanup = () => {
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
           document.body?.classList.remove("tbx-resizing");
+          this.activeResizeCleanup = null;
+        };
+        const onUp = () => {
+          cleanup();
           this.saveState();
           this.render();
         };
+        this.activeResizeCleanup = cleanup;
         document.body?.classList.add("tbx-resizing");
         document.addEventListener("pointermove", onMove);
         document.addEventListener("pointerup", onUp);
@@ -2882,22 +2896,43 @@ class NexGridController<TData> implements TableXHandle<TData> {
           if (String(value) === opt) optEl.selected = true;
           select.appendChild(optEl);
         }
+        select.value = value !== null && value !== undefined ? String(value) : "";
         editInput = select;
       } else {
+        const initialText = value !== null && value !== undefined ? String(value) : "";
         editInput = el("input", {
           class: "tbx-cell-edit-input",
           attrs: {
             type: editType === "number" ? "number" : "text",
-            value: value !== null && value !== undefined ? String(value) : "",
+            value: initialText,
           },
         }) as HTMLInputElement;
+        editInput.value = initialText;
       }
 
       const save = () => {
         const nextVal = editType === "number" ? Number(editInput.value) : editInput.value;
         this.editingCell = null;
         if (rowId !== undefined) {
-          (row as Record<string, unknown>)[colId] = nextVal;
+          const propKey =
+            column.accessorKey !== undefined && String(column.accessorKey) !== ""
+              ? String(column.accessorKey)
+              : colId;
+          if (
+            row !== null &&
+            typeof row === "object" &&
+            !Object.isFrozen(row) &&
+            !propKey.includes(".") &&
+            propKey !== "__proto__" &&
+            propKey !== "constructor" &&
+            propKey !== "prototype"
+          ) {
+            try {
+              (row as Record<string, unknown>)[propKey] = nextVal;
+            } catch {
+              // Read-only row property; host receives newValue via onCellEdit
+            }
+          }
           this.options.onCellEdit?.({
             row,
             columnId: colId,
@@ -3218,3 +3253,61 @@ export function createTableX<TData>(
 }
 
 export const createNexGrid = createTableX;
+
+type HostWithHandle = HTMLElement & {
+  tablex?: TableXHandle<unknown>;
+  __tablexColCount?: number;
+};
+
+/**
+ * Mount (or upgrade) a grid from a DOM host element/id and a JSON `<script>` config element/id.
+ * Safe to call multiple times (idempotent) and CSP-friendly for Blazor / Razor JS interop.
+ */
+export function mountFromConfig(
+  containerOrId: HTMLElement | string,
+  configId?: string,
+): TableXHandle<unknown> | null {
+  if (typeof document === "undefined") return null;
+  const host = (
+    typeof containerOrId === "string" ? document.getElementById(containerOrId) : containerOrId
+  ) as HostWithHandle | null;
+  if (!host) return null;
+
+  const resolvedConfigId = configId ?? host.getAttribute("data-tablex-config") ?? "";
+  const dataEl = resolvedConfigId ? document.getElementById(resolvedConfigId) : null;
+  if (!dataEl || !dataEl.textContent) return host.tablex ?? null;
+
+  let parsed: TableXOptions<unknown>;
+  try {
+    parsed = JSON.parse(dataEl.textContent) as TableXOptions<unknown>;
+  } catch {
+    return host.tablex ?? null;
+  }
+
+  const nextColCount = Array.isArray(parsed.columns) ? parsed.columns.length : 0;
+  if (host.tablex) {
+    if ((host.__tablexColCount ?? 0) === 0 && nextColCount > 0) {
+      host.tablex.destroy();
+      delete host.tablex;
+    } else {
+      return host.tablex;
+    }
+  }
+
+  const handle = createTableX(host, parsed);
+  host.tablex = handle;
+  host.__tablexColCount = nextColCount;
+  return handle;
+}
+
+/** Destroy a grid previously attached to a host element (or element id) as `host.tablex`. */
+export function destroyMounted(containerOrId: HTMLElement | string): void {
+  if (typeof document === "undefined") return;
+  const host = (
+    typeof containerOrId === "string" ? document.getElementById(containerOrId) : containerOrId
+  ) as HostWithHandle | null;
+  if (!host?.tablex) return;
+  host.tablex.destroy();
+  delete host.tablex;
+  delete host.__tablexColCount;
+}

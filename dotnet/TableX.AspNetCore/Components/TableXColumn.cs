@@ -107,7 +107,7 @@ public class TableXColumn : ComponentBase
             FilterOptions = ParseFilterOptions(FilterOptions),
         };
 
-        ColumnCollection?.Add(new TableXColumnConfig
+        ColumnCollection?.RegisterColumn(new TableXColumnConfig
         {
             AccessorKey = Field,
             Header = Header ?? (Field.Length > 0 ? char.ToUpper(Field[0], System.Globalization.CultureInfo.InvariantCulture) + Field[1..] : Field),

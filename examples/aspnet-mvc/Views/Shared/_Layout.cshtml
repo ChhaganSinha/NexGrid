@@ -6,15 +6,11 @@
     <title>@ViewData["Title"] — TableX ASP.NET Core MVC example</title>
 
     @*
-        Both files ship inside TableX.AspNetCore as static web assets, served
-        from _content/TableX.AspNetCore/ by UseStaticFiles(). There is nothing
+        Both files ship inside NexGrid.AspNetCore as static web assets, served
+        from _content/NexGrid.AspNetCore/ by UseStaticFiles(). There is nothing
         to copy, download or bundle.
-
-        The literal paths are spelled out here for readability; the constants
-        TableXAssets.StylesheetPath and TableXAssets.ScriptPath hold exactly
-        the same values if you would rather not hard-code them.
     *@
-    <link rel="stylesheet" href="~/_content/TableX.AspNetCore/tablex.css" />
+    <link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
     <link rel="stylesheet" href="~/css/site.css" />
 </head>
 <body>
@@ -28,7 +24,7 @@
         It sits at the end of <body> so the browser can paint the page first;
         the init the Tag Helper emits waits for DOMContentLoaded when it has to.
     *@
-    <script src="~/_content/TableX.AspNetCore/tablex.global.js"></script>
+    <script src="@TableXAssets.ScriptPath"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -275,7 +275,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(/* ... */));
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
-app.UseStaticFiles();       // serves _content/TableX.AspNetCore/*
+app.UseStaticFiles();       // serves _content/NexGrid.AspNetCore/*
 app.MapRazorPages();
 
 app.MapGet("/api/students", (TableXQuery query, AppDbContext db, CancellationToken ct) =>
@@ -512,11 +512,11 @@ adapter — React, Angular, vanilla — works against your endpoint with no glue
 
 | Member | Description |
 | --- | --- |
-| `TableXTagHelper` | `<nex-grid>` |
-| `TableXColumnTagHelper` | `<nex-grid-column>` |
+| `TableXTagHelper` | `<nex-grid>` / `<table-x>` |
+| `TableXColumnTagHelper` | `<nex-grid-column>` / `<table-x-column>` |
 | `TableXDensity` · `TableXTheme` · `TableXColumnAlign` | Attribute enums. |
-| `TableXAssets.StylesheetPath` | `/_content/TableX.AspNetCore/tablex.css` |
-| `TableXAssets.ScriptPath` | `/_content/TableX.AspNetCore/tablex.global.js` |
+| `TableXAssets.StylesheetPath` | `/_content/NexGrid.AspNetCore/tablex.css` |
+| `TableXAssets.ScriptPath` | `/_content/NexGrid.AspNetCore/tablex.global.js` |
 | `TableXAssets.ContentRoot` · `.GlobalName` | Static web asset root; the browser global (`TableX`). |
 
 ---

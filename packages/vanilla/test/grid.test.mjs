@@ -278,6 +278,10 @@ class MockDocument extends MockNode {
     n.textContent = text;
     return n;
   }
+
+  getElementById(id) {
+    return this.querySelector(`#${id}`);
+  }
 }
 
 class MockEvent {
@@ -322,7 +326,7 @@ if (!globalThis.URL.revokeObjectURL) {
 }
 
 // Import vanilla package
-const { createTableX, createNexGrid } = await import("../dist/index.js");
+const { createTableX, createNexGrid, mountFromConfig, destroyMounted } = await import("../dist/index.js");
 
 test("createTableX mounts table, renders rows and updates correctly", () => {
   const container = document.createElement("div");
@@ -1069,6 +1073,91 @@ test("free-text column filter edits and clears cleanly, range filters work, and 
   assert.equal(container.querySelectorAll(".tbx-row").length, 2); // 92 and 84
 
   handle.destroy();
+});
+
+test("pinned offsets honor minWidth and skip pinning serial/select when no data column is pinned, inline edit handles frozen rows, and mountFromConfig upgrades cleanly", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  // 1. Unpinned grid should NOT sticky-pin S.No. or Select
+  const unpinned = createTableX(container, {
+    caption: "Unpinned Grid",
+    columns: [{ accessorKey: "name", header: "Name" }],
+    data: [{ id: "1", name: "Alice" }],
+    total: 1,
+    enableSelection: true,
+    showSerialNumber: true,
+  });
+  assert.equal(container.querySelector(".tbx-th--pinned-left"), null);
+  unpinned.destroy();
+
+  // 2. Pinned columns with minWidth compute non-overlapping offsets + inline edit on frozen row with accessorKey
+  let editedPayload = null;
+  const frozenRow = Object.freeze({ id: "1", fullName: "Alice", dept: "CS" });
+  const pinnedGrid = createTableX(container, {
+    caption: "Pinned & Frozen Edit",
+    columns: [
+      { id: "student", accessorKey: "fullName", header: "Student", meta: { minWidth: 230, pinned: "left", editable: true } },
+      { accessorKey: "dept", header: "Dept", meta: { width: 120, pinned: "left" } },
+    ],
+    data: [frozenRow],
+    total: 1,
+    showSerialNumber: false,
+    enableSelection: false,
+    onCellEdit: (edit) => {
+      editedPayload = edit;
+    },
+  });
+
+  const pinnedHeaders = container.querySelectorAll(".tbx-th--pinned-left");
+  assert.equal(pinnedHeaders.length, 2);
+  assert.equal(pinnedHeaders[0].style.left, "0px");
+  assert.equal(pinnedHeaders[1].style.left, "230px", "Second pinned column offsets by first column's minWidth (230px)");
+
+  // Trigger inline cell edit on frozen row
+  const editableCell = container.querySelector(".tbx-cell--editable");
+  assert.ok(editableCell);
+  editableCell.dispatchEvent(new MockMouseEvent("dblclick"));
+  const editInput = container.querySelector(".tbx-cell-edit-input");
+  assert.ok(editInput);
+  assert.equal(editInput.value, "Alice", "Reads initial value via accessorKey");
+  editInput.value = "Alicia";
+  editInput.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+  assert.deepEqual(editedPayload, {
+    row: frozenRow,
+    columnId: "student",
+    oldValue: "Alice",
+    newValue: "Alicia",
+  });
+  pinnedGrid.destroy();
+
+  // 3. mountFromConfig & destroyMounted (Blazor / TagHelper lifecycle)
+  const host = document.createElement("div");
+  host.setAttribute("id", "blazor-host-1");
+  const cfg = document.createElement("script");
+  cfg.setAttribute("id", "blazor-host-1-config");
+  cfg.textContent = JSON.stringify({ caption: "Blazor Grid", columns: [], data: [] });
+  document.body.appendChild(host);
+  document.body.appendChild(cfg);
+
+  const firstHandle = mountFromConfig("blazor-host-1", "blazor-host-1-config");
+  assert.ok(firstHandle);
+
+  // Simulate Blazor second pass populating child <TableXColumn> definitions
+  cfg.textContent = JSON.stringify({
+    caption: "Blazor Grid",
+    columns: [{ accessorKey: "name", header: "Employee" }],
+    data: [{ id: "1", name: "Manju" }],
+    clientSidePagination: true,
+  });
+  const upgradedHandle = mountFromConfig("blazor-host-1", "blazor-host-1-config");
+  assert.notEqual(upgradedHandle, firstHandle, "Upgrades empty-column initial SSR mount once columns arrive");
+  assert.equal(host.querySelectorAll(".tbx-row").length, 1);
+
+  destroyMounted("blazor-host-1");
+  assert.equal(host.tablex, undefined);
+  host.remove();
+  cfg.remove();
 });
 
 

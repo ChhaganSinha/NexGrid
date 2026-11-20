@@ -677,6 +677,15 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+  const resizeCleanupRef = React.useRef<(() => void) | null>(null);
+  const editInputRef = React.useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      resizeCleanupRef.current?.();
+      resizeCleanupRef.current = null;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!openFilterCol) return;
@@ -917,33 +926,36 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     const rightOffsets = new Map<string, number>();
     let currentLeft = 0;
     let lastLeftPinnedId: string | null = null;
+    const hasLeftPinned = visibleCols.some((c) => c.meta?.pinned === "left");
 
-    if (renderExpandedRow) {
-      leftOffsets.set("__expand", currentLeft);
-      currentLeft += 40;
-      lastLeftPinnedId = "__expand";
-    }
+    if (hasLeftPinned) {
+      if (renderExpandedRow) {
+        leftOffsets.set("__expand", currentLeft);
+        currentLeft += 40;
+        lastLeftPinnedId = "__expand";
+      }
 
-    if (enableSelection) {
-      leftOffsets.set("__select", currentLeft);
-      currentLeft += 44;
-      lastLeftPinnedId = "__select";
-    }
+      if (enableSelection) {
+        leftOffsets.set("__select", currentLeft);
+        currentLeft += 44;
+        lastLeftPinnedId = "__select";
+      }
 
-    if (showSerialNumber) {
-      leftOffsets.set("__serial", currentLeft);
-      currentLeft += 56;
-      lastLeftPinnedId = "__serial";
-    }
+      if (showSerialNumber) {
+        leftOffsets.set("__serial", currentLeft);
+        currentLeft += 56;
+        lastLeftPinnedId = "__serial";
+      }
 
-    for (const col of visibleCols) {
-      const id = getColumnId(col);
-      const pin = col.meta?.pinned;
-      const width = colWidths[id] ?? col.meta?.width ?? 140;
-      if (pin === "left") {
-        leftOffsets.set(id, currentLeft);
-        currentLeft += width;
-        lastLeftPinnedId = id;
+      for (const col of visibleCols) {
+        const id = getColumnId(col);
+        const pin = col.meta?.pinned;
+        const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+        if (pin === "left") {
+          leftOffsets.set(id, currentLeft);
+          currentLeft += width;
+          lastLeftPinnedId = id;
+        }
       }
     }
 
@@ -954,7 +966,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       if (!col) continue;
       const id = getColumnId(col);
       const pin = col.meta?.pinned;
-      const width = colWidths[id] ?? col.meta?.width ?? 140;
+      const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
         currentRight += width;
@@ -1112,14 +1124,16 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     }
 
     if (fetchPage) {
+      const cap = maxExportRows ?? DEFAULT_ROW_CAP;
       const full = await fetchAllPages<TData>(
         (page, size) => fetchPage(page, size, query),
-        maxExportRows ?? DEFAULT_ROW_CAP,
+        cap,
       );
-      return full.items;
+      return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
     }
 
     if (fetchEndpoint) {
+      const cap = maxExportRows ?? DEFAULT_ROW_CAP;
       const full = await fetchAllPages<TData>(async (page, size) => {
         const url = buildQueryUrl(fetchEndpoint, {
           ...query,
@@ -1129,11 +1143,21 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         const response = await fetch(url, { cache: "no-store", ...fetchOptions });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
-      }, maxExportRows ?? DEFAULT_ROW_CAP);
-      return full.items;
+      }, cap);
+      return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
     }
 
     return rows;
+  };
+
+  const handleBulkExport = async (format: ExportFormat): Promise<void> => {
+    const pool = allData ?? (isClientSide ? data : rows);
+    const selectedRows = pool.filter((r) => selectedIds.has(getRowId(r)));
+    if (selectedRows.length > 0) {
+      await executeExportWithRows(format, selectedRows);
+      return;
+    }
+    await handleExport(format);
   };
 
   const handleExport = async (format: ExportFormat): Promise<void> => {
@@ -1262,22 +1286,27 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      resizeCleanupRef.current?.();
       const startX = e.clientX;
-      const targetTh = (e.currentTarget.parentElement as HTMLElement) || null;
+      const targetTh =
+        (e.currentTarget.closest?.("th") as HTMLElement | null) ||
+        (e.currentTarget.parentElement as HTMLElement | null);
       const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (customWidth ?? meta?.width ?? 120);
 
       const onMove = (moveEvent: PointerEvent) => {
         const nextW = Math.max(meta?.minWidth ?? 60, Math.round(startWidth + (moveEvent.clientX - startX)));
         setColWidths((prev) => ({ ...prev, [id]: nextW }));
       };
-      const onUp = () => {
+      const cleanup = () => {
         document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointerup", cleanup);
         document.body?.classList.remove("tbx-resizing");
+        resizeCleanupRef.current = null;
       };
+      resizeCleanupRef.current = cleanup;
       document.body?.classList.add("tbx-resizing");
       document.addEventListener("pointermove", onMove);
-      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointerup", cleanup);
     };
 
     return (
@@ -2148,78 +2177,118 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                             }
                           >
                             {isCurrentlyEditing ? (
-                              <div
-                                className="tbx-cell-edit-wrap"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {col.meta?.editType === "select" && col.meta.editOptions ? (
-                                  <select
-                                    autoFocus
-                                    className="tbx-cell-edit-select tbx-cell-edit-input"
-                                    defaultValue={String((row as Record<string, unknown>)[colId] ?? "")}
-                                    id={`${instanceId}-edit-${id}-${colId}`}
+                              (() => {
+                                const currentCellVal = getCellValue(col, row);
+                                const defaultEditStr =
+                                  currentCellVal !== null && currentCellVal !== undefined
+                                    ? String(currentCellVal)
+                                    : "";
+                                const commitEdit = (rawVal: string) => {
+                                  const nextVal =
+                                    col.meta?.editType === "number" ? Number(rawVal) : rawVal;
+                                  const propKey =
+                                    col.accessorKey !== undefined && String(col.accessorKey) !== ""
+                                      ? String(col.accessorKey)
+                                      : colId;
+                                  if (
+                                    row !== null &&
+                                    typeof row === "object" &&
+                                    !Object.isFrozen(row) &&
+                                    !propKey.includes(".") &&
+                                    propKey !== "__proto__" &&
+                                    propKey !== "constructor" &&
+                                    propKey !== "prototype"
+                                  ) {
+                                    try {
+                                      (row as Record<string, unknown>)[propKey] = nextVal;
+                                    } catch {
+                                      // Ignore write errors on read-only properties; host owns state via onCellEdit
+                                    }
+                                  }
+                                  onCellEdit?.({
+                                    row,
+                                    columnId: colId,
+                                    oldValue: currentCellVal,
+                                    newValue: nextVal,
+                                  });
+                                  setEditingCell(null);
+                                };
+                                const handleEditKeyDown = (
+                                  e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+                                ) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    commitEdit(e.currentTarget.value);
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingCell(null);
+                                  }
+                                };
+
+                                return (
+                                  <div
+                                    className="tbx-cell-edit-wrap"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    {col.meta.editOptions.map((opt) => (
-                                      <option key={opt} value={opt}>
-                                        {opt}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    autoFocus
-                                    type={col.meta?.editType === "number" ? "number" : "text"}
-                                    className="tbx-cell-edit-input"
-                                    defaultValue={String((row as Record<string, unknown>)[colId] ?? "")}
-                                    id={`${instanceId}-edit-${id}-${colId}`}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        const el = e.currentTarget;
-                                        const val = col.meta?.editType === "number" ? Number(el.value) : el.value;
-                                        const oldVal = (row as Record<string, unknown>)[colId];
-                                        (row as Record<string, unknown>)[colId] = val;
-                                        onCellEdit?.({ row, columnId: colId, oldValue: oldVal, newValue: val });
-                                        setEditingCell(null);
-                                      } else if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        setEditingCell(null);
-                                      }
-                                    }}
-                                  />
-                                )}
-                                <div className="tbx-cell-edit-actions">
-                                  <button
-                                    type="button"
-                                    className="tbx-cell-edit-btn tbx-cell-edit-btn--save"
-                                    aria-label="Save"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const el = document.getElementById(`${instanceId}-edit-${id}-${colId}`) as HTMLInputElement | HTMLSelectElement | null;
-                                      if (el) {
-                                        const val = col.meta?.editType === "number" ? Number(el.value) : el.value;
-                                        const oldVal = (row as Record<string, unknown>)[colId];
-                                        (row as Record<string, unknown>)[colId] = val;
-                                        onCellEdit?.({ row, columnId: colId, oldValue: oldVal, newValue: val });
-                                      }
-                                      setEditingCell(null);
-                                    }}
-                                  >
-                                    <CheckIcon className="tbx-icon" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
-                                    aria-label="Cancel"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingCell(null);
-                                    }}
-                                  >
-                                    <XIcon className="tbx-icon" />
-                                  </button>
-                                </div>
-                              </div>
+                                    {col.meta?.editType === "select" && col.meta.editOptions ? (
+                                      <select
+                                        autoFocus
+                                        ref={(node) => {
+                                          editInputRef.current = node;
+                                        }}
+                                        className="tbx-cell-edit-select tbx-cell-edit-input"
+                                        defaultValue={defaultEditStr}
+                                        onKeyDown={handleEditKeyDown}
+                                      >
+                                        {col.meta.editOptions.map((opt) => (
+                                          <option key={opt} value={opt}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        autoFocus
+                                        ref={(node) => {
+                                          editInputRef.current = node;
+                                        }}
+                                        type={col.meta?.editType === "number" ? "number" : "text"}
+                                        className="tbx-cell-edit-input"
+                                        defaultValue={defaultEditStr}
+                                        onKeyDown={handleEditKeyDown}
+                                      />
+                                    )}
+                                    <div className="tbx-cell-edit-actions">
+                                      <button
+                                        type="button"
+                                        className="tbx-cell-edit-btn tbx-cell-edit-btn--save"
+                                        aria-label="Save"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (editInputRef.current) {
+                                            commitEdit(editInputRef.current.value);
+                                          } else {
+                                            setEditingCell(null);
+                                          }
+                                        }}
+                                      >
+                                        <CheckIcon className="tbx-icon" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
+                                        aria-label="Cancel"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingCell(null);
+                                        }}
+                                      >
+                                        <XIcon className="tbx-icon" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()
                             ) : (
                               renderCellContent(col, row, boolLabels)
                             )}
@@ -2241,6 +2310,94 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               })
             )}
           </tbody>
+
+          {!isLoading && hasSummary && rows.length > 0 ? (
+            <tfoot>
+              <tr className="tbx-summary-row">
+                {renderExpandedRow ? (
+                  <td
+                    className={[
+                      "tbx-summary-cell",
+                      leftOffsets.has("__expand") ? "tbx-td--pinned-left" : undefined,
+                      lastLeftPinnedId === "__expand" ? "tbx-pinned-border-left" : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    style={{
+                      width: "40px",
+                      left: leftOffsets.get("__expand"),
+                    }}
+                  />
+                ) : null}
+
+                {enableSelection ? (
+                  <td
+                    className={[
+                      "tbx-summary-cell tbx-summary-cell--select",
+                      leftOffsets.has("__select") ? "tbx-td--pinned-left" : undefined,
+                      lastLeftPinnedId === "__select" ? "tbx-pinned-border-left" : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    style={{
+                      left: leftOffsets.get("__select"),
+                    }}
+                  />
+                ) : null}
+
+                {showSerialNumber ? (
+                  <td
+                    className={[
+                      "tbx-summary-cell tbx-summary-cell--serial",
+                      leftOffsets.has("__serial") ? "tbx-td--pinned-left" : undefined,
+                      lastLeftPinnedId === "__serial" ? "tbx-pinned-border-left" : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    style={{
+                      left: leftOffsets.get("__serial"),
+                    }}
+                  />
+                ) : null}
+
+                {visible.map((col, colIndex) => {
+                  const colId = getColumnId(col);
+                  const aggVal = computeAggregation(col, rows);
+                  const aggLabel =
+                    col.meta?.aggregationLabel ||
+                    (typeof col.meta?.aggregation === "string" ? `${col.meta.aggregation}:` : "");
+                  return (
+                    <td
+                      key={`sum-${colId || colIndex}`}
+                      className={[
+                        "tbx-summary-cell",
+                        leftOffsets.has(colId) ? "tbx-td--pinned-left" : undefined,
+                        rightOffsets.has(colId) ? "tbx-td--pinned-right" : undefined,
+                        lastLeftPinnedId === colId ? "tbx-pinned-border-left" : undefined,
+                        firstRightPinnedId === colId ? "tbx-pinned-border-right" : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{
+                        textAlign: col.meta?.align ?? "left",
+                        ...(leftOffsets.has(colId) ? { left: leftOffsets.get(colId) } : {}),
+                        ...(rightOffsets.has(colId) ? { right: rightOffsets.get(colId) } : {}),
+                      }}
+                    >
+                      {aggVal !== null && aggVal !== undefined ? (
+                        <>
+                          {aggLabel ? <span className="tbx-summary-label">{aggLabel} </span> : null}
+                          <strong>{String(aggVal)}</strong>
+                        </>
+                      ) : colIndex === 0 && !aggLabel ? (
+                        <strong>Total</strong>
+                      ) : null}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
 
@@ -2299,7 +2456,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                         onClick={(event) => event.stopPropagation()}
                       >
                         <input
-                          type="checkbox"
+                          type={isSingleSelect ? "radio" : "checkbox"}
+                          name={isSingleSelect ? `${instanceId}-card-select` : undefined}
                           className="tbx-checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelectRow(id)}
@@ -2327,6 +2485,46 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           })
         )}
       </div>
+
+      {/* ── BULK ACTIONS FLOATING BAR ───────────────────────────────────── */}
+      {enableSelection && enableBulkActions !== false && selectedIds.size > 0 ? (
+        <div className="tbx-bulk-bar" role="region" aria-label="Bulk actions">
+          <span className="tbx-bulk-badge">{selectedIds.size} selected</span>
+          <div className="tbx-bulk-actions">
+            {isExportVisible ? (
+              <>
+                <button
+                  type="button"
+                  className="tbx-bulk-btn"
+                  disabled={isExporting}
+                  onClick={() => void handleBulkExport("excel")}
+                >
+                  <FileSpreadsheetIcon className="tbx-icon--excel" />
+                  <span>{locale.exportExcelButton ?? "Export Excel"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tbx-bulk-btn"
+                  disabled={isExporting}
+                  onClick={() => void handleBulkExport("csv")}
+                >
+                  <FileTextIcon className="tbx-icon--csv" />
+                  <span>{locale.exportCsvButton ?? "Export CSV"}</span>
+                </button>
+              </>
+            ) : null}
+            {bulkActions ? bulkActions(Array.from(selectedIds), deselectAll) : null}
+          </div>
+          <button
+            type="button"
+            className="tbx-bulk-btn tbx-bulk-btn--close"
+            aria-label="Deselect all"
+            onClick={deselectAll}
+          >
+            <XIcon className="tbx-icon" />
+          </button>
+        </div>
+      ) : null}
 
       {/* ── FOOTER ──────────────────────────────────────────────────────── */}
       {showFooter ? (

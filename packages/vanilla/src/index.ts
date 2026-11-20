@@ -8,7 +8,7 @@
 // wire the grid to its address bar, and asking it to load core separately would
 // defeat the point of a single-file bundle.
 
-export { createTableX, createNexGrid } from "./grid.js";
+export { createTableX, createNexGrid, mountFromConfig, destroyMounted } from "./grid.js";
 
 export type {
   TableXHandle,

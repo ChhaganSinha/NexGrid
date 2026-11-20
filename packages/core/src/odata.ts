@@ -13,6 +13,36 @@ import {
 import { totalPagesFor } from "./query.js";
 
 
+const ODATA_NUMBER_LITERAL = /^[+-]?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
+function formatODataComparableLiteral(raw: string): string {
+  const trimmed = raw.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === "true" || lower === "false") return lower;
+  if (ODATA_NUMBER_LITERAL.test(trimmed)) return trimmed;
+  return `'${trimmed.replace(/'/g, "''")}'`;
+}
+
+function parseODataPrefixOperator(
+  raw: string,
+): { odataOp: "ge" | "le" | "ne" | "gt" | "lt" | "eq"; operand: string } | null {
+  const table: ReadonlyArray<readonly [string, "ge" | "le" | "ne" | "gt" | "lt" | "eq"]> = [
+    [">=", "ge"],
+    ["<=", "le"],
+    ["!=", "ne"],
+    [">", "gt"],
+    ["<", "lt"],
+    ["=", "eq"],
+  ];
+  for (const [prefix, odataOp] of table) {
+    if (raw.startsWith(prefix)) {
+      const operand = raw.slice(prefix.length).trim();
+      if (operand.length > 0) return { odataOp, operand };
+    }
+  }
+  return null;
+}
+
 /** Options for customizing OData v4 query parameter generation. */
 export interface ODataQueryOptions {
   /** Map of NexGrid column IDs to OData entity property names (e.g. `{ createdAt: "CreationDate" }`). */
@@ -81,33 +111,41 @@ export function toODataParams(
 
   // Column filters: filter[status]=Active -> Status eq 'Active'
   // Range filters: filter[age]=18..65 -> Age ge 18 and Age le 65
+  // Operator filters: filter[score]=>=80 -> score ge 80
   if (query.filter) {
     for (const [key, value] of Object.entries(query.filter)) {
       if (!value || !value.trim()) continue;
       const trimmedVal = value.trim();
+      if (trimmedVal === "..") continue;
       const field = options?.fieldMap?.[key] ?? key;
       if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
       if (trimmedVal.includes("..")) {
         const [minStr, maxStr] = trimmedVal.split("..");
         const parts: string[] = [];
         if (minStr !== undefined && minStr.trim() !== "") {
-          const trimmedMin = minStr.trim();
-          const isNum = !isNaN(Number(trimmedMin));
-          const escapedMin = isNum ? trimmedMin : `'${trimmedMin.replace(/'/g, "''")}'`;
-          parts.push(`${field} ge ${escapedMin}`);
+          parts.push(`${field} ge ${formatODataComparableLiteral(minStr)}`);
         }
         if (maxStr !== undefined && maxStr.trim() !== "") {
-          const trimmedMax = maxStr.trim();
-          const isNum = !isNaN(Number(trimmedMax));
-          const escapedMax = isNum ? trimmedMax : `'${trimmedMax.replace(/'/g, "''")}'`;
-          parts.push(`${field} le ${escapedMax}`);
+          parts.push(`${field} le ${formatODataComparableLiteral(maxStr)}`);
         }
         if (parts.length > 0) {
           filterClauses.push(parts.join(" and "));
         }
       } else {
-        const escapedVal = trimmedVal.replace(/'/g, "''");
-        filterClauses.push(`${field} eq '${escapedVal}'`);
+        const parsedOp = parseODataPrefixOperator(trimmedVal);
+        if (parsedOp) {
+          filterClauses.push(
+            `${field} ${parsedOp.odataOp} ${formatODataComparableLiteral(parsedOp.operand)}`,
+          );
+        } else {
+          const lower = trimmedVal.toLowerCase();
+          if (lower === "true" || lower === "false") {
+            filterClauses.push(`${field} eq ${lower}`);
+          } else {
+            const escapedVal = trimmedVal.replace(/'/g, "''");
+            filterClauses.push(`${field} eq '${escapedVal}'`);
+          }
+        }
       }
     }
   }

@@ -211,7 +211,14 @@ public class TableXColumnTagHelper : TagHelper
             : char.ToUpper(field[0], CultureInfo.InvariantCulture) + field[1..];
 }
 
-/// <summary>The column list a &lt;nex-grid&gt; seeds for its children to fill.</summary>
+/// <summary>The column list a &lt;nex-grid&gt; or Blazor &lt;TableX&gt; seeds for its children to fill.</summary>
 internal sealed class TableXColumnCollection : List<TableXColumnConfig>
 {
+    internal Action? OnChanged { get; set; }
+
+    internal void RegisterColumn(TableXColumnConfig column)
+    {
+        Add(column);
+        OnChanged?.Invoke();
+    }
 }

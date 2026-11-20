@@ -111,3 +111,24 @@ test("toODataParams ignores field identifiers with injection characters", () => 
   assert.equal(params.$filter, undefined);
 });
 
+test("toODataParams handles booleans, comparison operators, and ignores empty ranges", () => {
+  const query = {
+    page: 1,
+    pageSize: 10,
+    sort: [],
+    filter: {
+      scholarship: "true",
+      active: "FALSE",
+      score: ">=85",
+      status: "!=Suspended",
+      emptyRange: "..",
+    },
+  };
+  const params = toODataParams(query);
+  assert.ok(params.$filter.includes("scholarship eq true"));
+  assert.ok(params.$filter.includes("active eq false"));
+  assert.ok(params.$filter.includes("score ge 85"));
+  assert.ok(params.$filter.includes("status ne 'Suspended'"));
+  assert.ok(!params.$filter.includes("emptyRange"));
+});
+

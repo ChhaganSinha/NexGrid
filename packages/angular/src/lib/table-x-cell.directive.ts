@@ -47,14 +47,29 @@ import type { TableXCellTemplateContext } from "./types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class TableXCellDirective<TData = any> {
   /** Id (or `accessorKey`) of the column this template renders. */
-  @Input({ required: true }) tableXCell = ""; @Input() set nexGridCell(v: string) { this.tableXCell = v; };
+  @Input() tableXCell = "";
+
+  @Input()
+  get nexGridCell(): string {
+    return this.tableXCell;
+  }
+  set nexGridCell(v: string) {
+    this.tableXCell = v;
+  }
 
   /**
    * Type anchor only — bind the same array you pass to `[data]` and the
    * template context becomes strongly typed. Never read at runtime.
    */
-  @Input() tableXCellOf?: readonly TData[]; @Input() set nexGridCellOf(v: readonly TData[] | undefined) { this.tableXCellOf = v; }
-  private _unused?: readonly TData[];
+  @Input() tableXCellOf?: readonly TData[];
+
+  @Input()
+  get nexGridCellOf(): readonly TData[] | undefined {
+    return this.tableXCellOf;
+  }
+  set nexGridCellOf(v: readonly TData[] | undefined) {
+    this.tableXCellOf = v;
+  }
 
   /** The captured template. Read by `<nex-grid>` via `@ContentChildren`. */
   readonly template: TemplateRef<TableXCellTemplateContext<TData>> = inject(TemplateRef);

@@ -38,3 +38,5 @@ jobs:
       - run: npm run build:core && npm run build:vanilla
       - run: dotnet build dotnet/TableX.sln -c Release
       - run: dotnet test dotnet/TableX.sln -c Release --no-build
+      - run: dotnet build examples/aspnet-mvc/TableX.Example.Mvc.csproj -c Release
+      - run: dotnet build examples/blazor/TableX.Example.Blazor.csproj -c Release

@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Rendering
 @using Microsoft.JSInterop
 @using System.Globalization
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <CascadingValue Value="_columns" IsFixed="true">
@@ -24,16 +25,18 @@
                 " from your App.razor, _Layout.cshtml or index.html before this grid renders.";
 
             function start() {
-                var host = document.getElementById(containerId);
-                var data = document.getElementById(configId);
-                if (!host || !data) return;
-
                 var api = window.TableX;
                 if (!api || typeof api.createTableX !== "function") {
                     if (window.console && window.console.error) window.console.error(warning);
                     return;
                 }
-
+                if (typeof api.mountFromConfig === "function") {
+                    api.mountFromConfig(containerId, configId);
+                    return;
+                }
+                var host = document.getElementById(containerId);
+                var data = document.getElementById(configId);
+                if (!host || !data) return;
                 if (!host.tablex) {
                     host.tablex = api.createTableX(host, JSON.parse(data.textContent));
                 }
@@ -53,6 +56,59 @@
     private ElementReference _containerRef;
     private readonly string _containerId = "tbx-blazor-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)[..12];
     private string _configId => _containerId + "-config";
+
+    protected override void OnInitialized()
+    {
+        _columns.OnChanged = () => _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!AutoInit) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("TableX.mountFromConfig", _containerId, _configId).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            // Prerendering / static SSR where JS interop is not active; the inline script handles init.
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit disconnected before render completed.
+        }
+        catch (JSException)
+        {
+            // Browser bundle not loaded yet or custom host handles init.
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _columns.OnChanged = null;
+        if (!AutoInit) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("TableX.destroyMounted", _containerId).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
 
     /// <summary>
     /// Accessible name for the table, and the default export file prefix. Required.

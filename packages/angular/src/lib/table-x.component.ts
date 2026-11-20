@@ -1519,6 +1519,7 @@ export class TableXComponent<TData>
   private cellTemplates = new Map<string, TemplateRef<NexGridCellTemplateContext<TData>>>();
   private detachMenuListeners: (() => void) | null = null;
   private detachFilterListeners: (() => void) | null = null;
+  private detachResizeListeners: (() => void) | null = null;
 
   /**
    * The search value we last pushed to the host. Lets an ECHO of our own
@@ -1624,6 +1625,8 @@ export class TableXComponent<TData>
     this.detachMenuListeners = null;
     this.detachFilterListeners?.();
     this.detachFilterListeners = null;
+    this.detachResizeListeners?.();
+    this.detachResizeListeners = null;
   }
 
   // ---------------------------------------------------------------------
@@ -1938,6 +1941,7 @@ export class TableXComponent<TData>
   protected onResizePointerDown(id: string, header: NexGridHeaderView, event: PointerEvent): void {
     event.preventDefault();
     event.stopPropagation();
+    this.detachResizeListeners?.();
     const startX = event.clientX;
     const targetTh = ((event.currentTarget as HTMLElement)?.closest?.("th") ??
       (event.currentTarget as HTMLElement)?.parentElement) as HTMLElement | null;
@@ -1950,16 +1954,22 @@ export class TableXComponent<TData>
       this.cdr.markForCheck();
     };
 
+    const cleanup = () => {
+      this.document.removeEventListener("pointermove", onMove);
+      this.document.removeEventListener("pointerup", onUp);
+      this.document.body?.classList.remove("tbx-resizing");
+      this.detachResizeListeners = null;
+    };
+
     const onUp = () => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      document.body?.classList.remove("tbx-resizing");
+      cleanup();
       this.saveState();
     };
 
-    document.body?.classList.add("tbx-resizing");
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
+    this.detachResizeListeners = cleanup;
+    this.document.body?.classList.add("tbx-resizing");
+    this.document.addEventListener("pointermove", onMove);
+    this.document.addEventListener("pointerup", onUp);
   }
 
   protected onResizeHandleDblClick(id: string): void {
@@ -2263,11 +2273,12 @@ export class TableXComponent<TData>
         }),
       });
       try {
+        const cap = this.maxExportRows ?? DEFAULT_ROW_CAP;
         const result = await fetchAllPages<TData>(
           (page, pageSize) => this.fetchPage!(page, pageSize, this.query),
-          this.maxExportRows ?? DEFAULT_ROW_CAP,
+          cap,
         );
-        return result.items;
+        return cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
       } catch {
         this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
         return this.data;
@@ -2285,6 +2296,7 @@ export class TableXComponent<TData>
     });
 
     try {
+      const cap = this.maxExportRows ?? DEFAULT_ROW_CAP;
       const result = await fetchAllPages<TData>(async (page, pageSize) => {
         const url = buildQueryUrl(endpoint, {
           ...this.query,
@@ -2294,8 +2306,8 @@ export class TableXComponent<TData>
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
-      }, this.maxExportRows ?? DEFAULT_ROW_CAP);
-      return result.items;
+      }, cap);
+      return cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
     } catch {
       this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
       return this.data;
@@ -2330,11 +2342,12 @@ export class TableXComponent<TData>
   private syncCellTemplates(): void {
     const templates = new Map<string, TemplateRef<NexGridCellTemplateContext<TData>>>();
     this.cellDirectives.forEach((directive) => {
-      if (directive.nexGridCell === "") return;
+      const key = directive.tableXCell || directive.nexGridCell;
+      if (!key) return;
       // The directive cannot know the grid's row type (it is keyed by a column
       // id), so the two generic instantiations are reconciled here.
       templates.set(
-        directive.nexGridCell,
+        key,
         directive.template as TemplateRef<NexGridCellTemplateContext<TData>>,
       );
     });
@@ -2472,7 +2485,12 @@ export class TableXComponent<TData>
       const cells: NexGridCellView<TData>[] = visible.map((column, columnIndex) => {
         const header = this.headers[columnIndex];
         const value = getCellValue(column, row);
-        const template = this.cellTemplates.get(getColumnId(column)) ?? null;
+        const colId = getColumnId(column);
+        const accessor = column.accessorKey === undefined ? "" : String(column.accessorKey);
+        const template =
+          this.cellTemplates.get(colId) ??
+          (accessor ? this.cellTemplates.get(accessor) : undefined) ??
+          null;
         return {
           key: header?.key ?? String(columnIndex),
           header: header?.title ?? "",

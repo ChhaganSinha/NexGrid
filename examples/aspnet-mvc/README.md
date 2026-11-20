@@ -48,9 +48,9 @@ blank".
 ### 2. Reference the assets once — `Views/Shared/_Layout.cshtml`
 
 ```cshtml
-<link rel="stylesheet" href="~/_content/TableX.AspNetCore/tablex.css" />
+<link rel="stylesheet" href="@TableXAssets.StylesheetPath" />
 ...
-<script src="~/_content/TableX.AspNetCore/tablex.global.js"></script>
+<script src="@TableXAssets.ScriptPath"></script>
 ```
 
 Both ship inside the package as static web assets, served by
