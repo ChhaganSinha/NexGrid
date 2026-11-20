@@ -2664,7 +2664,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         class: "tbx-select-all-banner-text",
         text: formatMessage(
           this.locale.allAcrossPagesSelected ??
-            "All {total} matching records across all pages are selected.",
+          "All {total} matching records across all pages are selected.",
           {
             total: this.total.toLocaleString(),
           },

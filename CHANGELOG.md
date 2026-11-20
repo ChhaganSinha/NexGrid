@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **100% Cross-Framework Feature Parity (`@nexgrid/angular` & `TableX.AspNetCore`)**:
+  - `@nexgrid/angular`: Added sticky left/right pinned columns, master-detail accordion row expansion (`*nexGridExpandedRow` / `renderExpandedRow`), `<tfoot>` summary/aggregation rows, double-click inline cell editing (`(cellEdit)`), drag-and-drop column reordering (`(columnOrderChange)`), floating bulk actions bar (`*nexGridBulkActions`), indeterminate Select-All checkbox, and zero-boilerplate client mode.
+  - `TableX.AspNetCore` (Razor TagHelpers & Blazor): Added `<nex-grid-column-group>` / `<TableXColumnGroup>`, `<NexGrid>` / `<NexGridColumn>` / `<NexGridColumnGroup>` Blazor aliases, and full attribute parity (`pinned`, `aggregation`, `editable`, `edit-type`, `edit-options`, `selection-mode`, `export-mode`, `max-export-rows`, `storage-key`, `enable-column-reorder`, `enable-summary-row`, `enable-bulk-actions`, `client-side-pagination`, `data`).
+- **Multi-Select Checkbox Column Filters & Column Header `⋮` Quick-Action Menus**:
+  - `filterType: "multi-select"` / `multiSelectFilter: true` renders searchable multi-select checkbox popovers emitting pipe-delimited OR tokens (`Active|Pending`), supported across `@nexgrid/core`, OData v4 (`$filter`), and `TableX.AspNetCore` (`IQueryable<T>`).
+  - Column `⋮` popovers include 1-click quick actions: **Sort Ascending**, **Sort Descending**, **Pin Left / Pin Right / Unpin** (persisted via `storageKey`), **Group by Column / Ungroup**, and **Hide Column**.
+- **Select All Across All Pages Banner (`allAcrossSelected`)**:
+  - Selecting all rows on a page when `total > pageSize` displays `.tbx-select-all-banner` (*"Select all {total} matching records"* / *"Clear selection"*), activates `allAcrossSelected: true`, resets automatically when search/filters change, and triggers full-dataset export from the Bulk Actions bar.
+- **Zero-Dependency Native OpenXML `.xlsx` Binary Export**:
+  - Added `toXlsxBytes` and `downloadXlsx` (`@nexgrid/core`), making `.xlsx` the default Excel export format with frozen header panes, auto-fitted column widths, native numeric cells, OWASP formula-injection defense, and colored ARGB status badges (retaining `format: "xls"` / `toExcelHtml` compatibility).
+- **DOM Row Virtualization (`enableVirtualization`, `virtualHeight`, `virtualOverscan`)**:
+  - Added `computeVirtualWindow` and native `<table>` top/bottom spacer windowing for smooth 60fps scrolling over 10,000+ rows while preserving sticky headers, summary footers, and pinned columns.
+- **Collapsible Client-Side Row Grouping (`groupBy`)**:
+  - Added `groupRows` and `groupBy` across all adapters and `.NET`, rendering collapsible `<tr class="tbx-group-row">` headers with row counts and automatic per-group aggregation summary chips.
+
+### Fixed
+
+- **Column Sorting & Filtering Overhaul**:
+  - Fixed multi-column `Shift+Click` sorting, `sortField` / `serverFilterField` / `accessorKey` / `accessorFn` resolution, exact `filterOptions` matching (`"Active"` no longer false-matches `"Inactive"`), comparison operators (`>=`, `<=`, `!=`, `>`, `<`), inclusive end-of-day date-range matching, negative/currency/null sorting, and viewport-clamped column filter popovers mounted on `.tbx-root`.
+- **Adapter & Integration Edge Cases**:
+  - Fixed Angular `*nexGridCell` template lookup when `accessorKey` differs from `id`, React summary/bulk bar visibility defaults, ASP.NET Core static web asset paths (`_content/TableX.AspNetCore/...`), Blazor SSR-to-interactive `mountFromConfig` lifecycle upgrades, and frozen-row inline cell editing.
+
 ## [0.4.0] - 2026-09-25
 
 ### Added

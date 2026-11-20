@@ -731,9 +731,9 @@ function ReactColumnFilterPopover<TData, TRender>({
   const filteredOpts = filterOptions
     ? hasTyped
       ? filterOptions.filter(
-          (opt) =>
-            !searchTerm.trim() || opt.toLowerCase().includes(searchTerm.toLowerCase().trim()),
-        )
+        (opt) =>
+          !searchTerm.trim() || opt.toLowerCase().includes(searchTerm.toLowerCase().trim()),
+      )
       : filterOptions
     : [];
 
@@ -1251,9 +1251,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     () =>
       activeGroupBy
         ? groupRows(rows, activeGroupBy, colList, {
-            yes: locale.booleanYes,
-            no: locale.booleanNo,
-          })
+          yes: locale.booleanYes,
+          no: locale.booleanNo,
+        })
         : null,
     [activeGroupBy, rows, colList, locale.booleanYes, locale.booleanNo],
   );
@@ -1270,12 +1270,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     () =>
       enableVirtualization && !activeGroupBy
         ? computeVirtualWindow({
-            totalRows: rows.length,
-            scrollTop: virtualScrollTop,
-            viewportHeight: virtualHeight,
-            density,
-            overscan: virtualOverscan,
-          })
+          totalRows: rows.length,
+          scrollTop: virtualScrollTop,
+          viewportHeight: virtualHeight,
+          density,
+          overscan: virtualOverscan,
+        })
         : null,
     [enableVirtualization, rows.length, virtualScrollTop, virtualHeight, density, virtualOverscan],
   );
@@ -1647,11 +1647,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   const rowKeyDown =
     (row: TData) =>
-    (event: React.KeyboardEvent): void => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      onRowClick?.(row);
-    };
+      (event: React.KeyboardEvent): void => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        onRowClick?.(row);
+      };
 
   const hasSummary =
     enableSummaryRow === true ||
@@ -1754,82 +1754,82 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         onPointerDown={
           enableColumnReorder && !isGroupChild
             ? (e) => {
-                const t = e.target as HTMLElement | null;
-                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
-                  headerPointerRef.current = null;
-                  return;
-                }
-                headerPointerRef.current = {
-                  colId: id,
-                  sortField,
-                  x: e.clientX,
-                  y: e.clientY,
-                  shiftKey: e.shiftKey,
-                  dropped: false,
-                };
+              const t = e.target as HTMLElement | null;
+              if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
+                headerPointerRef.current = null;
+                return;
               }
+              headerPointerRef.current = {
+                colId: id,
+                sortField,
+                x: e.clientX,
+                y: e.clientY,
+                shiftKey: e.shiftKey,
+                dropped: false,
+              };
+            }
             : undefined
         }
         onDragStart={
           enableColumnReorder && !isGroupChild
             ? (e) => {
-                const t = e.target as HTMLElement | null;
-                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
-                  e.preventDefault();
-                  return;
-                }
-                setDraggedColId(id);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", id);
+              const t = e.target as HTMLElement | null;
+              if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
+                e.preventDefault();
+                return;
               }
+              setDraggedColId(id);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", id);
+            }
             : undefined
         }
         onDragOver={
           enableColumnReorder && !isGroupChild
             ? (e) => {
-                e.preventDefault();
-              }
+              e.preventDefault();
+            }
             : undefined
         }
         onDrop={
           enableColumnReorder && !isGroupChild
             ? (e) => {
-                e.preventDefault();
-                if (!draggedColId || draggedColId === id) return;
-                if (headerPointerRef.current) {
-                  headerPointerRef.current.dropped = true;
-                }
-                const fromIdx = colList.findIndex((c) => getColumnId(c) === draggedColId);
-                const toIdx = colList.findIndex((c) => getColumnId(c) === id);
-                if (fromIdx >= 0 && toIdx >= 0) {
-                  const nextCols = [...colList];
-                  const moved = nextCols[fromIdx];
-                  if (!moved) return;
-                  nextCols.splice(fromIdx, 1);
-                  nextCols.splice(toIdx, 0, moved);
-                  setColList(nextCols);
-                  onColumnOrderChange?.(nextCols.map(getColumnId));
-                }
+              e.preventDefault();
+              if (!draggedColId || draggedColId === id) return;
+              if (headerPointerRef.current) {
+                headerPointerRef.current.dropped = true;
               }
+              const fromIdx = colList.findIndex((c) => getColumnId(c) === draggedColId);
+              const toIdx = colList.findIndex((c) => getColumnId(c) === id);
+              if (fromIdx >= 0 && toIdx >= 0) {
+                const nextCols = [...colList];
+                const moved = nextCols[fromIdx];
+                if (!moved) return;
+                nextCols.splice(fromIdx, 1);
+                nextCols.splice(toIdx, 0, moved);
+                setColList(nextCols);
+                onColumnOrderChange?.(nextCols.map(getColumnId));
+              }
+            }
             : undefined
         }
         onDragEnd={
           enableColumnReorder && !isGroupChild
             ? (e) => {
-                const ptr = headerPointerRef.current;
-                headerPointerRef.current = null;
-                setDraggedColId(null);
-                if (
-                  sortable &&
-                  ptr &&
-                  ptr.colId === id &&
-                  !ptr.dropped &&
-                  e.clientX > 0 &&
-                  Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 6
-                ) {
-                  toggleSort(ptr.sortField, ptr.shiftKey);
-                }
+              const ptr = headerPointerRef.current;
+              headerPointerRef.current = null;
+              setDraggedColId(null);
+              if (
+                sortable &&
+                ptr &&
+                ptr.colId === id &&
+                !ptr.dropped &&
+                e.clientX > 0 &&
+                Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 6
+              ) {
+                toggleSort(ptr.sortField, ptr.shiftKey);
               }
+            }
             : undefined
         }
         className={[
@@ -1849,22 +1849,22 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         onClick={
           sortable
             ? (event) => {
-                const t = event.target as HTMLElement | null;
-                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) return;
-                headerPointerRef.current = null;
-                toggleSort(sortField, event.shiftKey);
-              }
+              const t = event.target as HTMLElement | null;
+              if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) return;
+              headerPointerRef.current = null;
+              toggleSort(sortField, event.shiftKey);
+            }
             : undefined
         }
         onKeyDown={
           sortable
             ? (event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                const t = event.target as HTMLElement | null;
-                if (t?.closest(".tbx-col-filter-wrap")) return;
-                event.preventDefault();
-                toggleSort(sortField, event.shiftKey);
-              }
+              if (event.key !== "Enter" && event.key !== " ") return;
+              const t = event.target as HTMLElement | null;
+              if (t?.closest(".tbx-col-filter-wrap")) return;
+              event.preventDefault();
+              toggleSort(sortField, event.shiftKey);
+            }
             : undefined
         }
       >
@@ -1894,7 +1894,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           ) : null}
 
           {isFilterable(col, enableColumnFilters) ||
-          (!isStructuralColumn(col) && id !== "" && enableColumnMenu === true) ? (
+            (!isStructuralColumn(col) && id !== "" && enableColumnMenu === true) ? (
             <div
               className="tbx-col-filter-wrap"
               draggable={false}
@@ -1956,311 +1956,311 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
       {showToolbar ? (
         <div className="tbx-toolbar">
-        <div className="tbx-toolbar-group">
-          {enableSearch ? (
-            <div className="tbx-search">
-              <SearchIcon className="tbx-search-icon" />
-              <input
-                type="search"
-                className="tbx-search-input"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape" && searchText) {
-                    event.preventDefault();
-                    setSearchText("");
-                  }
-                }}
-                placeholder={searchPlaceholder ?? locale.searchPlaceholder}
-                aria-label={`Search ${caption}`}
-              />
-              {searchText ? (
-                <button
-                  type="button"
-                  className="tbx-search-clear"
-                  onClick={() => setSearchText("")}
-                  aria-label={locale.clearSearch}
-                >
-                  <XIcon className="tbx-icon" />
-                  <span className="tbx-sr-only">{locale.clearSearch}</span>
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+          <div className="tbx-toolbar-group">
+            {enableSearch ? (
+              <div className="tbx-search">
+                <SearchIcon className="tbx-search-icon" />
+                <input
+                  type="search"
+                  className="tbx-search-input"
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && searchText) {
+                      event.preventDefault();
+                      setSearchText("");
+                    }
+                  }}
+                  placeholder={searchPlaceholder ?? locale.searchPlaceholder}
+                  aria-label={`Search ${caption}`}
+                />
+                {searchText ? (
+                  <button
+                    type="button"
+                    className="tbx-search-clear"
+                    onClick={() => setSearchText("")}
+                    aria-label={locale.clearSearch}
+                  >
+                    <XIcon className="tbx-icon" />
+                    <span className="tbx-sr-only">{locale.clearSearch}</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
-        {/* Each trigger below carries an `aria-label` that repeats its visible
+          {/* Each trigger below carries an `aria-label` that repeats its visible
             label. That is not redundant: the label lives in a plain <span>, and
             hiding that span is the normal way to get an icon-only toolbar —
             the grid's own stylesheet does it under 640px. Without the label the
             button's accessible name would simply disappear at that breakpoint,
             leaving a screen reader with an unnamed control. The strings match
             the visible text exactly so voice control still matches on them. */}
-        <div className="tbx-toolbar-group tbx-toolbar-group--end">
-          {isColumnsVisible ? (
-            <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
-              <button
-                type="button"
-                id={columnsButtonId}
-                className="tbx-btn"
-                ref={columnsMenu.triggerRef}
-                aria-haspopup="menu"
-                aria-expanded={columnsMenu.isOpen}
-                aria-label={locale.columnsButton}
-                onClick={columnsMenu.toggle}
-              >
-                <ColumnsIcon className="tbx-icon" />
-                <span>{locale.columnsButton}</span>
-              </button>
-            {columnsMenu.isOpen ? (
-              <div className="tbx-menu" role="menu" aria-labelledby={columnsButtonId}>
-                <div className="tbx-menu-label">{locale.toggleColumnsLabel}</div>
-                <div className="tbx-menu-separator" />
-                {hideable.map((col) => {
-                  const id = getColumnId(col);
-                  const checked = hiddenCols[id] !== true;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitemcheckbox"
-                      aria-checked={checked}
-                      onClick={() => toggleColumn(id)}
-                    >
-                      <CheckIcon className="tbx-check" />
-                      <span>{getColumnTitle(col) || id}</span>
-                    </button>
-                  );
-                })}
-                {storageKey ? (
-                  <>
+          <div className="tbx-toolbar-group tbx-toolbar-group--end">
+            {isColumnsVisible ? (
+              <div className="tbx-menu-wrap" ref={columnsMenu.containerRef}>
+                <button
+                  type="button"
+                  id={columnsButtonId}
+                  className="tbx-btn"
+                  ref={columnsMenu.triggerRef}
+                  aria-haspopup="menu"
+                  aria-expanded={columnsMenu.isOpen}
+                  aria-label={locale.columnsButton}
+                  onClick={columnsMenu.toggle}
+                >
+                  <ColumnsIcon className="tbx-icon" />
+                  <span>{locale.columnsButton}</span>
+                </button>
+                {columnsMenu.isOpen ? (
+                  <div className="tbx-menu" role="menu" aria-labelledby={columnsButtonId}>
+                    <div className="tbx-menu-label">{locale.toggleColumnsLabel}</div>
                     <div className="tbx-menu-separator" />
-                    <button
-                      type="button"
-                      className="tbx-menu-item tbx-menu-item--reset"
-                      role="menuitem"
-                      onClick={handleResetView}
-                    >
-                      <span>{locale.resetView}</span>
-                    </button>
-                  </>
+                    {hideable.map((col) => {
+                      const id = getColumnId(col);
+                      const checked = hiddenCols[id] !== true;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className="tbx-menu-item"
+                          role="menuitemcheckbox"
+                          aria-checked={checked}
+                          onClick={() => toggleColumn(id)}
+                        >
+                          <CheckIcon className="tbx-check" />
+                          <span>{getColumnTitle(col) || id}</span>
+                        </button>
+                      );
+                    })}
+                    {storageKey ? (
+                      <>
+                        <div className="tbx-menu-separator" />
+                        <button
+                          type="button"
+                          className="tbx-menu-item tbx-menu-item--reset"
+                          role="menuitem"
+                          onClick={handleResetView}
+                        >
+                          <span>{locale.resetView}</span>
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}
-          </div>
-          ) : null}
 
-          {isDensityVisible ? (
-            <div className="tbx-menu-wrap" ref={densityMenu.containerRef}>
-              <button
-                type="button"
-                id={densityButtonId}
-                className="tbx-btn tbx-capitalize"
-                ref={densityMenu.triggerRef}
-                aria-haspopup="menu"
-                aria-expanded={densityMenu.isOpen}
-                aria-label={formatMessage(locale.densityButton, { density })}
-                onClick={densityMenu.toggle}
-              >
-                <DensityIcon className="tbx-icon" />
-                <span>{formatMessage(locale.densityButton, { density })}</span>
-              </button>
-            {densityMenu.isOpen ? (
-              <div className="tbx-menu" role="menu" aria-labelledby={densityButtonId}>
-                {DENSITIES.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className="tbx-menu-item"
-                    role="menuitemcheckbox"
-                    aria-checked={density === option}
-                    onClick={() => {
-                      setDensity(option);
-                      densityMenu.close();
-                    }}
-                  >
-                    <CheckIcon className="tbx-check" />
-                    <span>{locale[DENSITY_LABEL_KEY[option]]}</span>
-                  </button>
-                ))}
+            {isDensityVisible ? (
+              <div className="tbx-menu-wrap" ref={densityMenu.containerRef}>
+                <button
+                  type="button"
+                  id={densityButtonId}
+                  className="tbx-btn tbx-capitalize"
+                  ref={densityMenu.triggerRef}
+                  aria-haspopup="menu"
+                  aria-expanded={densityMenu.isOpen}
+                  aria-label={formatMessage(locale.densityButton, { density })}
+                  onClick={densityMenu.toggle}
+                >
+                  <DensityIcon className="tbx-icon" />
+                  <span>{formatMessage(locale.densityButton, { density })}</span>
+                </button>
+                {densityMenu.isOpen ? (
+                  <div className="tbx-menu" role="menu" aria-labelledby={densityButtonId}>
+                    {DENSITIES.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitemcheckbox"
+                        aria-checked={density === option}
+                        onClick={() => {
+                          setDensity(option);
+                          densityMenu.close();
+                        }}
+                      >
+                        <CheckIcon className="tbx-check" />
+                        <span>{locale[DENSITY_LABEL_KEY[option]]}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-          </div>
-          ) : null}
 
-          {isExportVisible ? (
-            resolvedExportMode === "excel" || resolvedExportMode === "csv" ? (
-              <button
-                type="button"
-                id={exportButtonId}
-                className="tbx-btn tbx-btn--export"
-                disabled={isExporting}
-                aria-label={
-                  isExporting
-                    ? locale.exportingButton
-                    : resolvedExportMode === "excel"
-                      ? (locale.exportExcelButton ?? "Export Excel")
-                      : (locale.exportCsvButton ?? "Export CSV")
-                }
-                onClick={() => void handleExport(resolvedExportMode)}
-              >
-                <DownloadTrayIcon className="tbx-icon" />
-                <span>
-                  {isExporting
-                    ? locale.exportingButton
-                    : resolvedExportMode === "excel"
-                      ? (locale.exportExcelButton ?? "Export Excel")
-                      : (locale.exportCsvButton ?? "Export CSV")}
-                </span>
-              </button>
-            ) : resolvedExportMode === "split" ? (
-              <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
-                <div className="tbx-split-btn">
+            {isExportVisible ? (
+              resolvedExportMode === "excel" || resolvedExportMode === "csv" ? (
+                <button
+                  type="button"
+                  id={exportButtonId}
+                  className="tbx-btn tbx-btn--export"
+                  disabled={isExporting}
+                  aria-label={
+                    isExporting
+                      ? locale.exportingButton
+                      : resolvedExportMode === "excel"
+                        ? (locale.exportExcelButton ?? "Export Excel")
+                        : (locale.exportCsvButton ?? "Export CSV")
+                  }
+                  onClick={() => void handleExport(resolvedExportMode)}
+                >
+                  <DownloadTrayIcon className="tbx-icon" />
+                  <span>
+                    {isExporting
+                      ? locale.exportingButton
+                      : resolvedExportMode === "excel"
+                        ? (locale.exportExcelButton ?? "Export Excel")
+                        : (locale.exportCsvButton ?? "Export CSV")}
+                  </span>
+                </button>
+              ) : resolvedExportMode === "split" ? (
+                <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
+                  <div className="tbx-split-btn">
+                    <button
+                      type="button"
+                      id={exportButtonId}
+                      className="tbx-btn tbx-btn--export"
+                      disabled={isExporting}
+                      aria-label={isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}
+                      onClick={() => void handleExport("excel")}
+                    >
+                      <DownloadTrayIcon className="tbx-icon" />
+                      <span>{isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      id={`${exportButtonId}-dropdown`}
+                      className="tbx-btn tbx-btn--export"
+                      ref={exportMenu.triggerRef}
+                      disabled={isExporting}
+                      aria-haspopup="menu"
+                      aria-expanded={exportMenu.isOpen}
+                      aria-label="More export options"
+                      onClick={exportMenu.toggle}
+                    >
+                      <ChevronDownIcon className="tbx-icon tbx-chevron" />
+                    </button>
+                  </div>
+                  {exportMenu.isOpen ? (
+                    <div
+                      className="tbx-menu tbx-menu--end"
+                      role="menu"
+                      aria-labelledby={exportButtonId}
+                    >
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("excel")}
+                      >
+                        <FileSpreadsheetIcon className="tbx-icon--excel" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportExcelTitle}</strong>
+                          <small>{locale.exportExcelSubtitle}</small>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("csv")}
+                      >
+                        <FileTextIcon className="tbx-icon--csv" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportCsvTitle}</strong>
+                          <small>{locale.exportCsvSubtitle}</small>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("clipboard")}
+                      >
+                        <FileTextIcon className="tbx-icon--csv" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportClipboardTitle}</strong>
+                          <small>{locale.exportClipboardSubtitle}</small>
+                        </div>
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
                   <button
                     type="button"
                     id={exportButtonId}
-                    className="tbx-btn tbx-btn--export"
-                    disabled={isExporting}
-                    aria-label={isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}
-                    onClick={() => void handleExport("excel")}
-                  >
-                    <DownloadTrayIcon className="tbx-icon" />
-                    <span>{isExporting ? locale.exportingButton : (locale.exportExcelButton ?? "Export Excel")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    id={`${exportButtonId}-dropdown`}
                     className="tbx-btn tbx-btn--export"
                     ref={exportMenu.triggerRef}
                     disabled={isExporting}
                     aria-haspopup="menu"
                     aria-expanded={exportMenu.isOpen}
-                    aria-label="More export options"
+                    aria-label={isExporting ? locale.exportingButton : locale.exportButton}
                     onClick={exportMenu.toggle}
                   >
+                    <DownloadTrayIcon className="tbx-icon" />
+                    <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
                     <ChevronDownIcon className="tbx-icon tbx-chevron" />
                   </button>
+                  {exportMenu.isOpen ? (
+                    <div
+                      className="tbx-menu tbx-menu--end"
+                      role="menu"
+                      aria-labelledby={exportButtonId}
+                    >
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("excel")}
+                      >
+                        <FileSpreadsheetIcon className="tbx-icon--excel" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportExcelTitle}</strong>
+                          <small>{locale.exportExcelSubtitle}</small>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("csv")}
+                      >
+                        <FileTextIcon className="tbx-icon--csv" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportCsvTitle}</strong>
+                          <small>{locale.exportCsvSubtitle}</small>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="tbx-menu-item"
+                        role="menuitem"
+                        onClick={() => void handleExport("clipboard")}
+                      >
+                        <FileTextIcon className="tbx-icon--csv" />
+                        <div className="tbx-menu-item-title">
+                          <strong>{locale.exportClipboardTitle}</strong>
+                          <small>{locale.exportClipboardSubtitle}</small>
+                        </div>
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
-                {exportMenu.isOpen ? (
-                  <div
-                    className="tbx-menu tbx-menu--end"
-                    role="menu"
-                    aria-labelledby={exportButtonId}
-                  >
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("excel")}
-                    >
-                      <FileSpreadsheetIcon className="tbx-icon--excel" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportExcelTitle}</strong>
-                        <small>{locale.exportExcelSubtitle}</small>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("csv")}
-                    >
-                      <FileTextIcon className="tbx-icon--csv" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportCsvTitle}</strong>
-                        <small>{locale.exportCsvSubtitle}</small>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("clipboard")}
-                    >
-                      <FileTextIcon className="tbx-icon--csv" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportClipboardTitle}</strong>
-                        <small>{locale.exportClipboardSubtitle}</small>
-                      </div>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="tbx-menu-wrap" ref={exportMenu.containerRef}>
-                <button
-                  type="button"
-                  id={exportButtonId}
-                  className="tbx-btn tbx-btn--export"
-                  ref={exportMenu.triggerRef}
-                  disabled={isExporting}
-                  aria-haspopup="menu"
-                  aria-expanded={exportMenu.isOpen}
-                  aria-label={isExporting ? locale.exportingButton : locale.exportButton}
-                  onClick={exportMenu.toggle}
-                >
-                  <DownloadTrayIcon className="tbx-icon" />
-                  <span>{isExporting ? locale.exportingButton : locale.exportButton}</span>
-                  <ChevronDownIcon className="tbx-icon tbx-chevron" />
-                </button>
-                {exportMenu.isOpen ? (
-                  <div
-                    className="tbx-menu tbx-menu--end"
-                    role="menu"
-                    aria-labelledby={exportButtonId}
-                  >
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("excel")}
-                    >
-                      <FileSpreadsheetIcon className="tbx-icon--excel" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportExcelTitle}</strong>
-                        <small>{locale.exportExcelSubtitle}</small>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("csv")}
-                    >
-                      <FileTextIcon className="tbx-icon--csv" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportCsvTitle}</strong>
-                        <small>{locale.exportCsvSubtitle}</small>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="tbx-menu-item"
-                      role="menuitem"
-                      onClick={() => void handleExport("clipboard")}
-                    >
-                      <FileTextIcon className="tbx-icon--csv" />
-                      <div className="tbx-menu-item-title">
-                        <strong>{locale.exportClipboardTitle}</strong>
-                        <small>{locale.exportClipboardSubtitle}</small>
-                      </div>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            )
-          ) : null}
+              )
+            ) : null}
 
-          {toolbarActions}
+            {toolbarActions}
+          </div>
         </div>
-      </div>
       ) : null}
 
       {/* ── ACTIVE FILTER PILLS BAR ────────────────────────────────────────── */}
       {showFilterPills !== false &&
-      (Boolean(query.q?.trim()) ||
-        Object.keys(query.filter ?? {}).some((k) => Boolean(query.filter?.[k]?.trim()))) ? (
+        (Boolean(query.q?.trim()) ||
+          Object.keys(query.filter ?? {}).some((k) => Boolean(query.filter?.[k]?.trim()))) ? (
         <div className="tbx-filter-pills-bar">
           <span className="tbx-filter-pills-title">Active filters:</span>
           {query.q?.trim() ? (
@@ -2393,10 +2393,10 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
       {/* ── SELECT ALL ACROSS PAGES BANNER ──────────────────────────────── */}
       {enableSelection &&
-      !isSingleSelect &&
-      !isLoading &&
-      pageRowIds.length > 0 &&
-      ((allPageSelected && total > pageRowIds.length) || allAcrossSelected) ? (
+        !isSingleSelect &&
+        !isLoading &&
+        pageRowIds.length > 0 &&
+        ((allPageSelected && total > pageRowIds.length) || allAcrossSelected) ? (
         <div className="tbx-select-all-banner" role="status" aria-live="polite">
           {allAcrossSelected ? (
             <>
@@ -2518,23 +2518,23 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               {!headerRows.hasGroups
                 ? visible.map((col) => renderLeafTh(col, 1, false))
                 : headerRows.topRow.map((cell, idx) => {
-                    if (cell.isGroup) {
-                      return (
-                        <th
-                          key={`grp-${cell.id}-${idx}`}
-                          colSpan={cell.colSpan}
-                          className="tbx-th tbx-th--group"
-                          scope="colgroup"
-                        >
-                          <span className="tbx-th-group-title">{cell.title}</span>
-                        </th>
-                      );
-                    }
-                    if (cell.leafColumn) {
-                      return renderLeafTh(cell.leafColumn, cell.rowSpan, false);
-                    }
-                    return null;
-                  })}
+                  if (cell.isGroup) {
+                    return (
+                      <th
+                        key={`grp-${cell.id}-${idx}`}
+                        colSpan={cell.colSpan}
+                        className="tbx-th tbx-th--group"
+                        scope="colgroup"
+                      >
+                        <span className="tbx-th-group-title">{cell.title}</span>
+                      </th>
+                    );
+                  }
+                  if (cell.leafColumn) {
+                    return renderLeafTh(cell.leafColumn, cell.rowSpan, false);
+                  }
+                  return null;
+                })}
             </tr>
             {headerRows.hasGroups ? (
               <tr>
@@ -2579,63 +2579,63 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 ) : null}
                 {(groupedRows
                   ? groupedRows.flatMap((grp) => {
-                      const isCollapsed = collapsedGroups.has(grp.key);
-                      const groupHeaderRow = (
-                        <tr
-                          key={`grp-row-${grp.key}`}
-                          className="tbx-group-row"
-                          data-group-key={grp.key}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleGroupCollapse(grp.key);
-                          }}
-                        >
-                          <td className="tbx-group-cell" colSpan={Math.max(1, columnCount)}>
-                            <div className="tbx-group-inner">
-                              <button
-                                type="button"
-                                className={
-                                  isCollapsed
-                                    ? "tbx-group-toggle"
-                                    : "tbx-group-toggle tbx-group-toggle--open"
-                                }
-                                aria-expanded={!isCollapsed}
-                                aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${grp.displayValue}`}
-                              >
-                                <ChevronRightIcon className="tbx-icon" />
-                              </button>
-                              <span className="tbx-group-label">{grp.columnTitle}:</span>
-                              <strong className="tbx-group-value">{grp.displayValue}</strong>
-                              <span className="tbx-group-count">{grp.count.toLocaleString()}</span>
-                              {grp.summaries.length > 0 ? (
-                                <span className="tbx-group-summaries">
-                                  {grp.summaries.map((s) => (
-                                    <span key={s.columnId} className="tbx-group-summary-chip">
-                                      <span>{s.label}</span>
-                                      <strong>{s.value}</strong>
-                                    </span>
-                                  ))}
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                      if (isCollapsed) return [{ kind: "group" as const, node: groupHeaderRow }];
-                      return [
-                        { kind: "group" as const, node: groupHeaderRow },
-                        ...grp.entries.map((entry) => ({
-                          kind: "row" as const,
-                          row: entry.row,
-                          index: entry.originalIndex,
-                        })),
-                      ];
-                    })
+                    const isCollapsed = collapsedGroups.has(grp.key);
+                    const groupHeaderRow = (
+                      <tr
+                        key={`grp-row-${grp.key}`}
+                        className="tbx-group-row"
+                        data-group-key={grp.key}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleGroupCollapse(grp.key);
+                        }}
+                      >
+                        <td className="tbx-group-cell" colSpan={Math.max(1, columnCount)}>
+                          <div className="tbx-group-inner">
+                            <button
+                              type="button"
+                              className={
+                                isCollapsed
+                                  ? "tbx-group-toggle"
+                                  : "tbx-group-toggle tbx-group-toggle--open"
+                              }
+                              aria-expanded={!isCollapsed}
+                              aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${grp.displayValue}`}
+                            >
+                              <ChevronRightIcon className="tbx-icon" />
+                            </button>
+                            <span className="tbx-group-label">{grp.columnTitle}:</span>
+                            <strong className="tbx-group-value">{grp.displayValue}</strong>
+                            <span className="tbx-group-count">{grp.count.toLocaleString()}</span>
+                            {grp.summaries.length > 0 ? (
+                              <span className="tbx-group-summaries">
+                                {grp.summaries.map((s) => (
+                                  <span key={s.columnId} className="tbx-group-summary-chip">
+                                    <span>{s.label}</span>
+                                    <strong>{s.value}</strong>
+                                  </span>
+                                ))}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                    if (isCollapsed) return [{ kind: "group" as const, node: groupHeaderRow }];
+                    return [
+                      { kind: "group" as const, node: groupHeaderRow },
+                      ...grp.entries.map((entry) => ({
+                        kind: "row" as const,
+                        row: entry.row,
+                        index: entry.originalIndex,
+                      })),
+                    ];
+                  })
                   : renderedRows.map((row, sliceIdx) => ({
-                      kind: "row" as const,
-                      row,
-                      index: virtualStartOffset + sliceIdx,
-                    }))
+                    kind: "row" as const,
+                    row,
+                    index: virtualStartOffset + sliceIdx,
+                  }))
                 ).map((item) => {
                   if (item.kind === "group") return item.node;
                   const row = item.row;
@@ -2644,264 +2644,264 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   const isSelected = allAcrossSelected || selectedIds.has(id);
                   const isExpanded = expandedRows.has(id);
 
-                return (
-                  <React.Fragment key={id || index}>
-                    <tr
-                      className={[
-                        "tbx-row",
-                        isSelected ? "tbx-row--selected" : undefined,
-                        isExpanded ? "tbx-row--expanded" : undefined,
-                        rowIsClickable ? "tbx-row--clickable" : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={rowIsClickable ? activateRow(row) : undefined}
-                      onKeyDown={rowIsClickable ? rowKeyDown(row) : undefined}
-                      tabIndex={rowIsClickable ? 0 : undefined}
-                    >
-                      {renderExpandedRow ? (
-                        <td
-                          className={[
-                            "tbx-td tbx-td--expand",
-                            leftOffsets.has("__expand") ? "tbx-td--pinned-left" : undefined,
-                            lastLeftPinnedId === "__expand" ? "tbx-pinned-border-left" : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          style={{
-                            width: "40px",
-                            left: leftOffsets.get("__expand"),
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            className={isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn"}
-                            aria-label={isExpanded ? "Collapse row" : "Expand row"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleExpandRow(id);
-                            }}
-                          >
-                            <ChevronRightIcon className="tbx-icon" />
-                          </button>
-                        </td>
-                      ) : null}
-
-                      {enableSelection ? (
-                        <td
-                          className={[
-                            "tbx-td tbx-td--select",
-                            leftOffsets.has("__select") ? "tbx-td--pinned-left" : undefined,
-                            lastLeftPinnedId === "__select" ? "tbx-pinned-border-left" : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          style={{
-                            left: leftOffsets.get("__select"),
-                          }}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <input
-                            type={isSingleSelect ? "radio" : "checkbox"}
-                            name={isSingleSelect ? `${instanceId}-select` : undefined}
-                            className="tbx-checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelectRow(id)}
-                            onClick={(event) => event.stopPropagation()}
-                            aria-label={formatMessage(locale.selectRowLabel, { id })}
-                          />
-                        </td>
-                      ) : null}
-
-                      {showSerialNumber ? (
-                        <td
-                          className={[
-                            "tbx-td tbx-td--serial",
-                            leftOffsets.has("__serial") ? "tbx-td--pinned-left" : undefined,
-                            lastLeftPinnedId === "__serial" ? "tbx-pinned-border-left" : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          style={{
-                            left: leftOffsets.get("__serial"),
-                          }}
-                        >
-                          {serialNumber(currentPage, pageSize, index)}
-                        </td>
-                      ) : null}
-
-                      {visible.map((col, colIndex) => {
-                        const colId = getColumnId(col);
-                        const isPinnedLeft = leftOffsets.has(colId);
-                        const isPinnedRight = rightOffsets.has(colId);
-                        const isLastLeft = lastLeftPinnedId === colId;
-                        const isFirstRight = firstRightPinnedId === colId;
-                        const isCellEditable = isEditable(col);
-                        const isCurrentlyEditing =
-                          editingCell?.rowId === id && editingCell?.columnId === colId;
-
-                        const tdStyle: React.CSSProperties = {
-                          ...bodyCellStyle(col),
-                          ...(isPinnedLeft ? { left: leftOffsets.get(colId) } : {}),
-                          ...(isPinnedRight ? { right: rightOffsets.get(colId) } : {}),
-                        };
-
-                        return (
+                  return (
+                    <React.Fragment key={id || index}>
+                      <tr
+                        className={[
+                          "tbx-row",
+                          isSelected ? "tbx-row--selected" : undefined,
+                          isExpanded ? "tbx-row--expanded" : undefined,
+                          rowIsClickable ? "tbx-row--clickable" : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={rowIsClickable ? activateRow(row) : undefined}
+                        onKeyDown={rowIsClickable ? rowKeyDown(row) : undefined}
+                        tabIndex={rowIsClickable ? 0 : undefined}
+                      >
+                        {renderExpandedRow ? (
                           <td
-                            key={colId || `col-${colIndex}`}
                             className={[
-                              "tbx-td",
-                              isCellEditable ? "tbx-cell--editable" : undefined,
-                              isPinnedLeft ? "tbx-td--pinned-left" : undefined,
-                              isPinnedRight ? "tbx-td--pinned-right" : undefined,
-                              isLastLeft ? "tbx-pinned-border-left" : undefined,
-                              isFirstRight ? "tbx-pinned-border-right" : undefined,
+                              "tbx-td tbx-td--expand",
+                              leftOffsets.has("__expand") ? "tbx-td--pinned-left" : undefined,
+                              lastLeftPinnedId === "__expand" ? "tbx-pinned-border-left" : undefined,
                             ]
                               .filter(Boolean)
                               .join(" ")}
-                            style={tdStyle}
-                            onDoubleClick={
-                              isCellEditable
-                                ? (e) => {
+                            style={{
+                              width: "40px",
+                              left: leftOffsets.get("__expand"),
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className={isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn"}
+                              aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpandRow(id);
+                              }}
+                            >
+                              <ChevronRightIcon className="tbx-icon" />
+                            </button>
+                          </td>
+                        ) : null}
+
+                        {enableSelection ? (
+                          <td
+                            className={[
+                              "tbx-td tbx-td--select",
+                              leftOffsets.has("__select") ? "tbx-td--pinned-left" : undefined,
+                              lastLeftPinnedId === "__select" ? "tbx-pinned-border-left" : undefined,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            style={{
+                              left: leftOffsets.get("__select"),
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type={isSingleSelect ? "radio" : "checkbox"}
+                              name={isSingleSelect ? `${instanceId}-select` : undefined}
+                              className="tbx-checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectRow(id)}
+                              onClick={(event) => event.stopPropagation()}
+                              aria-label={formatMessage(locale.selectRowLabel, { id })}
+                            />
+                          </td>
+                        ) : null}
+
+                        {showSerialNumber ? (
+                          <td
+                            className={[
+                              "tbx-td tbx-td--serial",
+                              leftOffsets.has("__serial") ? "tbx-td--pinned-left" : undefined,
+                              lastLeftPinnedId === "__serial" ? "tbx-pinned-border-left" : undefined,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            style={{
+                              left: leftOffsets.get("__serial"),
+                            }}
+                          >
+                            {serialNumber(currentPage, pageSize, index)}
+                          </td>
+                        ) : null}
+
+                        {visible.map((col, colIndex) => {
+                          const colId = getColumnId(col);
+                          const isPinnedLeft = leftOffsets.has(colId);
+                          const isPinnedRight = rightOffsets.has(colId);
+                          const isLastLeft = lastLeftPinnedId === colId;
+                          const isFirstRight = firstRightPinnedId === colId;
+                          const isCellEditable = isEditable(col);
+                          const isCurrentlyEditing =
+                            editingCell?.rowId === id && editingCell?.columnId === colId;
+
+                          const tdStyle: React.CSSProperties = {
+                            ...bodyCellStyle(col),
+                            ...(isPinnedLeft ? { left: leftOffsets.get(colId) } : {}),
+                            ...(isPinnedRight ? { right: rightOffsets.get(colId) } : {}),
+                          };
+
+                          return (
+                            <td
+                              key={colId || `col-${colIndex}`}
+                              className={[
+                                "tbx-td",
+                                isCellEditable ? "tbx-cell--editable" : undefined,
+                                isPinnedLeft ? "tbx-td--pinned-left" : undefined,
+                                isPinnedRight ? "tbx-td--pinned-right" : undefined,
+                                isLastLeft ? "tbx-pinned-border-left" : undefined,
+                                isFirstRight ? "tbx-pinned-border-right" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              style={tdStyle}
+                              onDoubleClick={
+                                isCellEditable
+                                  ? (e) => {
                                     e.stopPropagation();
                                     setEditingCell({ rowId: id, columnId: colId });
                                   }
-                                : undefined
-                            }
-                          >
-                            {isCurrentlyEditing ? (
-                              (() => {
-                                const currentCellVal = getCellValue(col, row);
-                                const defaultEditStr =
-                                  currentCellVal !== null && currentCellVal !== undefined
-                                    ? String(currentCellVal)
-                                    : "";
-                                const commitEdit = (rawVal: string) => {
-                                  const nextVal =
-                                    col.meta?.editType === "number" ? Number(rawVal) : rawVal;
-                                  const propKey =
-                                    col.accessorKey !== undefined && String(col.accessorKey) !== ""
-                                      ? String(col.accessorKey)
-                                      : colId;
-                                  if (
-                                    row !== null &&
-                                    typeof row === "object" &&
-                                    !Object.isFrozen(row) &&
-                                    !propKey.includes(".") &&
-                                    propKey !== "__proto__" &&
-                                    propKey !== "constructor" &&
-                                    propKey !== "prototype"
-                                  ) {
-                                    try {
-                                      (row as Record<string, unknown>)[propKey] = nextVal;
-                                    } catch {
-                                      // Ignore write errors on read-only properties; host owns state via onCellEdit
+                                  : undefined
+                              }
+                            >
+                              {isCurrentlyEditing ? (
+                                (() => {
+                                  const currentCellVal = getCellValue(col, row);
+                                  const defaultEditStr =
+                                    currentCellVal !== null && currentCellVal !== undefined
+                                      ? String(currentCellVal)
+                                      : "";
+                                  const commitEdit = (rawVal: string) => {
+                                    const nextVal =
+                                      col.meta?.editType === "number" ? Number(rawVal) : rawVal;
+                                    const propKey =
+                                      col.accessorKey !== undefined && String(col.accessorKey) !== ""
+                                        ? String(col.accessorKey)
+                                        : colId;
+                                    if (
+                                      row !== null &&
+                                      typeof row === "object" &&
+                                      !Object.isFrozen(row) &&
+                                      !propKey.includes(".") &&
+                                      propKey !== "__proto__" &&
+                                      propKey !== "constructor" &&
+                                      propKey !== "prototype"
+                                    ) {
+                                      try {
+                                        (row as Record<string, unknown>)[propKey] = nextVal;
+                                      } catch {
+                                        // Ignore write errors on read-only properties; host owns state via onCellEdit
+                                      }
                                     }
-                                  }
-                                  onCellEdit?.({
-                                    row,
-                                    columnId: colId,
-                                    oldValue: currentCellVal,
-                                    newValue: nextVal,
-                                  });
-                                  setEditingCell(null);
-                                };
-                                const handleEditKeyDown = (
-                                  e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
-                                ) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    commitEdit(e.currentTarget.value);
-                                  } else if (e.key === "Escape") {
-                                    e.preventDefault();
+                                    onCellEdit?.({
+                                      row,
+                                      columnId: colId,
+                                      oldValue: currentCellVal,
+                                      newValue: nextVal,
+                                    });
                                     setEditingCell(null);
-                                  }
-                                };
+                                  };
+                                  const handleEditKeyDown = (
+                                    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+                                  ) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      commitEdit(e.currentTarget.value);
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      setEditingCell(null);
+                                    }
+                                  };
 
-                                return (
-                                  <div
-                                    className="tbx-cell-edit-wrap"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {col.meta?.editType === "select" && col.meta.editOptions ? (
-                                      <select
-                                        autoFocus
-                                        ref={(node) => {
-                                          editInputRef.current = node;
-                                        }}
-                                        className="tbx-cell-edit-select tbx-cell-edit-input"
-                                        defaultValue={defaultEditStr}
-                                        onKeyDown={handleEditKeyDown}
-                                      >
-                                        {col.meta.editOptions.map((opt) => (
-                                          <option key={opt} value={opt}>
-                                            {opt}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    ) : (
-                                      <input
-                                        autoFocus
-                                        ref={(node) => {
-                                          editInputRef.current = node;
-                                        }}
-                                        type={col.meta?.editType === "number" ? "number" : "text"}
-                                        className="tbx-cell-edit-input"
-                                        defaultValue={defaultEditStr}
-                                        onKeyDown={handleEditKeyDown}
-                                      />
-                                    )}
-                                    <div className="tbx-cell-edit-actions">
-                                      <button
-                                        type="button"
-                                        className="tbx-cell-edit-btn tbx-cell-edit-btn--save"
-                                        aria-label="Save"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (editInputRef.current) {
-                                            commitEdit(editInputRef.current.value);
-                                          } else {
+                                  return (
+                                    <div
+                                      className="tbx-cell-edit-wrap"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {col.meta?.editType === "select" && col.meta.editOptions ? (
+                                        <select
+                                          autoFocus
+                                          ref={(node) => {
+                                            editInputRef.current = node;
+                                          }}
+                                          className="tbx-cell-edit-select tbx-cell-edit-input"
+                                          defaultValue={defaultEditStr}
+                                          onKeyDown={handleEditKeyDown}
+                                        >
+                                          {col.meta.editOptions.map((opt) => (
+                                            <option key={opt} value={opt}>
+                                              {opt}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <input
+                                          autoFocus
+                                          ref={(node) => {
+                                            editInputRef.current = node;
+                                          }}
+                                          type={col.meta?.editType === "number" ? "number" : "text"}
+                                          className="tbx-cell-edit-input"
+                                          defaultValue={defaultEditStr}
+                                          onKeyDown={handleEditKeyDown}
+                                        />
+                                      )}
+                                      <div className="tbx-cell-edit-actions">
+                                        <button
+                                          type="button"
+                                          className="tbx-cell-edit-btn tbx-cell-edit-btn--save"
+                                          aria-label="Save"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (editInputRef.current) {
+                                              commitEdit(editInputRef.current.value);
+                                            } else {
+                                              setEditingCell(null);
+                                            }
+                                          }}
+                                        >
+                                          <CheckIcon className="tbx-icon" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
+                                          aria-label="Cancel"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             setEditingCell(null);
-                                          }
-                                        }}
-                                      >
-                                        <CheckIcon className="tbx-icon" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
-                                        aria-label="Cancel"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingCell(null);
-                                        }}
-                                      >
-                                        <XIcon className="tbx-icon" />
-                                      </button>
+                                          }}
+                                        >
+                                          <XIcon className="tbx-icon" />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })()
-                            ) : (
-                              renderCellContent(col, row, boolLabels)
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    {isExpanded && renderExpandedRow ? (
-                      <tr className="tbx-expanded-row">
-                        <td className="tbx-expanded-cell" colSpan={columnCount}>
-                          <div className="tbx-detail-panel">
-                            {renderExpandedRow(row)}
-                          </div>
-                        </td>
+                                  );
+                                })()
+                              ) : (
+                                renderCellContent(col, row, boolLabels)
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
-                    ) : null}
-                  </React.Fragment>
-                );
-              })}
+                      {isExpanded && renderExpandedRow ? (
+                        <tr className="tbx-expanded-row">
+                          <td className="tbx-expanded-cell" colSpan={columnCount}>
+                            <div className="tbx-detail-panel">
+                              {renderExpandedRow(row)}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
                 {virtualWin && virtualWin.bottomSpacerHeight > 0 ? (
                   <tr className="tbx-virtual-spacer" aria-hidden="true">
                     <td
