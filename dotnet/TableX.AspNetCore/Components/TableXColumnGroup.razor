@@ -1,0 +1,42 @@
+@using Microsoft.AspNetCore.Components
+
+<CascadingValue Value="_childColumns" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly TableXColumnCollection _childColumns = new();
+
+    [CascadingParameter]
+    internal TableXColumnCollection? ParentCollection { get; set; }
+
+    /// <summary>Group header text displayed across all child columns. Required.</summary>
+    [Parameter]
+    public string Header { get; set; } = string.Empty;
+
+    /// <summary>Optional group column identifier.</summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>Child <see cref="TableXColumn"/> declarations.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrWhiteSpace(Header))
+        {
+            throw new InvalidOperationException("<TableXColumnGroup> requires a non-empty 'Header' parameter.");
+        }
+
+        _childColumns.OnChanged = () => ParentCollection?.OnChanged?.Invoke();
+
+        ParentCollection?.RegisterColumn(new TableXColumnConfig
+        {
+            Id = string.IsNullOrWhiteSpace(Id) ? null : Id,
+            Header = Header,
+            Columns = _childColumns,
+        });
+    }
+}

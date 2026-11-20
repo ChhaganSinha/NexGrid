@@ -19,12 +19,15 @@ import { DatePipe } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {
+  TableXBulkActionsDirective,
   TableXCellDirective,
   TableXComponent,
+  TableXExpandedRowDirective,
   TableXToolbarDirective,
   defaultQuery,
   serializeQuery,
   type TableXAngularColumn,
+  type TableXCellEditEvent,
   type TableXNotice,
   type QueryState,
 } from "@nexgrid/angular";
@@ -38,22 +41,33 @@ import { DEPARTMENTS, STATUSES, STUDENTS, StudentsService, type Student } from "
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [DatePipe, TableXComponent, TableXCellDirective, TableXToolbarDirective],
+  imports: [
+    DatePipe,
+    TableXComponent,
+    TableXCellDirective,
+    TableXToolbarDirective,
+    TableXExpandedRowDirective,
+    TableXBulkActionsDirective,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="page">
-      <h1>TableX — Angular</h1>
+      <h1>NexGrid — Angular</h1>
       <p class="intro">
         200 students served by an in-memory service that honours the same
-        <code>QueryState</code> a real endpoint would: search, sort, column filter, paging. The
-        live query is printed under the grid — watch it change as you interact.
+        <code>QueryState</code> a real endpoint would: search, sort, column filter, paging,
+        sticky columns, master-detail expansion, inline cell editing (double-click Status or Score),
+        summary footer, and drag-and-drop column reordering.
       </p>
 
       <table-x
         caption="Students"
         exportFileName="students"
+        storageKey="nexgrid-angular-demo"
         searchPlaceholder="Search name, email or department…"
         enableSelection
+        enableColumnReorder
+        enableSummaryRow
         exportMode="split"
         [allData]="allData"
         [columns]="columns"
@@ -66,6 +80,7 @@ import { DEPARTMENTS, STATUSES, STUDENTS, StudentsService, type Student } from "
         (retry)="load(query())"
         (rowClick)="open($event)"
         (selectionChange)="selected.set($event.ids)"
+        (cellEdit)="onCellEdit($event)"
         (notify)="notice.set($event)"
       >
         <!-- Custom cells, keyed by column id. "of: rows()" is a type anchor
@@ -117,6 +132,24 @@ import { DEPARTMENTS, STATUSES, STUDENTS, StudentsService, type Student } from "
 
           <button type="button" class="tbx-btn" (click)="breakNextLoad()">Break next load</button>
         </ng-template>
+
+        <ng-container *tableXExpandedRow="let row; of: rows()">
+          <div class="detail-row">
+            <strong>{{ row.name }}</strong> ({{ row.email }}) — Department:
+            <strong>{{ row.department }}</strong> | Score: <strong>{{ row.score }}</strong> |
+            Scholarship: <strong>{{ row.scholarship ? 'Yes' : 'No' }}</strong>
+          </div>
+        </ng-container>
+
+        <ng-template tableXBulkActions let-ids let-deselectAll="deselectAll">
+          <button
+            type="button"
+            class="tbx-bulk-btn"
+            (click)="archiveSelected(ids, deselectAll)"
+          >
+            Notify ({{ ids.length }})
+          </button>
+        </ng-template>
       </table-x>
 
       <footer class="page-foot">
@@ -143,7 +176,7 @@ export class AppComponent {
    * `*tableXCell` templates above.
    */
   readonly columns: TableXAngularColumn<Student>[] = [
-    { accessorKey: "name", header: "Student", meta: { minWidth: 200 } },
+    { accessorKey: "name", header: "Student", meta: { minWidth: 200, pinned: "left" } },
     { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220 } },
     {
       accessorKey: "department",
@@ -158,12 +191,23 @@ export class AppComponent {
         width: 130,
         serverFilterable: true,
         filterOptions: STATUSES,
+        editable: true,
+        editType: "select",
+        editOptions: STATUSES,
       },
     },
     {
       accessorKey: "score",
       header: "Score",
-      meta: { align: "right", width: 110, filterType: "number-range" },
+      meta: {
+        align: "right",
+        width: 120,
+        filterType: "number-range",
+        editable: true,
+        editType: "number",
+        aggregation: "avg",
+        aggregationLabel: "Avg:",
+      },
     },
     {
       accessorKey: "enrolledAt",
@@ -176,7 +220,7 @@ export class AppComponent {
       header: "Scholarship",
       meta: { align: "center", width: 120, filterOptions: ["true", "false"] },
     },
-    { id: "actions", header: "", meta: { align: "right", width: 90 } },
+    { id: "actions", header: "", meta: { align: "right", width: 90, pinned: "right" } },
   ];
 
   readonly rows = signal<Student[]>([]);
@@ -250,6 +294,21 @@ export class AppComponent {
 
   edit(student: Student): void {
     this.notice.set({ type: "info", message: `Edit ${student.name} (#${student.id})` });
+  }
+
+  onCellEdit(event: TableXCellEditEvent<Student>): void {
+    this.notice.set({
+      type: "success",
+      message: `Updated ${event.row.name}'s ${event.columnId}: ${String(event.oldValue)} → ${String(event.newValue)}`,
+    });
+  }
+
+  archiveSelected(ids: string[], deselectAll: () => void): void {
+    this.notice.set({
+      type: "info",
+      message: `Notified ${ids.length} selected student(s)`,
+    });
+    deselectAll();
   }
 
   breakNextLoad(): void {

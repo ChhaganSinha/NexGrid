@@ -49,7 +49,11 @@ namespace TableX.AspNetCore;
 /// </remarks>
 [HtmlTargetElement(TagName)]
 [HtmlTargetElement(AliasTagName)]
-[RestrictChildren(TableXColumnTagHelper.TagName, TableXColumnTagHelper.AliasTagName)]
+[RestrictChildren(
+    TableXColumnTagHelper.TagName,
+    TableXColumnTagHelper.AliasTagName,
+    TableXColumnGroupTagHelper.TagName,
+    TableXColumnGroupTagHelper.AliasTagName)]
 public class TableXTagHelper : TagHelper
 {
     /// <summary>The primary element name this Tag Helper targets.</summary>
@@ -121,9 +125,23 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("enable-selection")]
     public bool? EnableSelection { get; set; }
 
+    /// <summary>
+    /// Row selection mode: <c>Multi</c> (default) or <c>Single</c>, matched case-insensitively.
+    /// </summary>
+    [HtmlAttributeName("selection-mode")]
+    public string? SelectionMode { get; set; }
+
     /// <summary>Enable column-level filter menus in headers. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-column-filters")]
     public bool? EnableColumnFilters { get; set; }
+
+    /// <summary>Enable dragging column borders to resize columns. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-column-resize")]
+    public bool? EnableColumnResize { get; set; }
+
+    /// <summary>Enable drag-and-drop column reordering on headers. Defaults to <see langword="false"/>.</summary>
+    [HtmlAttributeName("enable-column-reorder")]
+    public bool? EnableColumnReorder { get; set; }
 
     /// <summary>Enable column sorting globally. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-sorting")]
@@ -133,13 +151,85 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("enable-export")]
     public bool? EnableExport { get; set; }
 
+    /// <summary>
+    /// Export button presentation: <c>Menu</c> (default), <c>Split</c>, <c>Excel</c>, or <c>Csv</c>.
+    /// </summary>
+    [HtmlAttributeName("export-mode")]
+    public string? ExportMode { get; set; }
+
+    /// <summary>Shortcut for direct 1-click Excel export.</summary>
+    [HtmlAttributeName("quick-export")]
+    public bool? QuickExport { get; set; }
+
+    /// <summary>Maximum rows collected during a full dataset export walk (0 for uncapped).</summary>
+    [HtmlAttributeName("max-export-rows")]
+    public int? MaxExportRows { get; set; }
+
     /// <summary>Export file prefix. Defaults to a slug of <see cref="Caption"/>.</summary>
     [HtmlAttributeName("export-file-name")]
     public string? ExportFileName { get; set; }
 
+    /// <summary>
+    /// Unique <c>localStorage</c> key to persist column widths, column order, hidden columns, and density.
+    /// </summary>
+    [HtmlAttributeName("storage-key")]
+    public string? StorageKey { get; set; }
+
+    /// <summary>Show the summary / aggregation footer row (<c>&lt;tfoot&gt;</c>).</summary>
+    [HtmlAttributeName("enable-summary-row")]
+    public bool? EnableSummaryRow { get; set; }
+
+    /// <summary>Show the floating bulk actions bar when rows are selected. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-bulk-actions")]
+    public bool? EnableBulkActions { get; set; }
+
+    /// <summary>Show active filter pills beneath the toolbar. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("show-filter-pills")]
+    public bool? ShowFilterPills { get; set; }
+
+    /// <summary>Show the entire toolbar area. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("show-toolbar")]
+    public bool? ShowToolbar { get; set; }
+
+    /// <summary>Show the entire footer area. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("show-footer")]
+    public bool? ShowFooter { get; set; }
+
+    /// <summary>Show the Columns visibility dropdown button. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-columns")]
+    public bool? EnableColumns { get; set; }
+
+    /// <summary>Show the Density dropdown button. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-density")]
+    public bool? EnableDensity { get; set; }
+
+    /// <summary>Show the footer pagination controls. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-pagination")]
+    public bool? EnablePagination { get; set; }
+
+    /// <summary>Show the rows-per-page selector in the footer. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-rows-per-page")]
+    public bool? EnableRowsPerPage { get; set; }
+
+    /// <summary>Show the jump-to-page input in the footer. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-jump-to-page")]
+    public bool? EnableJumpToPage { get; set; }
+
     /// <summary>Show the automatic <c>S.No.</c> column. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("show-serial-number")]
     public bool? ShowSerialNumber { get; set; }
+
+    /// <summary>Optional in-memory dataset serialized into JSON for client-side mode.</summary>
+    [HtmlAttributeName("data")]
+    public object? Data { get; set; }
+
+    /// <summary>Total row count when supplying a single server page via <see cref="Data"/>.</summary>
+    [HtmlAttributeName("total")]
+    public int? Total { get; set; }
+
+    /// <summary>Enable client-side pagination, sorting, search, and filtering over <see cref="Data"/>.</summary>
+    [HtmlAttributeName("client-side-pagination")]
+    public bool? ClientSidePagination { get; set; }
 
     /// <summary>Initial 1-based page. Defaults to 1.</summary>
     [HtmlAttributeName("page")]
@@ -246,6 +336,9 @@ public class TableXTagHelper : TagHelper
     {
         Caption = Caption ?? string.Empty,
         Columns = columns,
+        Data = Data,
+        Total = Total,
+        ClientSidePagination = ClientSidePagination,
         Endpoint = NullIfBlank(Endpoint),
         FetchEndpoint = NullIfBlank(FetchEndpoint),
         Density = TableXConfigSerializer.ToToken(
@@ -256,10 +349,29 @@ public class TableXTagHelper : TagHelper
         EnableSearch = EnableSearch,
         SearchPlaceholder = NullIfBlank(SearchPlaceholder),
         EnableSelection = EnableSelection,
+        SelectionMode = TableXConfigSerializer.ToToken(
+            TableXAttribute.ParseEnum<TableXSelectionMode>(SelectionMode, TagName, "selection-mode")),
         EnableColumnFilters = EnableColumnFilters,
+        EnableColumnResize = EnableColumnResize,
+        EnableColumnReorder = EnableColumnReorder,
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
+        ExportMode = TableXConfigSerializer.ToToken(
+            TableXAttribute.ParseEnum<TableXExportMode>(ExportMode, TagName, "export-mode")),
+        QuickExport = QuickExport,
+        MaxExportRows = MaxExportRows,
         ExportFileName = NullIfBlank(ExportFileName),
+        StorageKey = NullIfBlank(StorageKey),
+        EnableSummaryRow = EnableSummaryRow,
+        EnableBulkActions = EnableBulkActions,
+        ShowFilterPills = ShowFilterPills,
+        ShowToolbar = ShowToolbar,
+        ShowFooter = ShowFooter,
+        EnableColumns = EnableColumns,
+        EnableDensity = EnableDensity,
+        EnablePagination = EnablePagination,
+        EnableRowsPerPage = EnableRowsPerPage,
+        EnableJumpToPage = EnableJumpToPage,
         ShowSerialNumber = ShowSerialNumber,
         Query = BuildQueryConfig(),
     };

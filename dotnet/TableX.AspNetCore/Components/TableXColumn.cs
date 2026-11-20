@@ -82,6 +82,30 @@ public class TableXColumn : ComponentBase
     [Parameter]
     public string? FilterOptions { get; set; }
 
+    /// <summary>Sticky horizontal pin side (<see cref="TableXColumnPin.Left"/> or <see cref="TableXColumnPin.Right"/>).</summary>
+    [Parameter]
+    public TableXColumnPin? Pinned { get; set; }
+
+    /// <summary>Summary footer calculation (<see cref="TableXAggregation"/>).</summary>
+    [Parameter]
+    public TableXAggregation? Aggregation { get; set; }
+
+    /// <summary>Custom label prefix displayed in the summary footer cell (e.g. <c>"Avg:"</c>).</summary>
+    [Parameter]
+    public string? AggregationLabel { get; set; }
+
+    /// <summary>Enable double-click inline cell editing on this column.</summary>
+    [Parameter]
+    public bool? Editable { get; set; }
+
+    /// <summary>Inline editor control (<see cref="TableXEditType"/>).</summary>
+    [Parameter]
+    public TableXEditType? EditType { get; set; }
+
+    /// <summary>Comma-separated allowed options when <see cref="EditType"/> is <see cref="TableXEditType.Select"/>.</summary>
+    [Parameter]
+    public string? EditOptions { get; set; }
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -96,15 +120,21 @@ public class TableXColumn : ComponentBase
             MinWidth = MinWidth,
             Flex = Flex,
             Align = TableXConfigSerializer.ToToken(Align),
+            Pinned = TableXConfigSerializer.ToToken(Pinned),
             Hidden = Hidden ? true : null,
             Hideable = !Hideable ? false : null,
             Exportable = !Exportable ? false : null,
             ServerFilterable = Filterable,
             ServerFilterField = string.IsNullOrWhiteSpace(FilterField) ? null : FilterField,
             SortField = string.IsNullOrWhiteSpace(SortField) ? null : SortField,
-            FilterType = string.IsNullOrWhiteSpace(FilterType) ? null : FilterType.Trim().ToLowerInvariant(),
+            FilterType = TableXConfigSerializer.NormalizeFilterType(FilterType),
             FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
+            Aggregation = TableXConfigSerializer.ToToken(Aggregation),
+            AggregationLabel = string.IsNullOrWhiteSpace(AggregationLabel) ? null : AggregationLabel,
+            Editable = Editable,
+            EditType = TableXConfigSerializer.ToToken(EditType),
+            EditOptions = ParseFilterOptions(EditOptions),
         };
 
         ColumnCollection?.RegisterColumn(new TableXColumnConfig

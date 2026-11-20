@@ -29,26 +29,36 @@
     `.Sortable(s => s.EnrolledAt)`; an unregistered field is silently ignored,
     by design.
 *@
-<table-x id="students-grid"
+<nex-grid id="students-grid"
           caption="Students"
           endpoint="/api/students"
           export-file-name="students"
+          export-mode="Split"
+          storage-key="nexgrid-mvc-students"
           search-placeholder="Search name, email or department…"
           enable-selection="true"
+          enable-column-reorder="true"
+          enable-summary-row="true"
           page-size="25"
           sort="enrolledAt:desc">
-    <table-x-column field="name" header="Student" min-width="200" />
-    <table-x-column field="email" header="Email" min-width="220" />
-    <table-x-column field="department" header="Department" min-width="160"
+    <nex-grid-column field="name" header="Student" min-width="200" pinned="Left" />
+    <nex-grid-column field="email" header="Email" min-width="220" />
+    <nex-grid-column field="department" header="Department" min-width="160"
                      filterable="true"
                      filter-options="Computer Science,Mechanical,Electrical,Mathematics,Physics,Economics" />
-    <table-x-column field="status" header="Status" align="Center" width="130"
+    <nex-grid-column field="status" header="Status" align="Center" width="130"
                      filterable="true"
-                     filter-options="Active,Pending,Suspended,Alumni" />
-    <table-x-column field="score" header="Score" align="Right" width="110" filter-type="number-range" />
-    <table-x-column field="enrolledAt" header="Enrolled" width="150" filter-type="date-range" />
-    <table-x-column field="scholarship" header="Scholarship" align="Center" width="120" filter-options="true,false" />
-</table-x>
+                     filter-options="Active,Pending,Suspended,Alumni"
+                     editable="true"
+                     edit-type="Select"
+                     edit-options="Active,Pending,Suspended,Alumni" />
+    <nex-grid-column field="score" header="Score" align="Right" width="120"
+                     filter-type="number-range"
+                     aggregation="Avg"
+                     aggregation-label="Avg:" />
+    <nex-grid-column field="enrolledAt" header="Enrolled" width="150" filter-type="date-range" />
+    <nex-grid-column field="scholarship" header="Scholarship" align="Center" width="120" filter-options="true,false" />
+</nex-grid>
 
 <section class="panel">
     <h2>Column filters</h2>

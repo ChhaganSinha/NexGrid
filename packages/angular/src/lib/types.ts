@@ -62,8 +62,42 @@ export interface TableXSelectionChange {
 /** Theme mode: fixed light, fixed dark, or follow the OS preference. */
 export type TableXTheme = "light" | "dark" | "auto";
 
+/** Payload of the `cellEdit` output when an inline cell edit is committed. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface TableXCellEditEvent<TData = any> {
+  row: TData;
+  columnId: string;
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+/** Context handed to a `*nexGridExpandedRow` / `*tableXExpandedRow` template. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface TableXExpandedRowTemplateContext<TData = any> {
+  /** The row being rendered — `let-row` picks this up. */
+  $implicit: TData;
+  /** Zero-based index of the row within the current page (`let-i="rowIndex"`). */
+  rowIndex: number;
+}
+
+/** Context handed to a `*nexGridBulkActions` / `tableXBulkActions` template. */
+export interface TableXBulkActionsTemplateContext {
+  /** Selected row IDs — `let-ids` picks this up. */
+  $implicit: string[];
+  /** Selected row IDs (`let-selectedIds="selectedIds"`). */
+  selectedIds: string[];
+  /** Clears all selected rows (`let-deselectAll="deselectAll"`). */
+  deselectAll: () => void;
+}
+
 export type NexGridAngularColumn<TData> = TableXAngularColumn<TData>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type NexGridCellTemplateContext<TData = any> = TableXCellTemplateContext<TData>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NexGridCellEditEvent<TData = any> = TableXCellEditEvent<TData>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NexGridExpandedRowTemplateContext<TData = any> = TableXExpandedRowTemplateContext<TData>;
+export type NexGridBulkActionsTemplateContext = TableXBulkActionsTemplateContext;
 export type NexGridNotice = TableXNotice;
 export type NexGridSelectionChange = TableXSelectionChange;
 export type NexGridTheme = TableXTheme;

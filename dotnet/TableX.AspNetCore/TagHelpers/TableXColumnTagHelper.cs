@@ -34,6 +34,10 @@ namespace TableX.AspNetCore;
 [HtmlTargetElement(TagName, ParentTag = TableXTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
 [HtmlTargetElement(AliasTagName, ParentTag = TableXTagHelper.TagName, TagStructure = TagStructure.WithoutEndTag)]
 [HtmlTargetElement(AliasTagName, ParentTag = TableXTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(TagName, ParentTag = TableXColumnGroupTagHelper.TagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(TagName, ParentTag = TableXColumnGroupTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(AliasTagName, ParentTag = TableXColumnGroupTagHelper.TagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(AliasTagName, ParentTag = TableXColumnGroupTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
 public class TableXColumnTagHelper : TagHelper
 {
     /// <summary>The primary element name this Tag Helper targets.</summary>
@@ -134,6 +138,34 @@ public class TableXColumnTagHelper : TagHelper
     public string? FilterOptions { get; set; }
 
     /// <summary>
+    /// Sticky horizontal pin position: <c>Left</c> or <c>Right</c>, matched case-insensitively.
+    /// </summary>
+    [HtmlAttributeName("pinned")]
+    public string? Pinned { get; set; }
+
+    /// <summary>
+    /// Summary footer calculation: <c>Sum</c>, <c>Avg</c>, <c>Count</c>, <c>Min</c>, or <c>Max</c>.
+    /// </summary>
+    [HtmlAttributeName("aggregation")]
+    public string? Aggregation { get; set; }
+
+    /// <summary>Custom label prefix displayed in the summary footer cell (e.g. <c>"Avg:"</c>).</summary>
+    [HtmlAttributeName("aggregation-label")]
+    public string? AggregationLabel { get; set; }
+
+    /// <summary>Enable double-click inline cell editing on this column.</summary>
+    [HtmlAttributeName("editable")]
+    public bool? Editable { get; set; }
+
+    /// <summary>Inline editor control: <c>Text</c> (default), <c>Number</c>, or <c>Select</c>.</summary>
+    [HtmlAttributeName("edit-type")]
+    public string? EditType { get; set; }
+
+    /// <summary>Comma-separated allowed options when <see cref="EditType"/> is <c>Select</c>.</summary>
+    [HtmlAttributeName("edit-options")]
+    public string? EditOptions { get; set; }
+
+    /// <summary>
     /// Contribute this column to the parent grid and remove the element from the output.
     /// </summary>
     /// <param name="context">The Tag Helper context, carrying the parent's column collection.</param>
@@ -169,15 +201,24 @@ public class TableXColumnTagHelper : TagHelper
             Flex = Flex,
             Align = TableXConfigSerializer.ToToken(
                 TableXAttribute.ParseEnum<TableXColumnAlign>(Align, TagName, "align")),
+            Pinned = TableXConfigSerializer.ToToken(
+                TableXAttribute.ParseEnum<TableXColumnPin>(Pinned, TagName, "pinned")),
             Hidden = Hidden,
             Hideable = Hideable,
             Exportable = Exportable,
             ServerFilterable = Filterable,
             ServerFilterField = string.IsNullOrWhiteSpace(FilterField) ? null : FilterField,
             SortField = string.IsNullOrWhiteSpace(SortField) ? null : SortField,
-            FilterType = string.IsNullOrWhiteSpace(FilterType) ? null : FilterType.Trim().ToLowerInvariant(),
+            FilterType = TableXConfigSerializer.NormalizeFilterType(FilterType),
             FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
+            Aggregation = TableXConfigSerializer.ToToken(
+                TableXAttribute.ParseEnum<TableXAggregation>(Aggregation, TagName, "aggregation")),
+            AggregationLabel = string.IsNullOrWhiteSpace(AggregationLabel) ? null : AggregationLabel,
+            Editable = Editable,
+            EditType = TableXConfigSerializer.ToToken(
+                TableXAttribute.ParseEnum<TableXEditType>(EditType, TagName, "edit-type")),
+            EditOptions = ParseFilterOptions(EditOptions),
         };
 
         return new TableXColumnConfig

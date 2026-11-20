@@ -58,6 +58,63 @@ internal static class TableXConfigSerializer
         TableXColumnAlign.Right => "right",
         _ => null,
     };
+
+    internal static string? ToToken(TableXSelectionMode? mode) => mode switch
+    {
+        TableXSelectionMode.Multi => "multi",
+        TableXSelectionMode.Single => "single",
+        _ => null,
+    };
+
+    internal static string? ToToken(TableXExportMode? mode) => mode switch
+    {
+        TableXExportMode.Menu => "menu",
+        TableXExportMode.Split => "split",
+        TableXExportMode.Excel => "excel",
+        TableXExportMode.Csv => "csv",
+        _ => null,
+    };
+
+    internal static string? ToToken(TableXColumnPin? pin) => pin switch
+    {
+        TableXColumnPin.Left => "left",
+        TableXColumnPin.Right => "right",
+        _ => null,
+    };
+
+    internal static string? ToToken(TableXAggregation? aggregation) => aggregation switch
+    {
+        TableXAggregation.Sum => "sum",
+        TableXAggregation.Avg => "avg",
+        TableXAggregation.Count => "count",
+        TableXAggregation.Min => "min",
+        TableXAggregation.Max => "max",
+        _ => null,
+    };
+
+    internal static string? ToToken(TableXEditType? editType) => editType switch
+    {
+        TableXEditType.Text => "text",
+        TableXEditType.Number => "number",
+        TableXEditType.Select => "select",
+        _ => null,
+    };
+
+    internal static string? NormalizeFilterType(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var normalized = raw.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "numberrange" => "number-range",
+            "daterange" => "date-range",
+            _ => normalized,
+        };
+    }
 }
 
 internal sealed class TableXConfig
@@ -65,6 +122,12 @@ internal sealed class TableXConfig
     public string Caption { get; set; } = string.Empty;
 
     public IReadOnlyList<TableXColumnConfig> Columns { get; set; } = [];
+
+    public object? Data { get; set; }
+
+    public int? Total { get; set; }
+
+    public bool? ClientSidePagination { get; set; }
 
     public string? Endpoint { get; set; }
 
@@ -82,13 +145,47 @@ internal sealed class TableXConfig
 
     public bool? EnableSelection { get; set; }
 
+    public string? SelectionMode { get; set; }
+
     public bool? EnableColumnFilters { get; set; }
+
+    public bool? EnableColumnResize { get; set; }
+
+    public bool? EnableColumnReorder { get; set; }
 
     public bool? EnableSorting { get; set; }
 
     public bool? EnableExport { get; set; }
 
+    public string? ExportMode { get; set; }
+
+    public bool? QuickExport { get; set; }
+
+    public int? MaxExportRows { get; set; }
+
     public string? ExportFileName { get; set; }
+
+    public string? StorageKey { get; set; }
+
+    public bool? EnableSummaryRow { get; set; }
+
+    public bool? EnableBulkActions { get; set; }
+
+    public bool? ShowFilterPills { get; set; }
+
+    public bool? ShowToolbar { get; set; }
+
+    public bool? ShowFooter { get; set; }
+
+    public bool? EnableColumns { get; set; }
+
+    public bool? EnableDensity { get; set; }
+
+    public bool? EnablePagination { get; set; }
+
+    public bool? EnableRowsPerPage { get; set; }
+
+    public bool? EnableJumpToPage { get; set; }
 
     public bool? ShowSerialNumber { get; set; }
 
@@ -118,11 +215,15 @@ internal sealed class TableXSortConfig
 
 internal sealed class TableXColumnConfig
 {
-    public string AccessorKey { get; set; } = string.Empty;
+    public string? Id { get; set; }
+
+    public string? AccessorKey { get; set; }
 
     public string? Header { get; set; }
 
     public bool? EnableSorting { get; set; }
+
+    public IReadOnlyList<TableXColumnConfig>? Columns { get; set; }
 
     public TableXColumnMetaConfig? Meta { get; set; }
 }
@@ -136,6 +237,8 @@ internal sealed class TableXColumnMetaConfig
     public int? Flex { get; set; }
 
     public string? Align { get; set; }
+
+    public string? Pinned { get; set; }
 
     public bool? Hidden { get; set; }
 
@@ -155,12 +258,23 @@ internal sealed class TableXColumnMetaConfig
 
     public IReadOnlyList<string>? FilterOptions { get; set; }
 
+    public string? Aggregation { get; set; }
+
+    public string? AggregationLabel { get; set; }
+
+    public bool? Editable { get; set; }
+
+    public string? EditType { get; set; }
+
+    public IReadOnlyList<string>? EditOptions { get; set; }
+
     /// <summary>True when at least one hint was set; an all-null meta object is not written.</summary>
     internal bool HasValues =>
         Width is not null ||
         MinWidth is not null ||
         Flex is not null ||
         Align is not null ||
+        Pinned is not null ||
         Hidden is not null ||
         Hideable is not null ||
         Exportable is not null ||
@@ -169,5 +283,10 @@ internal sealed class TableXColumnMetaConfig
         SortField is not null ||
         FilterType is not null ||
         FilterPlaceholder is not null ||
-        FilterOptions is not null;
+        FilterOptions is not null ||
+        Aggregation is not null ||
+        AggregationLabel is not null ||
+        Editable is not null ||
+        EditType is not null ||
+        EditOptions is not null;
 }

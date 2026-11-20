@@ -52,6 +52,7 @@ import {
   DEFAULT_ROW_CAP,
   PAGE_SIZES,
   buildQueryUrl,
+  computeAggregation,
   defaultQuery,
   downloadCsv,
   downloadExcel,
@@ -66,8 +67,10 @@ import {
   getPageNumbers,
   getRecordRange,
   initialHiddenColumns,
+  isEditable,
   isHideable,
   isPageSize,
+  isPinned,
   isSortable,
   isFilterable,
   primarySort,
@@ -101,10 +104,14 @@ import {
   type RecordRange,
 } from "@nexgrid/core";
 
+import { TableXBulkActionsDirective } from "./table-x-bulk-actions.directive";
 import { TableXCellDirective } from "./table-x-cell.directive";
+import { TableXExpandedRowDirective } from "./table-x-expanded-row.directive";
 import { TableXToolbarDirective } from "./table-x-toolbar.directive";
 import type {
   TableXAngularColumn,
+  TableXBulkActionsTemplateContext,
+  TableXCellEditEvent,
   NexGridCellTemplateContext,
   TableXNotice,
   TableXSelectionChange,
@@ -125,6 +132,7 @@ import {
   type NexGridPagerItem,
   type NexGridRangePart,
   type NexGridRowView,
+  type TableXSummaryCellView,
 } from "./view-model";
 
 /** Which toolbar dropdown is open, if any. */
@@ -773,7 +781,12 @@ const SEARCH_DEBOUNCE_MS = 350;
                 }
 
                 @if (header.serverFilterable) {
-                  <div class="tbx-col-filter-wrap" (click)="$event.stopPropagation()">
+                  <div
+                    class="tbx-col-filter-wrap"
+                    draggable="false"
+                    (dragstart)="$event.preventDefault(); $event.stopPropagation()"
+                    (click)="$event.stopPropagation()"
+                  >
                     <button
                       type="button"
                       class="tbx-col-filter-btn"
@@ -805,6 +818,8 @@ const SEARCH_DEBOUNCE_MS = 350;
               @if (enableColumnResize) {
                 <div
                   class="tbx-resize-handle"
+                  draggable="false"
+                  (dragstart)="$event.preventDefault(); $event.stopPropagation()"
                   (pointerdown)="onResizePointerDown(header.id, header, $event)"
                   (dblclick)="onResizeHandleDblClick(header.id)"
                 ></div>
@@ -812,17 +827,32 @@ const SEARCH_DEBOUNCE_MS = 350;
             </ng-template>
 
             <tr>
+              @if (hasExpandColumn) {
+                <th
+                  class="tbx-th tbx-th--expand"
+                  scope="col"
+                  [attr.rowspan]="hasHeaderGroups ? 2 : null"
+                  [class.tbx-th--pinned-left]="expandPinnedLeft !== null"
+                  [class.tbx-pinned-border-left]="expandIsLastLeftPinned"
+                  [style.width.px]="40"
+                  [style.left.px]="expandPinnedLeft"
+                ></th>
+              }
               @if (enableSelection) {
                 <th
                   class="tbx-th tbx-th--select"
                   scope="col"
                   [attr.rowspan]="hasHeaderGroups ? 2 : null"
+                  [class.tbx-th--pinned-left]="selectPinnedLeft !== null"
+                  [class.tbx-pinned-border-left]="selectIsLastLeftPinned"
+                  [style.left.px]="selectPinnedLeft"
                 >
                   @if (selectionMode !== 'single') {
                     <input
                       type="checkbox"
                       class="tbx-checkbox"
                       [checked]="allPageSelected"
+                      [indeterminate]="somePageSelected"
                       [attr.aria-label]="strings.selectAllLabel"
                       (change)="toggleSelectAll()"
                     />
@@ -834,6 +864,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                   class="tbx-th tbx-th--serial"
                   scope="col"
                   [attr.rowspan]="hasHeaderGroups ? 2 : null"
+                  [class.tbx-th--pinned-left]="serialPinnedLeft !== null"
+                  [class.tbx-pinned-border-left]="serialIsLastLeftPinned"
+                  [style.left.px]="serialPinnedLeft"
                 >
                   {{ strings.serialHeader }}
                 </th>
@@ -852,12 +885,26 @@ const SEARCH_DEBOUNCE_MS = 350;
                     class="tbx-th"
                     scope="col"
                     [attr.rowspan]="header.rowSpan && header.rowSpan > 1 ? header.rowSpan : null"
+                    [attr.draggable]="header.draggable ? 'true' : null"
                     [class.tbx-th--sortable]="header.sortable"
+                    [class.tbx-th--draggable]="header.draggable"
+                    [class.tbx-th--dragging]="draggedColumnId === header.id"
+                    [class.tbx-th--pinned-left]="header.pinnedLeft !== null && header.pinnedLeft !== undefined"
+                    [class.tbx-th--pinned-right]="header.pinnedRight !== null && header.pinnedRight !== undefined"
+                    [class.tbx-pinned-border-left]="header.isLastLeftPinned"
+                    [class.tbx-pinned-border-right]="header.isFirstRightPinned"
                     [attr.tabindex]="header.sortable ? 0 : null"
                     [attr.aria-sort]="header.ariaSort"
                     [style.width.px]="header.width"
                     [style.minWidth.px]="header.minWidth"
                     [style.textAlign]="header.align"
+                    [style.left.px]="header.pinnedLeft"
+                    [style.right.px]="header.pinnedRight"
+                    (pointerdown)="onHeaderPointerDown(header, $event)"
+                    (dragstart)="onHeaderDragStart(header, $event)"
+                    (dragover)="onHeaderDragOver(header, $event)"
+                    (drop)="onHeaderDrop(header, $event)"
+                    (dragend)="onHeaderDragEnd(header, $event)"
                     (click)="onHeaderActivate(header, $event)"
                     (keydown.enter)="onHeaderKeydown($event, header)"
                     (keydown.space)="onHeaderKeydown($event, header)"
@@ -874,11 +921,17 @@ const SEARCH_DEBOUNCE_MS = 350;
                     class="tbx-th tbx-th--grouped-child"
                     scope="col"
                     [class.tbx-th--sortable]="header.sortable"
+                    [class.tbx-th--pinned-left]="header.pinnedLeft !== null && header.pinnedLeft !== undefined"
+                    [class.tbx-th--pinned-right]="header.pinnedRight !== null && header.pinnedRight !== undefined"
+                    [class.tbx-pinned-border-left]="header.isLastLeftPinned"
+                    [class.tbx-pinned-border-right]="header.isFirstRightPinned"
                     [attr.tabindex]="header.sortable ? 0 : null"
                     [attr.aria-sort]="header.ariaSort"
                     [style.width.px]="header.width"
                     [style.minWidth.px]="header.minWidth"
                     [style.textAlign]="header.align"
+                    [style.left.px]="header.pinnedLeft"
+                    [style.right.px]="header.pinnedRight"
                     (click)="onHeaderActivate(header, $event)"
                     (keydown.enter)="onHeaderKeydown($event, header)"
                     (keydown.space)="onHeaderKeydown($event, header)"
@@ -911,13 +964,53 @@ const SEARCH_DEBOUNCE_MS = 350;
                 <tr
                   class="tbx-row"
                   [class.tbx-row--selected]="row.selected"
+                  [class.tbx-row--expanded]="row.expanded"
                   [class.tbx-row--clickable]="isRowClickable"
                   (click)="onRowActivate(row)"
                 >
+                  @if (hasExpandColumn) {
+                    <td
+                      class="tbx-td tbx-td--expand"
+                      [class.tbx-td--pinned-left]="expandPinnedLeft !== null"
+                      [class.tbx-pinned-border-left]="expandIsLastLeftPinned"
+                      [style.width.px]="40"
+                      [style.left.px]="expandPinnedLeft"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <button
+                        type="button"
+                        class="tbx-expand-btn"
+                        [class.tbx-expand-btn--open]="row.expanded"
+                        [attr.aria-expanded]="row.expanded"
+                        [attr.aria-label]="row.expanded ? 'Collapse row' : 'Expand row'"
+                        (click)="toggleExpandRow(row.id, $event)"
+                      >
+                        <svg
+                          class="tbx-icon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </button>
+                    </td>
+                  }
                   @if (enableSelection) {
-                    <td class="tbx-td tbx-td--select" (click)="$event.stopPropagation()">
+                    <td
+                      class="tbx-td tbx-td--select"
+                      [class.tbx-td--pinned-left]="selectPinnedLeft !== null"
+                      [class.tbx-pinned-border-left]="selectIsLastLeftPinned"
+                      [style.left.px]="selectPinnedLeft"
+                      (click)="$event.stopPropagation()"
+                    >
                       <input
                         [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
+                        [attr.name]="selectionMode === 'single' ? selectRadioGroupName : null"
                         class="tbx-checkbox"
                         [checked]="row.selected"
                         [attr.aria-label]="row.selectLabel"
@@ -926,11 +1019,98 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </td>
                   }
                   @if (showSerialNumber) {
-                    <td class="tbx-td tbx-td--serial">{{ row.serial }}</td>
+                    <td
+                      class="tbx-td tbx-td--serial"
+                      [class.tbx-td--pinned-left]="serialPinnedLeft !== null"
+                      [class.tbx-pinned-border-left]="serialIsLastLeftPinned"
+                      [style.left.px]="serialPinnedLeft"
+                    >
+                      {{ row.serial }}
+                    </td>
                   }
                   @for (cell of row.cells; track cell.key) {
-                    <td class="tbx-td" [style.textAlign]="cell.align">
-                      @if (cell.template) {
+                    <td
+                      class="tbx-td"
+                      [class.tbx-cell--editable]="cell.editable"
+                      [class.tbx-td--pinned-left]="cell.pinnedLeft !== null && cell.pinnedLeft !== undefined"
+                      [class.tbx-td--pinned-right]="cell.pinnedRight !== null && cell.pinnedRight !== undefined"
+                      [class.tbx-pinned-border-left]="cell.isLastLeftPinned"
+                      [class.tbx-pinned-border-right]="cell.isFirstRightPinned"
+                      [style.textAlign]="cell.align"
+                      [style.left.px]="cell.pinnedLeft"
+                      [style.right.px]="cell.pinnedRight"
+                      (dblclick)="onCellDblClick(row, cell, $event)"
+                    >
+                      @if (editingCell?.rowId === row.id && editingCell?.columnId === cell.columnId) {
+                        <div
+                          class="tbx-cell-edit-wrap"
+                          (click)="$event.stopPropagation()"
+                          (dblclick)="$event.stopPropagation()"
+                        >
+                          @if (cell.editType === 'select' && cell.editOptions && cell.editOptions.length > 0) {
+                            <select
+                              class="tbx-cell-edit-select tbx-cell-edit-input"
+                              (change)="onEditValueChange($event)"
+                              (keydown.enter)="$event.preventDefault(); commitCellEdit(row, cell)"
+                              (keydown.escape)="$event.preventDefault(); cancelCellEdit($event)"
+                            >
+                              @for (opt of cell.editOptions; track opt) {
+                                <option [value]="opt" [selected]="opt === editingValue">{{ opt }}</option>
+                              }
+                            </select>
+                          } @else {
+                            <input
+                              [type]="cell.editType === 'number' ? 'number' : 'text'"
+                              class="tbx-cell-edit-input"
+                              [value]="editingValue"
+                              (input)="onEditValueChange($event)"
+                              (keydown.enter)="$event.preventDefault(); commitCellEdit(row, cell)"
+                              (keydown.escape)="$event.preventDefault(); cancelCellEdit($event)"
+                            />
+                          }
+                          <div class="tbx-cell-edit-actions">
+                            <button
+                              type="button"
+                              class="tbx-cell-edit-btn tbx-cell-edit-btn--save"
+                              aria-label="Save"
+                              (click)="commitCellEdit(row, cell, $event)"
+                            >
+                              <svg
+                                class="tbx-icon"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              class="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
+                              aria-label="Cancel"
+                              (click)="cancelCellEdit($event)"
+                            >
+                              <svg
+                                class="tbx-icon"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      } @else if (cell.template) {
                         <ng-container
                           [ngTemplateOutlet]="cell.template"
                           [ngTemplateOutletContext]="cell.context"
@@ -941,9 +1121,77 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </td>
                   }
                 </tr>
+                @if (row.expanded && hasExpandColumn) {
+                  <tr class="tbx-expanded-row">
+                    <td class="tbx-expanded-cell" [attr.colspan]="columnSpan">
+                      <div class="tbx-detail-panel">
+                        @if (expandedRowSlot) {
+                          <ng-container
+                            [ngTemplateOutlet]="expandedRowSlot.template"
+                            [ngTemplateOutletContext]="row.expandedContext"
+                          />
+                        } @else {
+                          {{ row.expandedText }}
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
               }
             }
           </tbody>
+          @if (!isLoading && hasSummary && rows.length > 0) {
+            <tfoot>
+              <tr class="tbx-summary-row">
+                @if (hasExpandColumn) {
+                  <td
+                    class="tbx-summary-cell"
+                    [class.tbx-td--pinned-left]="expandPinnedLeft !== null"
+                    [class.tbx-pinned-border-left]="expandIsLastLeftPinned"
+                    [style.width.px]="40"
+                    [style.left.px]="expandPinnedLeft"
+                  ></td>
+                }
+                @if (enableSelection) {
+                  <td
+                    class="tbx-summary-cell tbx-summary-cell--select"
+                    [class.tbx-td--pinned-left]="selectPinnedLeft !== null"
+                    [class.tbx-pinned-border-left]="selectIsLastLeftPinned"
+                    [style.left.px]="selectPinnedLeft"
+                  ></td>
+                }
+                @if (showSerialNumber) {
+                  <td
+                    class="tbx-summary-cell tbx-summary-cell--serial"
+                    [class.tbx-td--pinned-left]="serialPinnedLeft !== null"
+                    [class.tbx-pinned-border-left]="serialIsLastLeftPinned"
+                    [style.left.px]="serialPinnedLeft"
+                  ></td>
+                }
+                @for (sumCell of summaryCells; track sumCell.key) {
+                  <td
+                    class="tbx-summary-cell"
+                    [class.tbx-td--pinned-left]="sumCell.pinnedLeft !== null && sumCell.pinnedLeft !== undefined"
+                    [class.tbx-td--pinned-right]="sumCell.pinnedRight !== null && sumCell.pinnedRight !== undefined"
+                    [class.tbx-pinned-border-left]="sumCell.isLastLeftPinned"
+                    [class.tbx-pinned-border-right]="sumCell.isFirstRightPinned"
+                    [style.textAlign]="sumCell.align"
+                    [style.left.px]="sumCell.pinnedLeft"
+                    [style.right.px]="sumCell.pinnedRight"
+                  >
+                    @if (sumCell.value !== null) {
+                      @if (sumCell.label) {
+                        <span class="tbx-summary-label">{{ sumCell.label }} </span>
+                      }
+                      <strong>{{ sumCell.value }}</strong>
+                    } @else if (sumCell.isTotalLabel) {
+                      <strong>Total</strong>
+                    }
+                  </td>
+                }
+              </tr>
+            </tfoot>
+          }
         </table>
       </div>
 
@@ -1094,6 +1342,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                     <span class="tbx-card-select" (click)="$event.stopPropagation()">
                       <input
                         [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
+                        [attr.name]="selectionMode === 'single' ? cardSelectRadioGroupName : null"
                         class="tbx-checkbox"
                         [checked]="row.selected"
                         [attr.aria-label]="row.selectLabel"
@@ -1124,6 +1373,91 @@ const SEARCH_DEBOUNCE_MS = 350;
           }
         }
       </div>
+
+      @if (enableSelection && enableBulkActions && selectedCount > 0) {
+        <div class="tbx-bulk-bar" role="region" aria-label="Bulk actions">
+          <span class="tbx-bulk-badge">{{ selectedBadge }}</span>
+          <div class="tbx-bulk-actions">
+            @if (isExportVisible) {
+              <button
+                type="button"
+                class="tbx-bulk-btn"
+                [disabled]="isExporting"
+                (click)="runBulkExport('excel')"
+              >
+                <svg
+                  class="tbx-icon--excel"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                  <path d="M8 13h2" />
+                  <path d="M14 13h2" />
+                  <path d="M8 17h2" />
+                  <path d="M14 17h2" />
+                </svg>
+                <span>{{ strings.exportExcelButton ?? 'Export Excel' }}</span>
+              </button>
+              <button
+                type="button"
+                class="tbx-bulk-btn"
+                [disabled]="isExporting"
+                (click)="runBulkExport('csv')"
+              >
+                <svg
+                  class="tbx-icon--csv"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                  <path d="M10 9H8" />
+                  <path d="M16 13H8" />
+                  <path d="M16 17H8" />
+                </svg>
+                <span>{{ strings.exportCsvButton ?? 'Export CSV' }}</span>
+              </button>
+            }
+            @if (bulkActionsSlot) {
+              <ng-container
+                [ngTemplateOutlet]="bulkActionsSlot.template"
+                [ngTemplateOutletContext]="bulkActionsContext"
+              />
+            }
+          </div>
+          <button
+            type="button"
+            class="tbx-bulk-btn tbx-bulk-btn--close"
+            aria-label="Deselect all"
+            (click)="deselectAll()"
+          >
+            <svg
+              class="tbx-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+      }
 
       @if (showFooter) {
         <div class="tbx-footer">
@@ -1250,17 +1584,17 @@ export class TableXComponent<TData>
   /** Column definitions. `header`/`cell` functions must return strings. */
   @Input({ required: true }) columns: TableXAngularColumn<TData>[] = [];
 
-  /** The CURRENT page of rows only — never the full dataset. */
+  /** The CURRENT page of rows (or the full dataset when client-side pagination is active). */
   @Input({ required: true }) data: TData[] = [];
 
-  /** Total filtered row count, from the server. Drives the pager. */
-  @Input({ required: true }) total = 0;
+  /** Total filtered row count, from the server. Optional in client-side mode. */
+  @Input() total?: number;
 
-  /** The active query. Every mutation is emitted through `queryChange`. */
-  @Input({ required: true }) query: QueryState = defaultQuery();
+  /** The active query. Optional in uncontrolled client-side mode. */
+  @Input() query: QueryState = defaultQuery();
 
   /** Accessible name for the grid; also seeds the export file name. */
-  @Input({ required: true }) caption = "";
+  @Input() caption = "Data Grid";
 
   /** Row height preset. Changing it later overrides the user's menu choice. */
   @Input() density: Density = "default";
@@ -1288,6 +1622,18 @@ export class TableXComponent<TData>
 
   /** Enable dragging column borders to resize columns. */
   @Input({ transform: booleanAttribute }) enableColumnResize = true;
+
+  /** Enable drag-and-drop column reordering on header cells. */
+  @Input({ transform: booleanAttribute }) enableColumnReorder = false;
+
+  /** Show the summary / aggregation footer row (`<tfoot>`). Automatically shown when any column defines `meta.aggregation`. */
+  @Input({ transform: booleanAttribute }) enableSummaryRow = false;
+
+  /** Show the floating bulk-actions bar when rows are selected (`enableSelection` must also be true). */
+  @Input({ transform: booleanAttribute }) enableBulkActions = true;
+
+  /** Plain-text detail fallback for expandable rows when no `*tableXExpandedRow` template is provided. */
+  @Input() renderExpandedRow?: (row: TData) => string;
 
   /** Show the global search box. */
   @Input({ transform: booleanAttribute }) enableSearch = true;
@@ -1420,6 +1766,12 @@ export class TableXComponent<TData>
   /** Observed => replaces the built-in export entirely. */
   @Output() readonly exportAll = new EventEmitter<void>();
 
+  /** Emitted with the ordered array of column IDs whenever columns are reordered via drag-and-drop. */
+  @Output() readonly columnOrderChange = new EventEmitter<string[]>();
+
+  /** Emitted whenever an inline cell edit is committed. */
+  @Output() readonly cellEdit = new EventEmitter<TableXCellEditEvent<TData>>();
+
   // ---------------------------------------------------------------------
   // Content
   // ---------------------------------------------------------------------
@@ -1430,9 +1782,20 @@ export class TableXComponent<TData>
   @ContentChild(TableXToolbarDirective)
   protected toolbarSlot?: TableXToolbarDirective;
 
+  @ContentChild(TableXExpandedRowDirective)
+  protected expandedRowSlot?: TableXExpandedRowDirective;
+
+  @ContentChild(TableXBulkActionsDirective)
+  protected bulkActionsSlot?: TableXBulkActionsDirective;
+
   // ---------------------------------------------------------------------
   // Template state (protected: read by the template, not part of the API)
   // ---------------------------------------------------------------------
+
+  private static nextInstanceId = 0;
+  private readonly instanceUid = ++TableXComponent.nextInstanceId;
+  protected readonly selectRadioGroupName = `tbx-sel-${this.instanceUid}`;
+  protected readonly cardSelectRadioGroupName = `tbx-card-sel-${this.instanceUid}`;
 
   protected strings: TableXLocale = resolveLocale();
   protected currentDensity: Density = "default";
@@ -1446,17 +1809,30 @@ export class TableXComponent<TData>
   protected filterHasTyped = false;
   protected filteredPopoverOptions: readonly string[] = [];
   protected columnWidths: Record<string, number> = {};
+  protected draggedColumnId: string | null = null;
+  protected editingCell: { rowId: string; columnId: string } | null = null;
+  protected editingValue = "";
   protected isExporting = false;
   protected searchText = "";
   protected searchLabel = "";
   protected jumpValue = "1";
   protected jumpInputId = "tbx-jump-page";
 
+  protected hasExpandColumn = false;
+  protected expandPinnedLeft: number | null = null;
+  protected expandIsLastLeftPinned = false;
+  protected selectPinnedLeft: number | null = null;
+  protected selectIsLastLeftPinned = false;
+  protected serialPinnedLeft: number | null = null;
+  protected serialIsLastLeftPinned = false;
+
   protected headers: NexGridHeaderView[] = [];
   protected hasHeaderGroups = false;
   protected topHeaderCells: NexGridHeaderView[] = [];
   protected bottomHeaderCells: NexGridHeaderView[] = [];
   protected rows: NexGridRowView<TData>[] = [];
+  protected hasSummary = false;
+  protected summaryCells: TableXSummaryCellView[] = [];
   protected columnToggles: TableXColumnToggle[] = [];
   protected densityOptions: NexGridDensityOption[] = [];
   protected densityButtonLabel = "";
@@ -1466,6 +1842,12 @@ export class TableXComponent<TData>
   protected selectedBadge = "";
   protected selectedCount = 0;
   protected allPageSelected = false;
+  protected somePageSelected = false;
+  protected bulkActionsContext: TableXBulkActionsTemplateContext = {
+    $implicit: [],
+    selectedIds: [],
+    deselectAll: () => this.deselectAll(),
+  };
   protected columnSpan = 1;
   protected currentPage = 1;
   protected totalPages = 1;
@@ -1515,11 +1897,29 @@ export class TableXComponent<TData>
   private hiddenColumns: Readonly<Record<string, boolean>> = {};
   private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
+  private hasBoundQuery = false;
   private selectedIds: ReadonlySet<string> = new Set<string>();
+  private expandedRowIds = new Set<string>();
+  private headerPointer: {
+    colId: string;
+    sortField: string;
+    x: number;
+    y: number;
+    shiftKey: boolean;
+    dropped: boolean;
+  } | null = null;
   private cellTemplates = new Map<string, TemplateRef<NexGridCellTemplateContext<TData>>>();
   private detachMenuListeners: (() => void) | null = null;
   private detachFilterListeners: (() => void) | null = null;
   private detachResizeListeners: (() => void) | null = null;
+
+  private get isClientMode(): boolean {
+    return (
+      this.clientSidePagination ||
+      this.paginationMode === "client" ||
+      (!this.hasBoundQuery && !this.queryChange.observed)
+    );
+  }
 
   /**
    * The search value we last pushed to the host. Lets an ECHO of our own
@@ -1603,7 +2003,10 @@ export class TableXComponent<TData>
       }
       this.columnsSeeded = true;
     }
-    if (changes["query"]) this.syncFromQuery();
+    if (changes["query"]) {
+      this.hasBoundQuery = true;
+      this.syncFromQuery();
+    }
 
     this.recompute();
   }
@@ -1718,14 +2121,98 @@ export class TableXComponent<TData>
   }
 
   // ---------------------------------------------------------------------
-  // Sorting & Column Filtering
+  // Sorting, Column Drag-Reorder & Column Filtering
   // ---------------------------------------------------------------------
+
+  protected onHeaderPointerDown(header: NexGridHeaderView, event: PointerEvent): void {
+    if (!header.draggable) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
+      this.headerPointer = null;
+      return;
+    }
+    this.headerPointer = {
+      colId: header.id,
+      sortField: header.sortField || header.id,
+      x: event.clientX,
+      y: event.clientY,
+      shiftKey: event.shiftKey,
+      dropped: false,
+    };
+  }
+
+  protected onHeaderDragStart(header: NexGridHeaderView, event: DragEvent): void {
+    if (!header.draggable) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
+      event.preventDefault();
+      return;
+    }
+    this.draggedColumnId = header.id;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", header.id);
+    }
+  }
+
+  protected onHeaderDragOver(header: NexGridHeaderView, event: DragEvent): void {
+    if (!header.draggable || !this.draggedColumnId) return;
+    event.preventDefault();
+  }
+
+  protected onHeaderDrop(header: NexGridHeaderView, event: DragEvent): void {
+    if (!header.draggable) return;
+    event.preventDefault();
+    const fromId = this.draggedColumnId;
+    const toId = header.id;
+    if (!fromId || fromId === toId) return;
+    if (this.headerPointer) {
+      this.headerPointer.dropped = true;
+    }
+    const baseCols =
+      this.orderedColumns.length === this.columns.length ? [...this.orderedColumns] : [...this.columns];
+    const fromIdx = baseCols.findIndex((c) => getColumnId(c) === fromId);
+    const toIdx = baseCols.findIndex((c) => getColumnId(c) === toId);
+    if (fromIdx >= 0 && toIdx >= 0) {
+      const moved = baseCols[fromIdx];
+      if (!moved) return;
+      baseCols.splice(fromIdx, 1);
+      baseCols.splice(toIdx, 0, moved);
+      this.orderedColumns = baseCols;
+      this.saveState();
+      this.recompute();
+      this.columnOrderChange.emit(baseCols.map(getColumnId));
+      this.cdr.markForCheck();
+    }
+  }
+
+  protected onHeaderDragEnd(header: NexGridHeaderView, event: DragEvent): void {
+    const ptr = this.headerPointer;
+    this.headerPointer = null;
+    this.draggedColumnId = null;
+    if (
+      header.sortable &&
+      ptr &&
+      ptr.colId === header.id &&
+      !ptr.dropped &&
+      event.clientX > 0 &&
+      Math.hypot(event.clientX - ptr.x, event.clientY - ptr.y) < 6
+    ) {
+      this.emitQuery(
+        ptr.shiftKey
+          ? withToggledMultiSort(this.query, ptr.sortField)
+          : withToggledSort(this.query, ptr.sortField),
+      );
+    }
+    this.cdr.markForCheck();
+  }
 
   protected onHeaderActivate(header: NexGridHeaderView, event?: MouseEvent | KeyboardEvent | Event): void {
     const target = event?.target as HTMLElement | null;
     if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
       return;
     }
+    this.headerPointer = null;
     if (!header.sortable) return;
     const sortField = header.sortField || header.id;
     const isMulti =
@@ -2027,6 +2514,9 @@ export class TableXComponent<TData>
     this.orderedColumns = [...this.columns];
     this.openMenu = null;
     this.recompute();
+    if (this.columnOrderChange.observed) {
+      this.columnOrderChange.emit(this.orderedColumns.map(getColumnId));
+    }
     this.cdr.markForCheck();
   }
 
@@ -2096,6 +2586,11 @@ export class TableXComponent<TData>
     this.applySelection(next);
   }
 
+  protected deselectAll(): void {
+    if (this.selectedIds.size === 0) return;
+    this.applySelection(new Set());
+  }
+
   private applySelection(next: Set<string>): void {
     this.selectedIds = next;
     this.recompute();
@@ -2103,12 +2598,102 @@ export class TableXComponent<TData>
   }
 
   // ---------------------------------------------------------------------
-  // Rows
+  // Rows, Expansion & Inline Cell Editing
   // ---------------------------------------------------------------------
 
   protected onRowActivate(row: NexGridRowView<TData>): void {
     if (!this.isRowClickable) return;
     this.rowClick.emit(row.data);
+  }
+
+  protected toggleExpandRow(rowId: string, event: Event): void {
+    event.stopPropagation();
+    if (this.expandedRowIds.has(rowId)) {
+      this.expandedRowIds.delete(rowId);
+    } else {
+      this.expandedRowIds.add(rowId);
+    }
+    this.recompute();
+  }
+
+  protected onCellDblClick(
+    row: NexGridRowView<TData>,
+    cell: NexGridCellView<TData>,
+    event: MouseEvent,
+  ): void {
+    if (!cell.editable) return;
+    event.stopPropagation();
+    this.editingCell = { rowId: row.id, columnId: cell.columnId };
+    this.editingValue =
+      cell.rawValue !== null && cell.rawValue !== undefined ? String(cell.rawValue) : "";
+    this.cdr.markForCheck();
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        const input = this.hostRef.nativeElement?.querySelector?.(
+          ".tbx-cell-edit-input",
+        ) as (HTMLElement & { value?: string }) | null;
+        if (input) {
+          if ("value" in input && input.value !== this.editingValue) {
+            input.value = this.editingValue;
+          }
+          input.focus?.();
+        }
+      });
+    }
+  }
+
+  protected onEditValueChange(event: Event): void {
+    this.editingValue = eventValue(event);
+  }
+
+  protected cancelCellEdit(event?: Event): void {
+    event?.stopPropagation();
+    this.editingCell = null;
+    this.cdr.markForCheck();
+  }
+
+  protected commitCellEdit(
+    row: NexGridRowView<TData>,
+    cell: NexGridCellView<TData>,
+    event?: Event,
+  ): void {
+    event?.stopPropagation();
+    const rawVal = this.editingValue;
+    const nextVal = cell.editType === "number" ? Number(rawVal) : rawVal;
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const col = cols.find((c) => getColumnId(c) === cell.columnId);
+    const propKey =
+      col?.accessorKey !== undefined && String(col.accessorKey) !== ""
+        ? String(col.accessorKey)
+        : cell.columnId;
+    const targetRow = row.data;
+    if (
+      targetRow !== null &&
+      typeof targetRow === "object" &&
+      !Object.isFrozen(targetRow) &&
+      !propKey.includes(".") &&
+      propKey !== "__proto__" &&
+      propKey !== "constructor" &&
+      propKey !== "prototype"
+    ) {
+      try {
+        (targetRow as Record<string, unknown>)[propKey] = nextVal;
+      } catch {
+        // Host owns immutable/read-only state via (cellEdit)
+      }
+    }
+    this.editingCell = null;
+    this.recompute();
+    this.cellEdit.emit({
+      row: targetRow,
+      columnId: cell.columnId,
+      oldValue: cell.rawValue,
+      newValue: nextVal,
+    });
+    this.cdr.markForCheck();
   }
 
   // ---------------------------------------------------------------------
@@ -2149,6 +2734,16 @@ export class TableXComponent<TData>
   // Export (spec section 5 — identical flow in every adapter)
   // ---------------------------------------------------------------------
 
+  protected async runBulkExport(format: "excel" | "csv"): Promise<void> {
+    const pool = this.allData ?? (this.isClientMode ? this.data : this.rows.map((r) => r.data));
+    const selectedRows = pool.filter((r) => this.selectedIds.has(this.getRowId(r)));
+    if (selectedRows.length > 0) {
+      await this.exportRowsWithFormat(format, selectedRows);
+      return;
+    }
+    await this.runExport(format);
+  }
+
   protected async runExport(format: "excel" | "csv" | "clipboard"): Promise<void> {
     this.closeMenus();
 
@@ -2163,66 +2758,71 @@ export class TableXComponent<TData>
     try {
       // 2. Collect rows: the whole filtered dataset when we can reach it.
       const rows = await this.collectExportRows();
-
-      // 3. Nothing to write.
-      if (rows.length === 0) {
-        this.notify.emit({ type: "error", message: this.strings.exportNoData });
-        return;
-      }
-
-      // 4. Visible + exportable columns only, rendered as plain text.
-      const exportColumns = toExportColumns(
-        visibleColumns(flattenColumns(this.columns), this.hiddenColumns),
-        {
-          yes: this.strings.booleanYes,
-          no: this.strings.booleanNo,
-        },
-      );
-      const prefix = this.exportFileName ?? filePrefixFromCaption(this.caption);
-
-      // 5. Write the file or copy to clipboard
-      if (format === "clipboard") {
-        const ok = await copyToClipboard(rows, exportColumns);
-        if (ok) {
-          this.notify.emit({
-            type: "success",
-            message: formatMessage(this.strings.exportClipboardSuccess, {
-              count: rows.length.toLocaleString(),
-            }),
-          });
-        } else {
-          this.notify.emit({ type: "error", message: "Failed to copy to clipboard" });
-        }
-        return;
-      }
-
-      if (format === "excel") {
-        const count = downloadExcel<TData>({
-          filename: prefix,
-          caption: this.caption,
-          rows,
-          columns: exportColumns,
-          badgeRules: this.badgeRules,
-          serialHeader: this.strings.serialHeader,
-        });
-        this.notify.emit({
-          type: "success",
-          message: formatMessage(this.strings.exportExcelSuccess, {
-            count: count.toLocaleString(),
-          }),
-        });
-      } else {
-        const count = downloadCsv(timestampedFilename(prefix), rows, exportColumns);
-        this.notify.emit({
-          type: "success",
-          message: formatMessage(this.strings.exportCsvSuccess, {
-            count: count.toLocaleString(),
-          }),
-        });
-      }
+      await this.exportRowsWithFormat(format, rows);
     } finally {
       this.isExporting = false;
       this.cdr.markForCheck();
+    }
+  }
+
+  private async exportRowsWithFormat(
+    format: "excel" | "csv" | "clipboard",
+    rows: readonly TData[],
+  ): Promise<void> {
+    if (rows.length === 0) {
+      this.notify.emit({ type: "error", message: this.strings.exportNoData });
+      return;
+    }
+
+    const rawColumns =
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const exportColumns = toExportColumns(
+      visibleColumns(flattenColumns(rawColumns), this.hiddenColumns),
+      {
+        yes: this.strings.booleanYes,
+        no: this.strings.booleanNo,
+      },
+    );
+    const prefix = this.exportFileName ?? filePrefixFromCaption(this.caption);
+
+    if (format === "clipboard") {
+      const ok = await copyToClipboard(rows, exportColumns);
+      if (ok) {
+        this.notify.emit({
+          type: "success",
+          message: formatMessage(this.strings.exportClipboardSuccess, {
+            count: rows.length.toLocaleString(),
+          }),
+        });
+      } else {
+        this.notify.emit({ type: "error", message: "Failed to copy to clipboard" });
+      }
+      return;
+    }
+
+    if (format === "excel") {
+      const count = downloadExcel<TData>({
+        filename: prefix,
+        caption: this.caption,
+        rows,
+        columns: exportColumns,
+        badgeRules: this.badgeRules,
+        serialHeader: this.strings.serialHeader,
+      });
+      this.notify.emit({
+        type: "success",
+        message: formatMessage(this.strings.exportExcelSuccess, {
+          count: count.toLocaleString(),
+        }),
+      });
+    } else {
+      const count = downloadCsv(timestampedFilename(prefix), rows, exportColumns);
+      this.notify.emit({
+        type: "success",
+        message: formatMessage(this.strings.exportCsvSuccess, {
+          count: count.toLocaleString(),
+        }),
+      });
     }
   }
 
@@ -2233,11 +2833,12 @@ export class TableXComponent<TData>
    * what the user is looking at.
    */
   private async collectExportRows(): Promise<TData[]> {
+    const knownTotal = this.total ?? this.data.length;
     if (this.fetchAllData) {
       this.notify.emit({
         type: "info",
         message: formatMessage(this.strings.exportFetchingAll, {
-          total: this.total.toLocaleString(),
+          total: knownTotal.toLocaleString(),
         }),
       });
       try {
@@ -2249,7 +2850,7 @@ export class TableXComponent<TData>
       }
     }
 
-    const all = this.allData ?? (this.clientSidePagination || this.paginationMode === "client" ? this.data : undefined);
+    const all = this.allData ?? (this.isClientMode ? this.data : undefined);
     if (all && all.length > 0) {
       const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
       const leafCols = flattenColumns(rawColumns);
@@ -2269,7 +2870,7 @@ export class TableXComponent<TData>
       this.notify.emit({
         type: "info",
         message: formatMessage(this.strings.exportFetchingAll, {
-          total: this.total.toLocaleString(),
+          total: knownTotal.toLocaleString(),
         }),
       });
       try {
@@ -2286,12 +2887,12 @@ export class TableXComponent<TData>
     }
 
     const endpoint = this.fetchEndpoint;
-    if (!endpoint || this.data.length >= this.total) return this.data;
+    if (!endpoint || this.data.length >= knownTotal) return this.data;
 
     this.notify.emit({
       type: "info",
       message: formatMessage(this.strings.exportFetchingAll, {
-        total: this.total.toLocaleString(),
+        total: knownTotal.toLocaleString(),
       }),
     });
 
@@ -2319,7 +2920,7 @@ export class TableXComponent<TData>
   // ---------------------------------------------------------------------
 
   private emitQuery(next: QueryState): void {
-    if (this.clientSidePagination || this.paginationMode === "client") {
+    if (this.isClientMode) {
       this.query = next;
       this.recompute();
       this.cdr.markForCheck();
@@ -2358,8 +2959,12 @@ export class TableXComponent<TData>
   private mapColumnToHeaderView(
     column: TableXAngularColumn<TData>,
     key: string,
-    rowSpan = 1,
-    isGroupChild = false,
+    rowSpan: number,
+    isGroupChild: boolean,
+    leftOffsets: ReadonlyMap<string, number>,
+    rightOffsets: ReadonlyMap<string, number>,
+    lastLeftPinnedId: string | null,
+    firstRightPinnedId: string | null,
   ): NexGridHeaderView {
     const id = getColumnId(column);
     const effectiveSortable = isSortable(column) && this.enableSorting !== false;
@@ -2410,6 +3015,11 @@ export class TableXComponent<TData>
       colSpan: 1,
       isGroup: false,
       isGroupChild,
+      pinnedLeft: leftOffsets.get(id) ?? null,
+      pinnedRight: rightOffsets.get(id) ?? null,
+      isLastLeftPinned: lastLeftPinnedId === id,
+      isFirstRightPinned: firstRightPinnedId === id,
+      draggable: this.enableColumnReorder && !isGroupChild,
     };
   }
 
@@ -2422,13 +3032,78 @@ export class TableXComponent<TData>
     const keys = trackKeys(visible.map(getColumnId));
     const headerRows = buildHeaderRows(rawColumns, this.hiddenColumns);
     this.hasHeaderGroups = headerRows.hasGroups;
+    this.hasExpandColumn = Boolean(this.expandedRowSlot || this.renderExpandedRow);
     const labels = { yes: strings.booleanYes, no: strings.booleanNo };
+
+    // Compute sticky left/right offsets matching React & Vanilla
+    const leftOffsets = new Map<string, number>();
+    const rightOffsets = new Map<string, number>();
+    let lastLeftPinnedId: string | null = null;
+    let currentLeft = 0;
+    const hasLeftPinned = visible.some((c) => isPinned(c) === "left");
+
+    if (hasLeftPinned) {
+      if (this.hasExpandColumn) {
+        leftOffsets.set("__expand", currentLeft);
+        currentLeft += 40;
+        lastLeftPinnedId = "__expand";
+      }
+      if (this.enableSelection) {
+        leftOffsets.set("__select", currentLeft);
+        currentLeft += 44;
+        lastLeftPinnedId = "__select";
+      }
+      if (this.showSerialNumber) {
+        leftOffsets.set("__serial", currentLeft);
+        currentLeft += 56;
+        lastLeftPinnedId = "__serial";
+      }
+      for (const col of visible) {
+        const id = getColumnId(col);
+        if (isPinned(col) === "left") {
+          const w = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+          leftOffsets.set(id, currentLeft);
+          currentLeft += w;
+          lastLeftPinnedId = id;
+        }
+      }
+    }
+
+    let currentRight = 0;
+    let firstRightPinnedId: string | null = null;
+    for (let i = visible.length - 1; i >= 0; i--) {
+      const col = visible[i];
+      if (!col) continue;
+      const id = getColumnId(col);
+      if (isPinned(col) === "right") {
+        const w = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+        rightOffsets.set(id, currentRight);
+        currentRight += w;
+        firstRightPinnedId = id;
+      }
+    }
+
+    this.expandPinnedLeft = leftOffsets.get("__expand") ?? null;
+    this.expandIsLastLeftPinned = lastLeftPinnedId === "__expand";
+    this.selectPinnedLeft = leftOffsets.get("__select") ?? null;
+    this.selectIsLastLeftPinned = lastLeftPinnedId === "__select";
+    this.serialPinnedLeft = leftOffsets.get("__serial") ?? null;
+    this.serialIsLastLeftPinned = lastLeftPinnedId === "__serial";
 
     this.searchLabel = `Search ${this.caption}`;
     this.jumpInputId = `tbx-jump-page-${this.caption.toLowerCase().replace(/\s+/g, "-")}`;
 
     this.headers = visible.map((column, index) =>
-      this.mapColumnToHeaderView(column, keys[index] ?? String(index), 1, false),
+      this.mapColumnToHeaderView(
+        column,
+        keys[index] ?? String(index),
+        1,
+        false,
+        leftOffsets,
+        rightOffsets,
+        lastLeftPinnedId,
+        firstRightPinnedId,
+      ),
     );
 
     if (!headerRows.hasGroups) {
@@ -2446,12 +3121,30 @@ export class TableXComponent<TData>
             rowSpan: cell.rowSpan,
           };
         }
-        return this.mapColumnToHeaderView(cell.leafColumn!, cell.id, cell.rowSpan, false);
+        return this.mapColumnToHeaderView(
+          cell.leafColumn!,
+          cell.id,
+          cell.rowSpan,
+          false,
+          leftOffsets,
+          rightOffsets,
+          lastLeftPinnedId,
+          firstRightPinnedId,
+        );
       });
 
-      this.bottomHeaderCells = headerRows.bottomRow.map((cell) => {
-        return this.mapColumnToHeaderView(cell.leafColumn!, cell.id, 1, true);
-      });
+      this.bottomHeaderCells = headerRows.bottomRow.map((cell) =>
+        this.mapColumnToHeaderView(
+          cell.leafColumn!,
+          cell.id,
+          1,
+          true,
+          leftOffsets,
+          rightOffsets,
+          lastLeftPinnedId,
+          firstRightPinnedId,
+        ),
+      );
     }
 
     this.activeFilterHeader = this.openFilterColumn
@@ -2461,11 +3154,11 @@ export class TableXComponent<TData>
       this.syncFilteredPopoverOptions();
     }
 
-    const isClient = this.clientSidePagination || this.paginationMode === "client";
+    const isClient = this.isClientMode;
     const searchFields =
       this.searchableFields && this.searchableFields.length > 0
         ? this.searchableFields
-        : (searchableColumnIds(leafCols) as (keyof TData & string)[]);
+        : (searchableColumnIds(leafCols, this.hiddenColumns as Record<string, boolean>) as (keyof TData & string)[]);
     const clientPaged = isClient
       ? queryClientData(this.data, this.query, {
           columns: rawColumns,
@@ -2473,7 +3166,7 @@ export class TableXComponent<TData>
         })
       : null;
     const displayData = clientPaged ? clientPaged.items : this.data;
-    const effectiveTotal = clientPaged ? clientPaged.total : this.total;
+    const effectiveTotal = clientPaged ? clientPaged.total : (this.total ?? this.data.length);
 
     const page = Math.max(1, Math.trunc(this.query.page));
     const pageSize = this.query.pageSize;
@@ -2482,6 +3175,11 @@ export class TableXComponent<TData>
     this.rows = displayData.map((row, rowIndex) => {
       const id = this.getRowId(row);
       const selected = this.selectedIds.has(id);
+      const expanded = this.hasExpandColumn && this.expandedRowIds.has(id);
+      const expandedText =
+        expanded && !this.expandedRowSlot && this.renderExpandedRow
+          ? this.renderExpandedRow(row)
+          : null;
       const cells: NexGridCellView<TData>[] = visible.map((column, columnIndex) => {
         const header = this.headers[columnIndex];
         const value = getCellValue(column, row);
@@ -2493,23 +3191,61 @@ export class TableXComponent<TData>
           null;
         return {
           key: header?.key ?? String(columnIndex),
+          columnId: colId,
+          rawValue: value,
           header: header?.title ?? "",
           align: header?.align ?? "left",
           template,
           context: template === null ? null : { $implicit: row, value, column, rowIndex },
           text: template === null ? cellText(column, row, value, labels) : "",
+          editable: isEditable(column),
+          editType: column.meta?.editType ?? "text",
+          editOptions: column.meta?.editOptions,
+          pinnedLeft: leftOffsets.get(colId) ?? null,
+          pinnedRight: rightOffsets.get(colId) ?? null,
+          isLastLeftPinned: lastLeftPinnedId === colId,
+          isFirstRightPinned: firstRightPinnedId === colId,
         };
       });
       return {
         key: uniqueKey(id === "" ? String(rowIndex) : id, rowKeys),
         id,
+        rowIndex,
         data: row,
         serial: serialNumber(page, pageSize, rowIndex),
         selected,
+        expanded,
+        expandedText,
+        expandedContext: { $implicit: row, rowIndex },
         selectLabel: formatMessage(strings.selectRowLabel, { id }),
         cells,
       };
     });
+
+    this.hasSummary =
+      this.enableSummaryRow || visible.some((col) => col.meta?.aggregation !== undefined);
+    if (this.hasSummary && displayData.length > 0) {
+      this.summaryCells = visible.map((col, colIndex) => {
+        const colId = getColumnId(col);
+        const aggVal = computeAggregation(col, displayData);
+        const aggLabel =
+          col.meta?.aggregationLabel ||
+          (typeof col.meta?.aggregation === "string" ? `${col.meta.aggregation}:` : "");
+        return {
+          key: `sum-${keys[colIndex] ?? colIndex}`,
+          align: col.meta?.align ?? "left",
+          label: aggLabel,
+          value: aggVal !== null && aggVal !== undefined ? String(aggVal) : null,
+          isTotalLabel: colIndex === 0 && !aggLabel && (aggVal === null || aggVal === undefined),
+          pinnedLeft: leftOffsets.get(colId) ?? null,
+          pinnedRight: rightOffsets.get(colId) ?? null,
+          isLastLeftPinned: lastLeftPinnedId === colId,
+          isFirstRightPinned: firstRightPinnedId === colId,
+        };
+      });
+    } else {
+      this.summaryCells = [];
+    }
 
     const toggleKeys = new Set<string>();
     this.columnToggles = leafCols.filter(isHideable).map((column, index) => {
@@ -2532,7 +3268,10 @@ export class TableXComponent<TData>
     });
 
     this.columnSpan =
-      visible.length + (this.showSerialNumber ? 1 : 0) + (this.enableSelection ? 1 : 0) || 1;
+      visible.length +
+        (this.hasExpandColumn ? 1 : 0) +
+        (this.showSerialNumber ? 1 : 0) +
+        (this.enableSelection ? 1 : 0) || 1;
 
     this.currentPage = page;
     this.totalPages = totalPagesFor(effectiveTotal, pageSize);
@@ -2559,6 +3298,14 @@ export class TableXComponent<TData>
     this.selectedBadge = formatMessage(strings.selectedBadge, { count: this.selectedCount });
     this.allPageSelected =
       this.rows.length > 0 && this.rows.every((row) => this.selectedIds.has(row.id));
+    this.somePageSelected =
+      !this.allPageSelected && this.rows.some((row) => this.selectedIds.has(row.id));
+    const selectedList = Array.from(this.selectedIds);
+    this.bulkActionsContext = {
+      $implicit: selectedList,
+      selectedIds: selectedList,
+      deselectAll: () => this.deselectAll(),
+    };
   }
 
   private densityLabel(density: Density): string {

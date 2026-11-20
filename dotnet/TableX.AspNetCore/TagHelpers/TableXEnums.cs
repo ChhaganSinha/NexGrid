@@ -69,3 +69,71 @@ public enum TableXColumnAlign
     /// <summary>Right aligned — the usual choice for numbers.</summary>
     Right = 2,
 }
+
+/// <summary>Row selection mode when <c>enable-selection</c> is turned on.</summary>
+public enum TableXSelectionMode
+{
+    /// <summary>Multiple rows can be selected via checkboxes (the default).</summary>
+    Multi = 0,
+
+    /// <summary>At most one row can be selected at a time via radio buttons.</summary>
+    Single = 1,
+}
+
+/// <summary>Toolbar export button presentation mode.</summary>
+public enum TableXExportMode
+{
+    /// <summary>Single button opening a dropdown menu with Excel, CSV, and Clipboard options (the default).</summary>
+    Menu = 0,
+
+    /// <summary>1-click Excel export button paired with a chevron dropdown for CSV and Clipboard.</summary>
+    Split = 1,
+
+    /// <summary>Direct 1-click Excel export button.</summary>
+    Excel = 2,
+
+    /// <summary>Direct 1-click CSV export button.</summary>
+    Csv = 3,
+}
+
+/// <summary>Sticky horizontal pin side for a column.</summary>
+public enum TableXColumnPin
+{
+    /// <summary>Freeze column to the left edge during horizontal scrolling.</summary>
+    Left = 0,
+
+    /// <summary>Freeze column to the right edge during horizontal scrolling.</summary>
+    Right = 1,
+}
+
+/// <summary>Built-in summary footer calculation for a column.</summary>
+public enum TableXAggregation
+{
+    /// <summary>Sum of numeric values on the current page.</summary>
+    Sum = 0,
+
+    /// <summary>Arithmetic mean of numeric values on the current page.</summary>
+    Avg = 1,
+
+    /// <summary>Row count on the current page.</summary>
+    Count = 2,
+
+    /// <summary>Minimum numeric value on the current page.</summary>
+    Min = 3,
+
+    /// <summary>Maximum numeric value on the current page.</summary>
+    Max = 4,
+}
+
+/// <summary>Editor control rendered when inline cell editing is triggered.</summary>
+public enum TableXEditType
+{
+    /// <summary>Plain text input (the default).</summary>
+    Text = 0,
+
+    /// <summary>Numeric input.</summary>
+    Number = 1,
+
+    /// <summary>Dropdown select populated from <c>edit-options</c>.</summary>
+    Select = 2,
+}

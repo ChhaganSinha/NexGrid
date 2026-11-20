@@ -12,7 +12,7 @@
 import type { TemplateRef } from "@angular/core";
 import { getCellText, getColumnId, type TableXColumn } from "@nexgrid/core";
 
-import type { TableXCellTemplateContext } from "./types";
+import type { TableXCellTemplateContext, TableXExpandedRowTemplateContext } from "./types";
 
 /** One rendered header cell. */
 export interface TableXHeaderView {
@@ -54,12 +54,26 @@ export interface TableXHeaderView {
   rowSpan?: number;
   /** Whether this cell is a grouped child under a group header. */
   isGroupChild?: boolean;
+  /** Left sticky pixel offset when pinned left, else `null`. */
+  pinnedLeft?: number | null;
+  /** Right sticky pixel offset when pinned right, else `null`. */
+  pinnedRight?: number | null;
+  /** True on the rightmost left-pinned column (renders divider shadow). */
+  isLastLeftPinned?: boolean;
+  /** True on the leftmost right-pinned column (renders divider shadow). */
+  isFirstRightPinned?: boolean;
+  /** Whether this header cell can be dragged to reorder columns. */
+  draggable?: boolean;
 }
 
 /** One rendered data cell, in the table and in the mobile card list. */
 export interface TableXCellView<TData> {
   /** Stable, unique `@for` track key (shared with the header cell). */
   key: string;
+  /** Column id. */
+  columnId: string;
+  /** Raw cell value read from the row. */
+  rawValue: unknown;
   /** Header text, used as the `<dt>` label in the card list. */
   header: string;
   align: "left" | "center" | "right";
@@ -69,6 +83,20 @@ export interface TableXCellView<TData> {
   context: TableXCellTemplateContext<TData> | null;
   /** Plain-text rendering, used when there is no template. */
   text: string;
+  /** Whether double-clicking this cell enters inline edit mode. */
+  editable: boolean;
+  /** Inline editor control type. */
+  editType: "text" | "number" | "select";
+  /** Select options when `editType === 'select'`. */
+  editOptions?: readonly string[];
+  /** Left sticky pixel offset when pinned left, else `null`. */
+  pinnedLeft?: number | null;
+  /** Right sticky pixel offset when pinned right, else `null`. */
+  pinnedRight?: number | null;
+  /** True on the rightmost left-pinned column. */
+  isLastLeftPinned?: boolean;
+  /** True on the leftmost right-pinned column. */
+  isFirstRightPinned?: boolean;
 }
 
 /** One rendered row. */
@@ -77,14 +105,35 @@ export interface TableXRowView<TData> {
   key: string;
   /** The row's identity, from `getRowId`. Drives selection. */
   id: string;
+  /** Zero-based index within the displayed page. */
+  rowIndex: number;
   /** The original row object, handed back to `rowClick` and cell templates. */
   data: TData;
   /** Absolute serial number within the whole result set. */
   serial: number;
   selected: boolean;
+  /** Whether this row's master-detail panel is expanded. */
+  expanded: boolean;
+  /** Plain-text detail fallback from `renderExpandedRow(row)` when no template directive is supplied. */
+  expandedText: string | null;
+  /** Template context for `*tableXExpandedRow` / `*nexGridExpandedRow`. */
+  expandedContext: TableXExpandedRowTemplateContext<TData>;
   /** Accessible name for this row's selection checkbox. */
   selectLabel: string;
   cells: TableXCellView<TData>[];
+}
+
+/** One rendered cell in the `<tfoot>` summary row. */
+export interface TableXSummaryCellView {
+  key: string;
+  align: "left" | "center" | "right";
+  label: string;
+  value: string | null;
+  isTotalLabel: boolean;
+  pinnedLeft?: number | null;
+  pinnedRight?: number | null;
+  isLastLeftPinned?: boolean;
+  isFirstRightPinned?: boolean;
 }
 
 /** One entry in the Columns menu. */
@@ -132,6 +181,7 @@ export interface TableXRangePart {
 export type NexGridHeaderView = TableXHeaderView;
 export type NexGridCellView<TData> = TableXCellView<TData>;
 export type NexGridRowView<TData> = TableXRowView<TData>;
+export type NexGridSummaryCellView = TableXSummaryCellView;
 export type NexGridPagerItem = TableXPagerItem;
 export type NexGridColumnToggle = TableXColumnToggle;
 export type NexGridDensityOption = TableXDensityOption;

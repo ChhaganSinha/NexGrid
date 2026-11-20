@@ -153,10 +153,28 @@
     public bool EnableSelection { get; set; }
 
     /// <summary>
+    /// Row selection mode (<see cref="TableXSelectionMode.Multi"/> or <see cref="TableXSelectionMode.Single"/>).
+    /// </summary>
+    [Parameter]
+    public TableXSelectionMode? SelectionMode { get; set; }
+
+    /// <summary>
     /// Enable column-level filter menus in headers. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
     public bool? EnableColumnFilters { get; set; }
+
+    /// <summary>
+    /// Enable dragging column borders to resize columns. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableColumnResize { get; set; }
+
+    /// <summary>
+    /// Enable drag-and-drop column reordering on header cells. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableColumnReorder { get; set; }
 
     /// <summary>
     /// Enable column sorting globally. Defaults to <see langword="true"/>.
@@ -171,16 +189,118 @@
     public bool EnableExport { get; set; } = true;
 
     /// <summary>
+    /// Export button presentation (<see cref="TableXExportMode.Menu"/>, <see cref="TableXExportMode.Split"/>, <see cref="TableXExportMode.Excel"/>, or <see cref="TableXExportMode.Csv"/>).
+    /// </summary>
+    [Parameter]
+    public TableXExportMode? ExportMode { get; set; }
+
+    /// <summary>
+    /// Shortcut for direct 1-click Excel export.
+    /// </summary>
+    [Parameter]
+    public bool? QuickExport { get; set; }
+
+    /// <summary>
+    /// Maximum rows collected during a full dataset export walk (0 for uncapped).
+    /// </summary>
+    [Parameter]
+    public int? MaxExportRows { get; set; }
+
+    /// <summary>
     /// Export file prefix. Defaults to a slug of <see cref="Caption"/>.
     /// </summary>
     [Parameter]
     public string? ExportFileName { get; set; }
 
     /// <summary>
+    /// Unique <c>localStorage</c> key to persist column widths, column order, hidden columns, and density.
+    /// </summary>
+    [Parameter]
+    public string? StorageKey { get; set; }
+
+    /// <summary>
+    /// Show the summary / aggregation footer row (<c>&lt;tfoot&gt;</c>).
+    /// </summary>
+    [Parameter]
+    public bool? EnableSummaryRow { get; set; }
+
+    /// <summary>
+    /// Show the floating bulk actions bar when rows are selected. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableBulkActions { get; set; }
+
+    /// <summary>
+    /// Show active filter pills beneath the toolbar. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? ShowFilterPills { get; set; }
+
+    /// <summary>
+    /// Show the entire toolbar area. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? ShowToolbar { get; set; }
+
+    /// <summary>
+    /// Show the entire footer area. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? ShowFooter { get; set; }
+
+    /// <summary>
+    /// Show the Columns visibility dropdown button. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableColumns { get; set; }
+
+    /// <summary>
+    /// Show the Density dropdown button. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableDensity { get; set; }
+
+    /// <summary>
+    /// Show the footer pagination controls. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnablePagination { get; set; }
+
+    /// <summary>
+    /// Show the rows-per-page selector in the footer. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableRowsPerPage { get; set; }
+
+    /// <summary>
+    /// Show the jump-to-page input in the footer. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableJumpToPage { get; set; }
+
+    /// <summary>
     /// Show the automatic S.No. column. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
     public bool ShowSerialNumber { get; set; } = true;
+
+    /// <summary>
+    /// Optional in-memory dataset for client-side mode.
+    /// </summary>
+    [Parameter]
+    public IEnumerable<TItem>? Data { get; set; }
+
+    /// <summary>
+    /// Total row count when supplying a single server page via <see cref="Data"/>.
+    /// </summary>
+    [Parameter]
+    public int? Total { get; set; }
+
+    /// <summary>
+    /// Enable client-side pagination, sorting, search, and filtering over <see cref="Data"/>.
+    /// </summary>
+    [Parameter]
+    public bool? ClientSidePagination { get; set; }
 
     /// <summary>Initial 1-based page. Defaults to 1.</summary>
     [Parameter]
@@ -226,6 +346,9 @@
     {
         Caption = Caption,
         Columns = _columns,
+        Data = Data,
+        Total = Total,
+        ClientSidePagination = ClientSidePagination,
         Endpoint = Endpoint,
         FetchEndpoint = FetchEndpoint ?? Endpoint,
         Density = TableXConfigSerializer.ToToken(Density),
@@ -234,10 +357,27 @@
         EnableSearch = EnableSearch,
         SearchPlaceholder = SearchPlaceholder,
         EnableSelection = EnableSelection,
+        SelectionMode = TableXConfigSerializer.ToToken(SelectionMode),
         EnableColumnFilters = EnableColumnFilters,
+        EnableColumnResize = EnableColumnResize,
+        EnableColumnReorder = EnableColumnReorder,
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
+        ExportMode = TableXConfigSerializer.ToToken(ExportMode),
+        QuickExport = QuickExport,
+        MaxExportRows = MaxExportRows,
         ExportFileName = ExportFileName,
+        StorageKey = string.IsNullOrWhiteSpace(StorageKey) ? null : StorageKey,
+        EnableSummaryRow = EnableSummaryRow,
+        EnableBulkActions = EnableBulkActions,
+        ShowFilterPills = ShowFilterPills,
+        ShowToolbar = ShowToolbar,
+        ShowFooter = ShowFooter,
+        EnableColumns = EnableColumns,
+        EnableDensity = EnableDensity,
+        EnablePagination = EnablePagination,
+        EnableRowsPerPage = EnableRowsPerPage,
+        EnableJumpToPage = EnableJumpToPage,
         ShowSerialNumber = ShowSerialNumber,
         Query = BuildQueryConfig(),
     });
