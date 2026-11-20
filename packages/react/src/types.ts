@@ -151,6 +151,12 @@ export interface TableXProps<TData> {
   enableSummaryRow?: boolean;
   /** Enable drag-and-drop column header reordering. Default `false`. */
   enableColumnReorder?: boolean;
+  /** Enable DOM row virtualization for smooth 60fps scrolling over 10,000+ rows. Default `false`. */
+  enableVirtualization?: boolean;
+  /** Scroll viewport max-height in pixels when `enableVirtualization` is `true`. Default `520`. */
+  virtualHeight?: number;
+  /** Extra buffer rows rendered above and below the virtual viewport. Default `6`. */
+  virtualOverscan?: number;
   /** Called when column order changes via drag-and-drop reordering. */
   onColumnOrderChange?: (newOrder: string[]) => void;
   /** Called when a cell's value is committed via inline cell editing. */

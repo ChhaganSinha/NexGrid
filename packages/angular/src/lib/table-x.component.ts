@@ -48,11 +48,13 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged } from "rxjs"
 
 import {
   DEFAULT_PAGE_SIZE,
+  DEFAULT_VIRTUAL_HEIGHT,
   DENSITIES,
   DEFAULT_ROW_CAP,
   PAGE_SIZES,
   buildQueryUrl,
   computeAggregation,
+  computeVirtualWindow,
   defaultQuery,
   downloadCsv,
   downloadExcel,
@@ -745,7 +747,12 @@ const SEARCH_DEBOUNCE_MS = 350;
         </div>
       }
 
-      <div class="tbx-table-wrap">
+      <div
+        class="tbx-table-wrap"
+        [class.tbx-table-wrap--virtual]="enableVirtualization"
+        [style.maxHeight.px]="enableVirtualization ? virtualHeight : null"
+        (scroll)="onTableWrapScroll($event)"
+      >
         <table class="tbx-table" [attr.aria-label]="caption">
           <thead>
             <ng-template #thInner let-header>
@@ -992,6 +999,11 @@ const SEARCH_DEBOUNCE_MS = 350;
                 <td class="tbx-state" [attr.colspan]="columnSpan">{{ strings.emptyText }}</td>
               </tr>
             } @else {
+              @if (virtualTopSpacer > 0) {
+                <tr class="tbx-virtual-spacer" aria-hidden="true">
+                  <td [attr.colspan]="columnSpan" [style.height.px]="virtualTopSpacer"></td>
+                </tr>
+              }
               @for (row of rows; track row.key) {
                 <tr
                   class="tbx-row"
@@ -1169,6 +1181,11 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </td>
                   </tr>
                 }
+              }
+              @if (virtualBottomSpacer > 0) {
+                <tr class="tbx-virtual-spacer" aria-hidden="true">
+                  <td [attr.colspan]="columnSpan" [style.height.px]="virtualBottomSpacer"></td>
+                </tr>
               }
             }
           </tbody>
@@ -1861,6 +1878,15 @@ export class TableXComponent<TData>
   /** Explicit pagination mode: `"server"` (default) or `"client"`. */
   @Input() paginationMode: "client" | "server" = "server";
 
+  /** Enable DOM row virtualization for 10,000+ rows. */
+  @Input({ transform: booleanAttribute }) enableVirtualization = false;
+
+  /** Scroll viewport max-height in pixels when `enableVirtualization` is `true`. */
+  @Input() virtualHeight: number = DEFAULT_VIRTUAL_HEIGHT;
+
+  /** Extra buffer rows rendered above and below the virtual viewport. */
+  @Input() virtualOverscan = 6;
+
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
 
@@ -2020,6 +2046,9 @@ export class TableXComponent<TData>
   protected showSelectAllBanner = false;
   protected selectAllAcrossBannerButton = "";
   protected allAcrossBannerMessage = "";
+  protected virtualTopSpacer = 0;
+  protected virtualBottomSpacer = 0;
+  private virtualScrollTop = 0;
   protected bulkActionsContext: TableXBulkActionsTemplateContext = {
     $implicit: [],
     selectedIds: [],
@@ -3201,6 +3230,11 @@ export class TableXComponent<TData>
   // ---------------------------------------------------------------------
 
   private emitQuery(next: QueryState): void {
+    if (this.enableVirtualization) {
+      this.virtualScrollTop = 0;
+      const wrap = this.hostRef.nativeElement?.querySelector?.(".tbx-table-wrap") as HTMLElement | null;
+      if (wrap) wrap.scrollTop = 0;
+    }
     if (this.isClientMode) {
       this.query = next;
       this.recompute();
@@ -3315,6 +3349,16 @@ export class TableXComponent<TData>
   }
 
   /** Rebuild everything the template reads. Cheap enough to never be partial. */
+  protected onTableWrapScroll(event: Event): void {
+    if (!this.enableVirtualization) return;
+    const target = event.currentTarget as HTMLElement | null;
+    const nextTop = target?.scrollTop ?? 0;
+    if (Math.abs(nextTop - this.virtualScrollTop) >= 1) {
+      this.virtualScrollTop = nextTop;
+      this.recompute();
+    }
+  }
+
   private recompute(): void {
     const strings = this.strings;
     const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
@@ -3449,6 +3493,7 @@ export class TableXComponent<TData>
     }
 
     const isClient = this.isClientMode;
+    const unpaginatedVirtual = this.enableVirtualization && !this.isPaginationVisible;
     const searchFields =
       this.searchableFields && this.searchableFields.length > 0
         ? this.searchableFields
@@ -3457,6 +3502,7 @@ export class TableXComponent<TData>
       ? queryClientData(this.data, this.query, {
           columns: rawColumns,
           ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+          ...(unpaginatedVirtual ? { paginate: false } : {}),
         })
       : null;
     const displayData = clientPaged ? clientPaged.items : this.data;
@@ -3475,7 +3521,24 @@ export class TableXComponent<TData>
     const pageSize = this.query.pageSize;
     const rowKeys = new Set<string>();
 
-    this.rows = displayData.map((row, rowIndex) => {
+    const virtualWin = this.enableVirtualization
+      ? computeVirtualWindow({
+          totalRows: displayData.length,
+          scrollTop: this.virtualScrollTop,
+          viewportHeight: this.virtualHeight,
+          density: this.currentDensity,
+          overscan: this.virtualOverscan,
+        })
+      : null;
+    this.virtualTopSpacer = virtualWin ? virtualWin.topSpacerHeight : 0;
+    this.virtualBottomSpacer = virtualWin ? virtualWin.bottomSpacerHeight : 0;
+    const windowedData = virtualWin
+      ? displayData.slice(virtualWin.startIndex, virtualWin.endIndex)
+      : displayData;
+    const virtualStartOffset = virtualWin ? virtualWin.startIndex : 0;
+
+    this.rows = windowedData.map((row, sliceIndex) => {
+      const rowIndex = virtualStartOffset + sliceIndex;
       const id = this.getRowId(row);
       const selected = this.allAcrossSelected || this.selectedIds.has(id);
       const expanded = this.hasExpandColumn && this.expandedRowIds.has(id);

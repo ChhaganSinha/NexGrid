@@ -81,6 +81,9 @@ export {
   isPageSize,
   PAGE_SIZES,
   DEFAULT_PAGE_SIZE,
+  computeVirtualWindow,
+  DEFAULT_VIRTUAL_HEIGHT,
+  DEFAULT_VIRTUAL_OVERSCAN,
   // Localization
   DEFAULT_LOCALE,
   resolveLocale,
@@ -88,4 +91,9 @@ export {
   toXlsxBytes,
   downloadXlsx,
 } from "@nexgrid/core";
-export type { ClientQueryOptions, FilterMatchOptions } from "@nexgrid/core";
+export type {
+  ClientQueryOptions,
+  FilterMatchOptions,
+  VirtualWindow,
+  VirtualWindowInput,
+} from "@nexgrid/core";

@@ -20,9 +20,11 @@
 import {
   DENSITIES,
   DEFAULT_ROW_CAP,
+  DEFAULT_VIRTUAL_HEIGHT,
   PAGE_SIZES,
   buildQueryUrl,
   computeAggregation,
+  computeVirtualWindow,
   copyToClipboard,
   defaultQuery,
   downloadCsv,
@@ -229,6 +231,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private expandedRows = new Set<string>();
   private editingCell: { rowId: string; columnId: string } | null = null;
   private draggedColumnId: string | null = null;
+  private virtualScrollTop = 0;
 
   constructor(container: HTMLElement, options: TableXOptions<TData>) {
     this.options = options;
@@ -444,7 +447,18 @@ class NexGridController<TData> implements TableXHandle<TData> {
       this.tfoot,
     ]);
     this.bulkBar = el("div", { class: "tbx-bulk-bar" });
-    this.tableWrap = el("div", { class: "tbx-table-wrap" }, [table]);
+    this.tableWrap = el(
+      "div",
+      {
+        class: options.enableVirtualization
+          ? "tbx-table-wrap tbx-table-wrap--virtual"
+          : "tbx-table-wrap",
+        style: options.enableVirtualization
+          ? { maxHeight: `${options.virtualHeight ?? DEFAULT_VIRTUAL_HEIGHT}px` }
+          : undefined,
+      },
+      [table],
+    );
 
     // ---- Cards ------------------------------------------------------------
     this.cards = el("div", { class: "tbx-cards" });
@@ -518,6 +532,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.addGlobalListener(document, "pointerdown", this.handleDocumentPointerDown);
     this.addGlobalListener(document, "keydown", this.handleDocumentKeyDown);
     this.tableWrap.addEventListener("scroll", () => {
+      if (this.options.enableVirtualization) {
+        const nextTop = this.tableWrap.scrollTop ?? 0;
+        if (Math.abs(nextTop - this.virtualScrollTop) >= 1) {
+          this.virtualScrollTop = nextTop;
+          this.renderBody();
+        }
+      }
       if (this.openFilterColumn !== null) {
         this.repositionActiveFilterPopover();
       }
@@ -540,9 +561,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const searchFields =
       this.options.searchableFields ??
       (searchableColumnIds(this.columns, this.hidden) as (keyof TData & string)[]);
+    const unpaginatedVirtual =
+      this.options.enableVirtualization === true &&
+      (this.options.enablePagination === false || this.options.showPagination === false);
     return {
       columns: this.columns,
       ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+      ...(unpaginatedVirtual ? { paginate: false } : {}),
       ...extra,
     };
   }
@@ -777,6 +802,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     const filterChanged = this.filterFingerprint(next) !== this.filterFingerprint(this.query);
     this.query = next;
+    if (this.options.enableVirtualization) {
+      this.virtualScrollTop = 0;
+      if (this.tableWrap) this.tableWrap.scrollTop = 0;
+    }
     if (filterChanged && this.allAcrossSelected) {
       this.allAcrossSelected = false;
       this.emitSelection();
@@ -2255,14 +2284,54 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const rows: HTMLElement[] = [];
-    for (let index = 0; index < this.data.length; index++) {
-      const row = this.data[index];
-      if (row === undefined) continue;
-      const built = this.buildRow(row, index, cols, colSpan);
-      if (Array.isArray(built)) {
-        rows.push(...built);
-      } else {
-        rows.push(built);
+    if (this.options.enableVirtualization) {
+      const win = computeVirtualWindow({
+        totalRows: this.data.length,
+        scrollTop: this.virtualScrollTop,
+        viewportHeight: this.options.virtualHeight,
+        density: this.density,
+        overscan: this.options.virtualOverscan,
+      });
+      if (win.topSpacerHeight > 0) {
+        rows.push(
+          el("tr", { class: "tbx-virtual-spacer", attrs: { "aria-hidden": "true" } }, [
+            el("td", {
+              attrs: { colspan: String(colSpan) },
+              style: { height: `${win.topSpacerHeight}px` },
+            }),
+          ]),
+        );
+      }
+      for (let index = win.startIndex; index < win.endIndex; index++) {
+        const row = this.data[index];
+        if (row === undefined) continue;
+        const built = this.buildRow(row, index, cols, colSpan);
+        if (Array.isArray(built)) {
+          rows.push(...built);
+        } else {
+          rows.push(built);
+        }
+      }
+      if (win.bottomSpacerHeight > 0) {
+        rows.push(
+          el("tr", { class: "tbx-virtual-spacer", attrs: { "aria-hidden": "true" } }, [
+            el("td", {
+              attrs: { colspan: String(colSpan) },
+              style: { height: `${win.bottomSpacerHeight}px` },
+            }),
+          ]),
+        );
+      }
+    } else {
+      for (let index = 0; index < this.data.length; index++) {
+        const row = this.data[index];
+        if (row === undefined) continue;
+        const built = this.buildRow(row, index, cols, colSpan);
+        if (Array.isArray(built)) {
+          rows.push(...built);
+        } else {
+          rows.push(built);
+        }
       }
     }
     replaceChildren(this.tbody, rows);
@@ -3496,6 +3565,22 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const cols = this.visibleCols();
+    if (this.options.enableVirtualization && this.data.length > 50) {
+      const win = computeVirtualWindow({
+        totalRows: this.data.length,
+        scrollTop: this.virtualScrollTop,
+        viewportHeight: this.options.virtualHeight,
+        density: this.density,
+        overscan: this.options.virtualOverscan,
+      });
+      const cardNodes: HTMLElement[] = [];
+      for (let index = win.startIndex; index < win.endIndex; index++) {
+        const row = this.data[index];
+        if (row !== undefined) cardNodes.push(this.buildCard(row, index, cols));
+      }
+      replaceChildren(this.cards, cardNodes);
+      return;
+    }
     replaceChildren(
       this.cards,
       this.data.map((row, index) => this.buildCard(row, index, cols)),

@@ -183,6 +183,18 @@
     public bool? EnableColumnReorder { get; set; }
 
     /// <summary>
+    /// Enable DOM row virtualization for 10,000+ rows. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableVirtualization { get; set; }
+
+    /// <summary>
+    /// Scroll viewport max-height in pixels when <see cref="EnableVirtualization"/> is <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public int? VirtualHeight { get; set; }
+
+    /// <summary>
     /// Enable column sorting globally. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
@@ -368,6 +380,8 @@
         EnableColumnMenu = EnableColumnMenu,
         EnableColumnResize = EnableColumnResize,
         EnableColumnReorder = EnableColumnReorder,
+        EnableVirtualization = EnableVirtualization,
+        VirtualHeight = VirtualHeight,
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportMode = TableXConfigSerializer.ToToken(ExportMode),

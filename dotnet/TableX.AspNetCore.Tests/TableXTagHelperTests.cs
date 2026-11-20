@@ -22,6 +22,8 @@ public class TableXTagHelperTests
             EnableColumnReorder = true,
             EnableColumnResize = true,
             EnableColumnMenu = true,
+            EnableVirtualization = true,
+            VirtualHeight = 600,
             EnableSummaryRow = true,
             EnableBulkActions = true,
             ShowFilterPills = true,
@@ -84,6 +86,8 @@ public class TableXTagHelperTests
         Assert.Equal(5000, root.GetProperty("maxExportRows").GetInt32());
         Assert.True(root.GetProperty("enableColumnReorder").GetBoolean());
         Assert.True(root.GetProperty("enableColumnMenu").GetBoolean());
+        Assert.True(root.GetProperty("enableVirtualization").GetBoolean());
+        Assert.Equal(600, root.GetProperty("virtualHeight").GetInt32());
         Assert.True(root.GetProperty("enableSummaryRow").GetBoolean());
 
         var cols = root.GetProperty("columns");

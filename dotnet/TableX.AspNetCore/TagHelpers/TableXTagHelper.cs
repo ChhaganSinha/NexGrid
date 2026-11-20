@@ -147,6 +147,14 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("enable-column-reorder")]
     public bool? EnableColumnReorder { get; set; }
 
+    /// <summary>Enable DOM row virtualization for 10,000+ rows. Defaults to <see langword="false"/>.</summary>
+    [HtmlAttributeName("enable-virtualization")]
+    public bool? EnableVirtualization { get; set; }
+
+    /// <summary>Scroll viewport max-height in pixels when <see cref="EnableVirtualization"/> is <see langword="true"/>.</summary>
+    [HtmlAttributeName("virtual-height")]
+    public int? VirtualHeight { get; set; }
+
     /// <summary>Enable column sorting globally. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-sorting")]
     public bool? EnableSorting { get; set; }
@@ -359,6 +367,8 @@ public class TableXTagHelper : TagHelper
         EnableColumnMenu = EnableColumnMenu,
         EnableColumnResize = EnableColumnResize,
         EnableColumnReorder = EnableColumnReorder,
+        EnableVirtualization = EnableVirtualization,
+        VirtualHeight = VirtualHeight,
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportMode = TableXConfigSerializer.ToToken(

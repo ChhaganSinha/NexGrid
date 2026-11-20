@@ -19,9 +19,11 @@ import * as React from "react";
 import {
   DENSITIES,
   DEFAULT_ROW_CAP,
+  DEFAULT_VIRTUAL_HEIGHT,
   PAGE_SIZES,
   buildQueryUrl,
   computeAggregation,
+  computeVirtualWindow,
   downloadCsv,
   downloadExcel,
   fetchAllPages,
@@ -850,6 +852,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     bulkActions,
     enableSummaryRow,
     enableColumnReorder = false,
+    enableVirtualization = false,
+    virtualHeight = DEFAULT_VIRTUAL_HEIGHT,
+    virtualOverscan,
     onColumnOrderChange,
     onCellEdit,
     storageKey,
@@ -980,6 +985,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     [searchableFields, colList, hiddenCols],
   );
 
+  const unpaginatedVirtual = enableVirtualization && !isPaginationVisible;
+
   const clientQueryOptions = React.useMemo(
     // An empty list means "search everything" to the engine, so only pass one
     // when it has entries — with no visible column there is nothing to narrow
@@ -987,8 +994,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     () => ({
       columns: colList,
       ...(clientSearchFields.length > 0 ? { searchableFields: clientSearchFields } : {}),
+      ...(unpaginatedVirtual ? { paginate: false } : {}),
     }),
-    [colList, clientSearchFields],
+    [colList, clientSearchFields, unpaginatedVirtual],
   );
 
   const clientPaged = React.useMemo(() => {
@@ -1131,6 +1139,15 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const tableWrapRef = React.useRef<HTMLDivElement>(null);
   const prevHeightRef = React.useRef<number>(0);
+  const [virtualScrollTop, setVirtualScrollTop] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!enableVirtualization) return;
+    setVirtualScrollTop(0);
+    if (tableWrapRef.current) {
+      tableWrapRef.current.scrollTop = 0;
+    }
+  }, [enableVirtualization, query]);
 
   React.useLayoutEffect(() => {
     if (typeof window === "undefined" || !tableWrapRef.current) return;
@@ -1179,6 +1196,25 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     (renderExpandedRow ? 1 : 0) +
     (showSerialNumber ? 1 : 0) +
     (enableSelection ? 1 : 0);
+
+  const virtualWin = React.useMemo(
+    () =>
+      enableVirtualization
+        ? computeVirtualWindow({
+            totalRows: rows.length,
+            scrollTop: virtualScrollTop,
+            viewportHeight: virtualHeight,
+            density,
+            overscan: virtualOverscan,
+          })
+        : null,
+    [enableVirtualization, rows.length, virtualScrollTop, virtualHeight, density, virtualOverscan],
+  );
+  const renderedRows = React.useMemo(
+    () => (virtualWin ? rows.slice(virtualWin.startIndex, virtualWin.endIndex) : rows),
+    [rows, virtualWin],
+  );
+  const virtualStartOffset = virtualWin ? virtualWin.startIndex : 0;
 
   // ---- Pinned offsets helper -----------------------------------------------
 
@@ -2314,7 +2350,18 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       ) : null}
 
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}
-      <div ref={tableWrapRef} className="tbx-table-wrap">
+      <div
+        ref={tableWrapRef}
+        className={
+          enableVirtualization ? "tbx-table-wrap tbx-table-wrap--virtual" : "tbx-table-wrap"
+        }
+        style={enableVirtualization ? { maxHeight: `${virtualHeight}px` } : undefined}
+        onScroll={
+          enableVirtualization
+            ? (e) => setVirtualScrollTop(e.currentTarget.scrollTop)
+            : undefined
+        }
+      >
         <table className="tbx-table" aria-label={caption}>
           <thead>
             <tr>
@@ -2438,10 +2485,20 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 </td>
               </tr>
             ) : (
-              rows.map((row, index) => {
-                const id = pageRowIds[index] ?? String(index);
-                const isSelected = allAcrossSelected || selectedIds.has(id);
-                const isExpanded = expandedRows.has(id);
+              <>
+                {virtualWin && virtualWin.topSpacerHeight > 0 ? (
+                  <tr className="tbx-virtual-spacer" aria-hidden="true">
+                    <td
+                      colSpan={Math.max(1, columnCount)}
+                      style={{ height: `${virtualWin.topSpacerHeight}px` }}
+                    />
+                  </tr>
+                ) : null}
+                {renderedRows.map((row, sliceIdx) => {
+                  const index = virtualStartOffset + sliceIdx;
+                  const id = pageRowIds[index] ?? String(index);
+                  const isSelected = allAcrossSelected || selectedIds.has(id);
+                  const isExpanded = expandedRows.has(id);
 
                 return (
                   <React.Fragment key={id || index}>
@@ -2700,7 +2757,16 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                     ) : null}
                   </React.Fragment>
                 );
-              })
+              })}
+                {virtualWin && virtualWin.bottomSpacerHeight > 0 ? (
+                  <tr className="tbx-virtual-spacer" aria-hidden="true">
+                    <td
+                      colSpan={Math.max(1, columnCount)}
+                      style={{ height: `${virtualWin.bottomSpacerHeight}px` }}
+                    />
+                  </tr>
+                ) : null}
+              </>
             )}
           </tbody>
 
@@ -2818,7 +2884,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             <div className="tbx-state">{locale.emptyText}</div>
           </div>
         ) : (
-          rows.map((row, index) => {
+          renderedRows.map((row, sliceIdx) => {
+            const index = virtualStartOffset + sliceIdx;
             const id = pageRowIds[index] ?? String(index);
             const isSelected = allAcrossSelected || selectedIds.has(id);
 

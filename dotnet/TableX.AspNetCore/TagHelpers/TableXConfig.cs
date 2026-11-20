@@ -156,6 +156,10 @@ internal sealed class TableXConfig
 
     public bool? EnableColumnReorder { get; set; }
 
+    public bool? EnableVirtualization { get; set; }
+
+    public int? VirtualHeight { get; set; }
+
     public bool? EnableSorting { get; set; }
 
     public bool? EnableExport { get; set; }

@@ -1337,6 +1337,51 @@ test("select all across all pages banner sets allAcrossSelected, populates match
   handle.destroy();
 });
 
+test("enableVirtualization windows 10,000 rows with top/bottom spacers and preserves accurate serial numbers on scroll", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const bigData = Array.from({ length: 10_000 }, (_, i) => ({
+    id: String(i + 1),
+    name: `Record ${i + 1}`,
+  }));
+
+  const handle = createTableX(container, {
+    caption: "Virtual 10k Grid",
+    columns: [{ accessorKey: "name", header: "Name" }],
+    data: bigData,
+    clientSidePagination: true,
+    enablePagination: false,
+    enableVirtualization: true,
+    virtualHeight: 440,
+    virtualOverscan: 4,
+  });
+
+  const wrap = container.querySelector(".tbx-table-wrap");
+  assert.ok(wrap.classList.contains("tbx-table-wrap--virtual"));
+  assert.equal(wrap.style.maxHeight, "440px");
+
+  // At scrollTop = 0, only ~15 rows are mounted out of 10,000 (plus 1 bottom spacer)
+  const initialRows = container.querySelectorAll(".tbx-row");
+  assert.ok(initialRows.length > 0 && initialRows.length <= 20, `Expected <=20 DOM rows, got ${initialRows.length}`);
+  assert.equal(container.querySelectorAll(".tbx-virtual-spacer").length, 1, "Only bottom spacer at scrollTop=0");
+  assert.equal(initialRows[0].querySelector(".tbx-td--serial").textContent, "1");
+
+  // Scroll down to row 500 (500 * 44px = 22,000px)
+  wrap.scrollTop = 22_000;
+  wrap.dispatchEvent(new MockEvent("scroll"));
+
+  const scrolledRows = container.querySelectorAll(".tbx-row");
+  assert.ok(scrolledRows.length <= 25, "DOM row count stays bounded mid-scroll");
+  const spacers = container.querySelectorAll(".tbx-virtual-spacer");
+  assert.equal(spacers.length, 2, "Both top and bottom spacers exist mid-scroll");
+
+  // With overscan=4, startIndex = 500 - 4 = 496 -> serial number 497!
+  assert.equal(scrolledRows[0].querySelector(".tbx-td--serial").textContent, "497");
+
+  handle.destroy();
+});
+
 
 
 

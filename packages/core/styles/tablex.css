@@ -710,6 +710,33 @@
   scrollbar-width: thin;
 }
 
+.tbx-table-wrap--virtual {
+  overflow: auto;
+  touch-action: pan-x pan-y;
+}
+
+.tbx-table-wrap--virtual thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.tbx-table-wrap--virtual tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+}
+
+.tbx-virtual-spacer,
+.tbx-virtual-spacer td {
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: 0;
+  font-size: 0;
+  pointer-events: none;
+  background: transparent !important;
+}
+
 .tbx-cards {
   display: flex;
   flex-direction: column;
@@ -2457,6 +2484,7 @@
   .tbx-table-wrap {
     border: none !important;
     overflow: visible !important;
+    max-height: none !important;
   }
 
   .tbx-table {

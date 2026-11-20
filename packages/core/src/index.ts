@@ -83,6 +83,14 @@ export type { ClientQueryOptions, FilterMatchOptions } from "./client-query.js";
 export { getPageNumbers, getRecordRange, serialNumber } from "./pagination.js";
 export type { PageItem, RecordRange } from "./pagination.js";
 
+// Row virtualization
+export {
+  computeVirtualWindow,
+  DEFAULT_VIRTUAL_HEIGHT,
+  DEFAULT_VIRTUAL_OVERSCAN,
+} from "./virtual.js";
+export type { VirtualWindow, VirtualWindowInput } from "./virtual.js";
+
 // Wire format (REST & OData v4)
 export { toSearchParams, serializeQuery, parseQuery, buildQueryUrl } from "./serialize.js";
 export { toODataParams, buildODataUrl, fromODataResponse } from "./odata.js";

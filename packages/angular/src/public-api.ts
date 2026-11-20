@@ -52,9 +52,12 @@ export type {
 // Re-exported from the engine for convenience.
 export {
   PAGE_SIZES,
+  DEFAULT_VIRTUAL_HEIGHT,
+  DEFAULT_VIRTUAL_OVERSCAN,
   buildQueryUrl,
   compareValues,
   computeAggregation,
+  computeVirtualWindow,
   defaultQuery,
   downloadXlsx,
   formatFilterPillValue,
@@ -93,4 +96,6 @@ export type {
   QueryState,
   SortDir,
   SortSpec,
+  VirtualWindow,
+  VirtualWindowInput,
 } from "@nexgrid/core";
