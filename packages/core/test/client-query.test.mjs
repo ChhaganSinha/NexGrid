@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { defaultQuery, queryClientData, searchableColumnIds } from "../dist/index.js";
+import {
+  compareValues,
+  defaultQuery,
+  matchesFilterValue,
+  queryClientData,
+  searchableColumnIds,
+} from "../dist/index.js";
 
 const TEST_DATA = [
   { id: 1, name: "Alice Smith", department: "Engineering", score: 95 },
@@ -257,5 +263,93 @@ test("queryClientData sorts case-insensitively across property names and ignores
   // Sort with prototype keys shouldn't throw or corrupt
   const protoResult = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "__proto__", dir: "asc" }] });
   assert.equal(protoResult.items.length, 3);
+});
+
+test("matchesFilterValue enforces exact matching for select / filterOptions (Active does not match Inactive)", () => {
+  const statusHint = { filterOptions: ["Active", "Inactive", "Pending"] };
+  assert.equal(matchesFilterValue("Active", "Active", statusHint), true);
+  assert.equal(matchesFilterValue("Active", "active", statusHint), true);
+  assert.equal(matchesFilterValue("Inactive", "Active", statusHint), false);
+  assert.equal(matchesFilterValue("Female", "Male", { filterOptions: ["Male", "Female"] }), false);
+});
+
+test("matchesFilterValue rejects wildcard/empty false positives and handles booleans strictly", () => {
+  assert.equal(matchesFilterValue(85, "%"), false);
+  assert.equal(matchesFilterValue("Alice", "%"), false);
+  assert.equal(matchesFilterValue("100%", "%"), true);
+  assert.equal(matchesFilterValue(0, "   "), true); // empty filter means no filter
+  assert.equal(matchesFilterValue(false, "a"), false);
+  assert.equal(matchesFilterValue(true, "yes"), true);
+  assert.equal(matchesFilterValue(false, "no"), true);
+  assert.equal(matchesFilterValue(false, "inactive"), true);
+});
+
+test("matchesFilterValue supports comparison operators and full ISO datetime / Date ranges", () => {
+  assert.equal(matchesFilterValue(92, ">=90"), true);
+  assert.equal(matchesFilterValue(89, ">=90"), false);
+  assert.equal(matchesFilterValue(75, "<80"), true);
+  assert.equal(matchesFilterValue(88, "!=88"), false);
+
+  const isoTimestamp = "2024-02-20T18:45:00Z";
+  assert.equal(matchesFilterValue(isoTimestamp, "2024-01-01..2024-02-20"), true);
+  assert.equal(matchesFilterValue(isoTimestamp, "2024-02-21..2024-03-01"), false);
+  assert.equal(matchesFilterValue(isoTimestamp, "20 Feb 2024"), true);
+  assert.equal(matchesFilterValue(new Date("2023-04-12T09:15:00Z"), "Apr 12, 2023"), true);
+  assert.equal(matchesFilterValue(new Date("2023-04-12T09:15:00Z"), "2023-04-01..2023-04-12"), true);
+});
+
+test("compareValues and queryClientData sort negatives, decimals, currency, dates, and place null/NaN last", () => {
+  const rows = [
+    { id: 1, val: null, price: "$1,200.50", num: -2 },
+    { id: 2, val: 10.5, price: "$200.00", num: -10 },
+    { id: 3, val: Number.NaN, price: "$90.00", num: 0 },
+    { id: 4, val: 10.12, price: undefined, num: 5 },
+  ];
+
+  const ascVal = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "val", dir: "asc" }] });
+  assert.deepEqual(ascVal.items.map((r) => r.id), [4, 2, 1, 3]);
+
+  const descVal = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "val", dir: "desc" }] });
+  assert.deepEqual(descVal.items.map((r) => r.id), [2, 4, 1, 3]);
+
+  const ascPrice = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "price", dir: "asc" }] });
+  assert.deepEqual(ascPrice.items.map((r) => r.id), [3, 2, 1, 4]);
+
+  const ascNum = queryClientData(rows, { ...defaultQuery(), sort: [{ field: "num", dir: "asc" }] });
+  assert.deepEqual(ascNum.items.map((r) => r.num), [-10, -2, 0, 5]);
+  assert.ok(compareValues(-10, -2, "asc") < 0);
+  assert.ok(compareValues(-10, -2, "desc") > 0);
+  assert.ok(compareValues(null, 5, "desc") > 0, "null stays last even in desc");
+});
+
+test("queryClientData resolves columns metadata (slug id + accessorKey, accessorFn, filterOptions, sortable: false)", () => {
+  const rows = [
+    { id: 1, fullName: "Charlie", status: "Inactive", nested: { score: 70 } },
+    { id: 2, fullName: "Alice", status: "Active", nested: { score: 95 } },
+    { id: 3, fullName: "Bob", status: "Active", nested: { score: 85 } },
+  ];
+  const columns = [
+    { id: "student", accessorKey: "fullName" },
+    { id: "state", accessorKey: "status", meta: { filterOptions: ["Active", "Inactive"] } },
+    { id: "points", accessorFn: (r) => r.nested.score },
+    { id: "unsortable", accessorKey: "id", sortable: false },
+  ];
+
+  // Filter by column id ("state") and exact option ("Active") + sort by accessorFn column ("points")
+  const res = queryClientData(
+    rows,
+    {
+      page: 1,
+      pageSize: 10,
+      sort: [
+        { field: "unsortable", dir: "desc" }, // ignored because sortable: false
+        { field: "points", dir: "desc" },
+      ],
+      filter: { state: "Active" },
+    },
+    { columns },
+  );
+
+  assert.deepEqual(res.items.map((r) => r.fullName), ["Alice", "Bob"]);
 });
 

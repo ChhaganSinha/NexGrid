@@ -31,6 +31,12 @@ export interface TableXColumnMeta {
   hideable?: boolean;
   /** Include in CSV/Excel exports. Defaults to true (except structural columns). */
   exportable?: boolean;
+  /** Marks the column as sortable. Defaults to true (except structural/group columns). */
+  sortable?: boolean;
+  /** Explicit toggle for sorting on this column. */
+  enableSorting?: boolean;
+  /** The key sent in `sort=<key>:dir` when it differs from the column id. */
+  sortField?: string;
   /** Marks the column as filterable (`filter[field]=value`). */
   filterable?: boolean;
   /** Explicit toggle for filtering on this column. */
@@ -71,6 +77,8 @@ export interface TableXColumn<TData, TRender = unknown> {
   id?: string;
   /** The row property this column reads (TanStack-compatible alias for `id`). */
   accessorKey?: string;
+  /** Computed value reader (TanStack-compatible). */
+  accessorFn?: (row: TData) => unknown;
   /** Header text, or a render function for custom headers. */
   header?: string | ((ctx: Record<string, never>) => TRender);
   /** Custom cell renderer. When omitted the raw row value is rendered as text. */
@@ -79,10 +87,16 @@ export interface TableXColumn<TData, TRender = unknown> {
   columns?: TableXColumn<TData, TRender>[];
   /** Sorting is ON by default; structural columns opt out with `false`. */
   enableSorting?: boolean;
+  /** Alias for enableSorting. */
+  sortable?: boolean;
+  /** Custom client-side sort comparator for this column. */
+  sortingFn?: (rowA: TData, rowB: TData, columnId: string) => number;
   /** Filtering can be enabled/disabled per column with boolean. */
   enableFiltering?: boolean;
   /** Alias for enableFiltering. */
   filterable?: boolean;
+  /** Custom client-side filter predicate for this column. */
+  filterFn?: (row: TData, columnId: string, filterValue: string) => boolean;
   /** Layout and behavior hints. */
   meta?: TableXColumnMeta;
 }
@@ -112,19 +126,81 @@ export function getColumnTitle<TData, TRender>(col: TableXColumn<TData, TRender>
   return id ? id.charAt(0).toUpperCase() + id.slice(1) : "";
 }
 
-/** Read the raw value a column shows for a row (by id/accessorKey). */
+const UNSAFE_PROPERTY_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Safely read a direct or dot-notated property off an object, falling back to case-insensitive key lookup. */
+export function readPropertyByPath(row: unknown, field: string): unknown {
+  if (!field || row === null || row === undefined || typeof row !== "object") return undefined;
+  if (UNSAFE_PROPERTY_KEYS.has(field)) return undefined;
+
+  const record = row as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(record, field) && record[field] !== undefined) {
+    return record[field];
+  }
+  const direct = record[field];
+  if (direct !== undefined) return direct;
+
+  if (field.includes(".")) {
+    const parts = field.split(".");
+    let curr: unknown = row;
+    for (const part of parts) {
+      if (!part || UNSAFE_PROPERTY_KEYS.has(part) || curr === null || curr === undefined || typeof curr !== "object") {
+        curr = undefined;
+        break;
+      }
+      const obj = curr as Record<string, unknown>;
+      if (obj[part] !== undefined) {
+        curr = obj[part];
+      } else {
+        const lowerPart = part.toLowerCase();
+        const foundKey = Object.keys(obj).find((k) => k.toLowerCase() === lowerPart);
+        curr = foundKey !== undefined ? obj[foundKey] : undefined;
+      }
+    }
+    if (curr !== undefined) return curr;
+  }
+
+  const lower = field.toLowerCase();
+  for (const k of Object.keys(record)) {
+    if (k.toLowerCase() === lower) return record[k];
+  }
+  return undefined;
+}
+
+/** Resolve the field name sent in `sort=<field>:dir` for a column. */
+export function getSortField<TData, TRender>(col: TableXColumn<TData, TRender>): string {
+  if (col.meta?.sortField) return col.meta.sortField;
+  if (col.accessorKey !== undefined && String(col.accessorKey) !== "") {
+    return String(col.accessorKey);
+  }
+  return getColumnId(col);
+}
+
+/** Resolve the field name sent in `filter[<field>]=value` for a column. */
+export function getFilterField<TData, TRender>(col: TableXColumn<TData, TRender>): string {
+  if (col.meta?.serverFilterField) return col.meta.serverFilterField;
+  if (col.accessorKey !== undefined && String(col.accessorKey) !== "") {
+    return String(col.accessorKey);
+  }
+  return getColumnId(col);
+}
+
+/** Read the raw value a column shows for a row (via `accessorFn`, `accessorKey`, or `id`). */
 export function getCellValue<TData, TRender>(
   col: TableXColumn<TData, TRender>,
   row: TData,
 ): unknown {
-  const field = getColumnId(col);
-  if (!field) return undefined;
-  const record = row as Record<string, unknown>;
-  const val = record[field];
-  if (val !== undefined) return val;
-  const lower = field.toLowerCase();
-  for (const k of Object.keys(record)) {
-    if (k.toLowerCase() === lower) return record[k];
+  if (typeof col.accessorFn === "function") {
+    return col.accessorFn(row);
+  }
+  const accessor = col.accessorKey === undefined ? "" : String(col.accessorKey);
+  if (accessor) {
+    const byAccessor = readPropertyByPath(row, accessor);
+    if (byAccessor !== undefined) return byAccessor;
+  }
+  const id = getColumnId(col);
+  if (id && id !== accessor) {
+    return readPropertyByPath(row, id);
   }
   return undefined;
 }
@@ -139,6 +215,7 @@ export function getCellText(
 ): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "boolean") return value ? labels.yes : labels.no;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -151,7 +228,10 @@ export function isGroupColumn<TData, TRender>(col: TableXColumn<TData, TRender>)
 /** Is this column sortable? (TanStack convention: on unless opted out.) */
 export function isSortable<TData, TRender>(col: TableXColumn<TData, TRender>): boolean {
   if (isGroupColumn(col)) return false;
-  return col.enableSorting !== false && getColumnId(col) !== "" && !isStructuralColumn(col);
+  if (isStructuralColumn(col) || getColumnId(col) === "") return false;
+  if (col.enableSorting === false || col.sortable === false) return false;
+  if (col.meta?.enableSorting === false || col.meta?.sortable === false) return false;
+  return true;
 }
 
 /** Can this column be toggled in the Columns menu? */
@@ -240,12 +320,23 @@ export function isFilterable<TData, TRender>(
   if (isGroupColumn(col)) return false;
   if (isStructuralColumn(col) || getColumnId(col) === "") return false;
   if (col.enableFiltering === false || col.filterable === false) return false;
-  if (col.meta?.filterable === false || col.meta?.enableFiltering === false) return false;
+  if (
+    col.meta?.filterable === false ||
+    col.meta?.enableFiltering === false ||
+    col.meta?.serverFilterable === false
+  ) {
+    return false;
+  }
   if (col.enableFiltering === true || col.filterable === true) return true;
-  if (col.meta?.serverFilterable === true || col.meta?.filterable === true || col.meta?.enableFiltering === true) {
+  if (
+    col.meta?.serverFilterable === true ||
+    col.meta?.filterable === true ||
+    col.meta?.enableFiltering === true
+  ) {
     return true;
   }
   if (col.meta?.filterOptions && col.meta.filterOptions.length > 0) return true;
+  if (col.meta?.filterType !== undefined) return true;
   return globalFilterable;
 }
 

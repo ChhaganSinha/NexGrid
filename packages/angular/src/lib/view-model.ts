@@ -20,6 +20,8 @@ export interface TableXHeaderView {
   key: string;
   /** Column id, used for sort intent. */
   id: string;
+  /** Effective sort field sent in `sort=<field>:dir`. */
+  sortField?: string;
   /** Resolved header text. */
   title: string;
   sortable?: boolean;
@@ -36,6 +38,10 @@ export interface TableXHeaderView {
   minWidth?: number | null;
   /** Whether the column has a server-filterable menu. */
   serverFilterable?: boolean;
+  /** Input type for column filter popover. */
+  filterType?: "text" | "select" | "number" | "number-range" | "date" | "date-range";
+  /** Custom placeholder for column filter input. */
+  filterPlaceholder?: string;
   /** Preset options if defined on column metadata. */
   filterOptions?: readonly string[];
   /** The current filter value applied to this column, if any. */

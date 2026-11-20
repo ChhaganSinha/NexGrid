@@ -12,7 +12,13 @@
 // worth copying: search and filter decide WHICH rows match, so they run before
 // the count that draws the pager; sort decides what the page window slices.
 
-import type { PagedResponse, QueryState } from "@nexgrid/core";
+import {
+  compareValues,
+  matchesFilterValue,
+  type FilterMatchOptions,
+  type PagedResponse,
+  type QueryState,
+} from "@nexgrid/core";
 
 import { DEPARTMENTS, STATUSES, type Student } from "./student-types";
 
@@ -31,7 +37,22 @@ const SORTABLE: readonly StudentField[] = [
   "scholarship",
 ];
 const SEARCHABLE: readonly StudentField[] = ["name", "email", "department"];
-const FILTERABLE: readonly StudentField[] = ["status", "department"];
+const FILTERABLE: readonly StudentField[] = [
+  "name",
+  "email",
+  "department",
+  "status",
+  "score",
+  "enrolledAt",
+  "scholarship",
+];
+const FILTER_HINTS: Partial<Record<StudentField, FilterMatchOptions>> = {
+  department: { filterOptions: DEPARTMENTS },
+  status: { filterOptions: STATUSES },
+  score: { filterType: "number-range" },
+  enrolledAt: { filterType: "date-range" },
+  scholarship: { filterOptions: ["true", "false"] },
+};
 
 const FIRST_NAMES = [
   "Aditi", "Rahul", "Meera", "Jonas", "Priya", "Chen", "Sofia", "Omar",
@@ -84,15 +105,6 @@ function buildStudents(count: number): Student[] {
 /** The 200-row dataset, generated once per server process. */
 export const STUDENTS: readonly Student[] = buildStudents(200);
 
-function compare(a: unknown, b: unknown): number {
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
-  return String(a ?? "").localeCompare(String(b ?? ""), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
 function isAllowed(field: string, allowlist: readonly StudentField[]): field is StudentField {
   return (allowlist as readonly string[]).includes(field);
 }
@@ -112,11 +124,11 @@ export function queryStudents(
     );
   }
 
-  // 2. Column filters (`filter[status]=Active`), equality, allowlisted.
+  // 2. Column filters (`filter[status]=Active`), allowlisted.
   for (const [field, value] of Object.entries(query.filter ?? {})) {
     if (!value || !isAllowed(field, FILTERABLE)) continue;
-    const wanted = value.toLowerCase();
-    matching = matching.filter((row) => String(row[field]).toLowerCase() === wanted);
+    const hint = FILTER_HINTS[field];
+    matching = matching.filter((row) => matchesFilterValue(row[field], value, hint));
   }
 
   // 3. Sort. Unknown fields are dropped, exactly as the server allowlist does.
@@ -124,8 +136,8 @@ export function queryStudents(
   matching.sort((left, right) => {
     for (const spec of sorts) {
       const field = spec.field as StudentField;
-      const result = compare(left[field], right[field]);
-      if (result !== 0) return spec.dir === "desc" ? -result : result;
+      const result = compareValues(left[field], right[field], spec.dir);
+      if (result !== 0) return result;
     }
     // A stable tiebreaker, so paging never shows the same row twice.
     return left.id - right.id;

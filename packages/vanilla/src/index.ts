@@ -71,9 +71,13 @@ export {
   getCellValue,
   getColumnId,
   getColumnTitle,
+  getFilterField,
+  getSortField,
   getPageNumbers,
   getRecordRange,
   isPageSize,
+  matchesFilterValue,
+  compareValues,
   parseQuery,
   primarySort,
   queryClientData,
@@ -94,6 +98,7 @@ export {
 
 export type {
   ClientQueryOptions,
+  FilterMatchOptions,
   Density,
   ExcelBadgeRule,
   TableXCellContext,

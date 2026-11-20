@@ -61,6 +61,7 @@
   --nxg-shadow: var(--tbx-shadow);
   --nxg-focus-ring: var(--tbx-focus-ring);
 
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -745,8 +746,7 @@
 
 .tbx-th {
   position: relative;
-  padding: 10px;
-  padding-inline-start: 14px;
+  padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
   color: var(--tbx-fg);
@@ -867,35 +867,43 @@
 /* ---- Column filter popover ---- */
 .tbx-col-filter-wrap {
   position: relative;
+  z-index: 12;
   display: inline-flex;
   margin-inline-start: auto;
   flex-shrink: 0;
+}
+
+.tbx-th-inner--center .tbx-col-filter-wrap,
+.tbx-th-inner--right .tbx-col-filter-wrap {
+  margin-inline-start: 2px;
 }
 
 .tbx-col-filter-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  margin-inline-end: -4px;
+  margin-inline-end: 0;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: var(--tbx-muted-fg);
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.65;
   transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .tbx-th:hover .tbx-col-filter-btn,
 .tbx-col-filter-btn:focus-visible,
+.tbx-col-filter-btn--open,
 .tbx-col-filter-btn--active {
   opacity: 1;
 }
 
-.tbx-col-filter-btn:hover {
+.tbx-col-filter-btn:hover,
+.tbx-col-filter-btn--open {
   opacity: 1;
   background: var(--tbx-muted);
   color: var(--tbx-fg);
@@ -909,22 +917,25 @@
 
 .tbx-filter-popover {
   position: absolute;
-  top: calc(100% + 6px);
-  inset-inline-end: 0;
+  top: 0;
+  left: 0;
   z-index: 1000;
-  min-width: 200px;
-  max-width: min(280px, calc(100vw - 24px));
+  min-width: 220px;
+  max-width: min(300px, calc(100vw - 24px));
   background: var(--tbx-card);
   border: 1px solid var(--tbx-border);
   border-radius: var(--tbx-radius-sm);
   box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  padding: 8px;
+  padding: 10px;
   text-align: start;
+  box-sizing: border-box;
 }
 
-/* Fallback: Ensure table container expands if filter popover is rendered in normal table flow */
-.tbx-table-wrap:has(.tbx-filter-popover) {
-  min-height: 260px;
+.tbx-filter-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--tbx-muted-fg);
+  text-align: center;
 }
 
 .tbx-filter-popover-input {
@@ -1139,7 +1150,7 @@
   top: 0;
   inset-inline-end: 0;
   bottom: 0;
-  width: 8px;
+  width: 6px;
   cursor: col-resize;
   user-select: none;
   touch-action: none;
@@ -1151,7 +1162,7 @@
   position: absolute;
   top: 20%;
   bottom: 20%;
-  inset-inline-end: 3px;
+  inset-inline-end: 2px;
   width: 2px;
   background: var(--tbx-border);
   opacity: 0;

@@ -6,20 +6,22 @@ public class TestStudent
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string Department { get; set; } = "Engineering";
     public StudentStatus Status { get; set; }
     public double Score { get; set; }
+    public DateTime EnrolledAt { get; set; }
 }
 
 public class TableXQueryableExtensionsTests
 {
     private readonly List<TestStudent> _students =
     [
-        new() { Id = 1, Name = "Alice Johnson", Email = "alice@example.com", Status = StudentStatus.Active, Score = 95.5 },
-        new() { Id = 2, Name = "Bob Smith", Email = "bob@example.com", Status = StudentStatus.Pending, Score = 82.0 },
-        new() { Id = 3, Name = "Charlie Brown", Email = "charlie@example.com", Status = StudentStatus.Active, Score = 88.0 },
-        new() { Id = 4, Name = "Diana Prince", Email = "diana@example.com", Status = StudentStatus.Suspended, Score = 74.0 },
-        new() { Id = 5, Name = "Evan Wright", Email = "evan@example.com", Status = StudentStatus.Alumni, Score = 91.0 },
+        new() { Id = 1, Name = "Alice Johnson", Email = "alice@example.com", Department = "Engineering", Status = StudentStatus.Active, Score = 95.5, EnrolledAt = new DateTime(2024, 1, 10, 9, 0, 0, DateTimeKind.Utc) },
+        new() { Id = 2, Name = "Bob Smith", Email = "bob@example.com", Department = "Marketing", Status = StudentStatus.Pending, Score = 82.0, EnrolledAt = new DateTime(2024, 1, 15, 16, 45, 0, DateTimeKind.Utc) },
+        new() { Id = 3, Name = "Charlie Brown", Email = "charlie@example.com", Department = "Engineering", Status = StudentStatus.Active, Score = 88.0, EnrolledAt = new DateTime(2024, 2, 5, 12, 0, 0, DateTimeKind.Utc) },
+        new() { Id = 4, Name = "Diana Prince", Email = null, Department = "Sales", Status = StudentStatus.Suspended, Score = 74.0, EnrolledAt = new DateTime(2024, 3, 20, 8, 30, 0, DateTimeKind.Utc) },
+        new() { Id = 5, Name = "Evan Wright", Email = "evan@example.com", Department = "Engineering", Status = StudentStatus.Alumni, Score = 91.0, EnrolledAt = new DateTime(2024, 4, 1, 0, 0, 0, DateTimeKind.Utc) },
     ];
 
     [Fact]
@@ -104,5 +106,85 @@ public class TableXQueryableExtensionsTests
 
         Assert.Equal(5, response.Total);
         Assert.Equal(5, response.Items.Count);
+    }
+
+    [Fact]
+    public void ToPagedResponse_Search_IsCaseInsensitiveAndNullSafe()
+    {
+        var query = new TableXQuery { Q = "  smith  " };
+
+        var response = _students.AsQueryable().ToPagedResponse(query, options => options
+            .Searchable(s => s.Name, s => s.Email));
+
+        Assert.Equal(1, response.Total);
+        Assert.Equal("Bob Smith", response.Items[0].Name);
+    }
+
+    [Fact]
+    public void ToPagedResponse_StringFilters_SupportCaseInsensitiveEqualsAndContains()
+    {
+        // Exact (case-insensitive) match via Filterable
+        var deptQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["department"] = "engineering" }
+        };
+        var deptRes = _students.AsQueryable().ToPagedResponse(deptQuery, options => options
+            .Filterable(s => s.Department));
+        Assert.Equal(3, deptRes.Total);
+
+        // Substring (case-insensitive) match via FilterableContains
+        var nameQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["name"] = "john", ["email"] = "EXAMPLE.COM" }
+        };
+        var nameRes = _students.AsQueryable().ToPagedResponse(nameQuery, options => options
+            .FilterableContains(s => s.Name, s => s.Email));
+        Assert.Equal(1, nameRes.Total);
+        Assert.Equal("Alice Johnson", nameRes.Items[0].Name);
+    }
+
+    [Fact]
+    public void ToPagedResponse_DateTimeFilters_IncludeEndOfDayInRangesAndSingleDates()
+    {
+        // Bob enrolled at 2024-01-15 16:45:00 UTC -> must be included when upper bound is "2024-01-15"
+        var rangeQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["enrolledAt"] = "2024-01-01..2024-01-15" }
+        };
+        var rangeRes = _students.AsQueryable().ToPagedResponse(rangeQuery, options => options
+            .Filterable(s => s.EnrolledAt));
+        Assert.Equal(2, rangeRes.Total); // Alice (Jan 10) and Bob (Jan 15 16:45)
+
+        // Single calendar date matches timestamp on that date
+        var dayQuery = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["enrolledAt"] = "2024-01-15" }
+        };
+        var dayRes = _students.AsQueryable().ToPagedResponse(dayQuery, options => options
+            .Filterable(s => s.EnrolledAt));
+        Assert.Equal(1, dayRes.Total);
+        Assert.Equal("Bob Smith", dayRes.Items[0].Name);
+    }
+
+    [Fact]
+    public void ToPagedResponse_OperatorAndMultiSort_WorkTogether()
+    {
+        var query = new TableXQuery
+        {
+            Filter = new Dictionary<string, string> { ["score"] = ">=80" },
+            Sort =
+            [
+                new SortSpec("department", SortDirection.Ascending),
+                new SortSpec("score", SortDirection.Descending),
+            ],
+        };
+
+        var res = _students.AsQueryable().ToPagedResponse(query, options => options
+            .Filterable(s => s.Score)
+            .Sortable(s => s.Department, s => s.Score));
+
+        // >= 80: Alice (Eng, 95.5), Evan (Eng, 91.0), Charlie (Eng, 88.0), Bob (Mkt, 82.0)
+        Assert.Equal(4, res.Total);
+        Assert.Equal(["Alice Johnson", "Evan Wright", "Charlie Brown", "Bob Smith"], res.Items.Select(s => s.Name).ToArray());
     }
 }

@@ -29,6 +29,10 @@ internal static class TableXExpressions
         typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])
         ?? throw new InvalidOperationException("string.Contains(string) is missing from the runtime.");
 
+    internal static readonly MethodInfo StringToLower =
+        typeof(string).GetMethod(nameof(string.ToLower), Type.EmptyTypes)
+        ?? throw new InvalidOperationException("string.ToLower() is missing from the runtime.");
+
     /// <summary>Strip the boxing Convert the compiler adds for <c>Func&lt;T, object&gt;</c>.</summary>
     internal static Expression Unwrap(Expression body)
     {
@@ -97,8 +101,13 @@ internal static class TableXExpressions
 
         if (type == typeof(string))
         {
-            value = raw;
+            value = trimmed;
             return true;
+        }
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return false;
         }
 
         if (type.IsEnum)
@@ -121,13 +130,16 @@ internal static class TableXExpressions
             }
 
             if (string.Equals(trimmed, "yes", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(trimmed, "active", StringComparison.OrdinalIgnoreCase))
+                string.Equals(trimmed, "active", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "1", StringComparison.Ordinal))
             {
                 value = true;
                 return true;
             }
 
-            if (string.Equals(trimmed, "no", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(trimmed, "no", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "inactive", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "0", StringComparison.Ordinal))
             {
                 value = false;
                 return true;
@@ -199,7 +211,17 @@ internal static class TableXExpressions
         {
             try
             {
-                var cleanNumber = trimmed.TrimEnd('%').Trim();
+                var cleanNumber = trimmed
+                    .TrimStart('$', '€', '£', '₹')
+                    .TrimEnd('%')
+                    .Replace(",", string.Empty, StringComparison.Ordinal)
+                    .Trim();
+
+                if (string.IsNullOrEmpty(cleanNumber))
+                {
+                    return false;
+                }
+
                 value = Convert.ChangeType(cleanNumber, type, CultureInfo.InvariantCulture);
                 return true;
             }
@@ -210,6 +232,16 @@ internal static class TableXExpressions
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when <paramref name="raw"/> represents a calendar date with no time-of-day
+    /// component (such as <c>2026-08-24</c> from an HTML <c>&lt;input type="date"&gt;</c>).
+    /// </summary>
+    internal static bool IsDateOnlyFilterToken(string raw)
+    {
+        var trimmed = raw.Trim();
+        return trimmed.Length > 0 && !trimmed.Contains(':', StringComparison.Ordinal);
     }
 
     /// <summary>Holds a value so the tree can read it as a field access, the way a closure does.</summary>

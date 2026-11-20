@@ -33,7 +33,7 @@ import {
 import { withFilter } from "@nexgrid/core";
 import { EMPTY, Subject, catchError, switchMap, tap } from "rxjs";
 
-import { STATUSES, STUDENTS, StudentsService, type Student } from "./students.service";
+import { DEPARTMENTS, STATUSES, STUDENTS, StudentsService, type Student } from "./students.service";
 
 @Component({
   selector: "app-root",
@@ -145,7 +145,11 @@ export class AppComponent {
   readonly columns: TableXAngularColumn<Student>[] = [
     { accessorKey: "name", header: "Student", meta: { minWidth: 200 } },
     { accessorKey: "email", header: "Email", meta: { hidden: true, minWidth: 220 } },
-    { accessorKey: "department", header: "Department", meta: { minWidth: 160 } },
+    {
+      accessorKey: "department",
+      header: "Department",
+      meta: { minWidth: 160, filterOptions: DEPARTMENTS },
+    },
     {
       accessorKey: "status",
       header: "Status",
@@ -153,13 +157,25 @@ export class AppComponent {
         align: "center",
         width: 130,
         serverFilterable: true,
-        filterOptions: ["Active", "Pending", "Suspended", "Alumni"],
+        filterOptions: STATUSES,
       },
     },
-    { accessorKey: "score", header: "Score", meta: { align: "right", width: 90 } },
-    { accessorKey: "enrolledAt", header: "Enrolled", meta: { width: 140 } },
+    {
+      accessorKey: "score",
+      header: "Score",
+      meta: { align: "right", width: 110, filterType: "number-range" },
+    },
+    {
+      accessorKey: "enrolledAt",
+      header: "Enrolled",
+      meta: { width: 150, filterType: "date-range" },
+    },
     // No cell template: booleans fall back to the locale's yes/no labels.
-    { accessorKey: "scholarship", header: "Scholarship", meta: { align: "center", width: 120 } },
+    {
+      accessorKey: "scholarship",
+      header: "Scholarship",
+      meta: { align: "center", width: 120, filterOptions: ["true", "false"] },
+    },
     { id: "actions", header: "", meta: { align: "right", width: 90 } },
   ];
 

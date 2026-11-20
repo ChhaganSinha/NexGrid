@@ -973,5 +973,103 @@ test("createTableX supports split export mode", () => {
   handle.destroy();
 });
 
+test("free-text column filter edits and clears cleanly, range filters work, and filterOptions show all options on re-open", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "name", header: "Name" },
+    {
+      accessorKey: "status",
+      header: "Status",
+      meta: { filterOptions: ["Active", "Inactive", "Pending"] },
+    },
+    {
+      accessorKey: "score",
+      header: "Score",
+      meta: { filterType: "number-range" },
+    },
+  ];
+
+  const rows = [
+    { id: "1", name: "Alice Smith", status: "Active", score: 92 },
+    { id: "2", name: "Bob Jones", status: "Inactive", score: 75 },
+    { id: "3", name: "Alice Brown", status: "Pending", score: 84 },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Filter Edge Cases",
+    columns,
+    data: rows,
+    clientSidePagination: true,
+  });
+
+  // Verify column reorder is opt-in (disabled by default so text selection in headers/inputs isn't hijacked)
+  const ths = container.querySelectorAll(".tbx-th--sortable");
+  assert.equal(ths[0].getAttribute("draggable"), null);
+
+  // 1. Free-text filter: apply "Alice", then edit to "Bob", then clear to ""
+  const openColFilter = (colId) => {
+    const btn = container
+      .querySelectorAll(".tbx-col-filter-btn")
+      .find((b) => b.getAttribute("data-filter-col") === colId);
+    assert.ok(btn, `Filter button for ${colId} should exist`);
+    btn.dispatchEvent(new MockMouseEvent("click"));
+    const pop = container.querySelector(".tbx-filter-popover");
+    assert.ok(pop, `Filter popover for ${colId} should open`);
+    assert.equal(pop.parentNode, container.querySelector(".tbx-root"), "Popover mounts on .tbx-root");
+    return pop;
+  };
+
+  let pop = openColFilter("name");
+  let input = pop.querySelector(".tbx-filter-popover-input");
+  input.value = "Alice";
+  pop.querySelector(".tbx-filter-popover-btn--primary").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.getQuery().filter?.name, "Alice");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 2);
+
+  // Re-open and change text to "Bob" (verifies stale selectedVal bug is fixed)
+  pop = openColFilter("name");
+  input = pop.querySelector(".tbx-filter-popover-input");
+  assert.equal(input.value, "Alice");
+  input.value = "Bob";
+  pop.querySelector(".tbx-filter-popover-btn--primary").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.getQuery().filter?.name, "Bob");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 1);
+
+  // Re-open, clear input manually, press Enter -> clears filter
+  pop = openColFilter("name");
+  input = pop.querySelector(".tbx-filter-popover-input");
+  input.value = "   ";
+  input.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+  assert.equal(handle.getQuery().filter?.name, undefined);
+  assert.equal(container.querySelectorAll(".tbx-row").length, 3);
+
+  // 2. Select filterOptions: pick "Active" (must NOT match "Inactive"), then re-open and verify ALL options still show
+  pop = openColFilter("status");
+  let opts = pop.querySelectorAll(".tbx-filter-option");
+  assert.equal(opts.length, 4); // All + 3 statuses
+  opts[1].dispatchEvent(new MockMouseEvent("click")); // "Active"
+  assert.equal(handle.getQuery().filter?.status, "Active");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 1, "Active must not match Inactive");
+
+  pop = openColFilter("status");
+  opts = pop.querySelectorAll(".tbx-filter-option");
+  assert.equal(opts.length, 4, "Re-opening active select filter shows all options until user types");
+  pop.querySelector(".tbx-filter-popover-btn").dispatchEvent(new MockMouseEvent("click")); // Clear
+
+  // 3. Number-range filter: set From=80, To=95
+  pop = openColFilter("score");
+  const rangeInputs = pop.querySelectorAll(".tbx-range-input");
+  assert.equal(rangeInputs.length, 2, "Range filter renders From and To inputs");
+  rangeInputs[0].value = "80";
+  rangeInputs[1].value = "95";
+  rangeInputs[1].dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+  assert.equal(handle.getQuery().filter?.score, "80..95");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 2); // 92 and 84
+
+  handle.destroy();
+});
+
 
 

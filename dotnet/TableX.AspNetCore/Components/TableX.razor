@@ -97,6 +97,18 @@
     public bool EnableSelection { get; set; }
 
     /// <summary>
+    /// Enable column-level filter menus in headers. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableColumnFilters { get; set; }
+
+    /// <summary>
+    /// Enable column sorting globally. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool? EnableSorting { get; set; }
+
+    /// <summary>
     /// Show the Excel/CSV export menu. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
@@ -113,6 +125,22 @@
     /// </summary>
     [Parameter]
     public bool ShowSerialNumber { get; set; } = true;
+
+    /// <summary>Initial 1-based page. Defaults to 1.</summary>
+    [Parameter]
+    public int? Page { get; set; }
+
+    /// <summary>Initial rows per page (coerced to valid <see cref="PageSizes"/>).</summary>
+    [Parameter]
+    public int? PageSize { get; set; }
+
+    /// <summary>Initial sort token, e.g. <c>enrolledAt:desc</c>.</summary>
+    [Parameter]
+    public string? Sort { get; set; }
+
+    /// <summary>Initial global search query.</summary>
+    [Parameter]
+    public string? Search { get; set; }
 
     /// <summary>
     /// Initial row density. Defaults to <see cref="TableXDensity.Default"/>.
@@ -150,8 +178,33 @@
         EnableSearch = EnableSearch,
         SearchPlaceholder = SearchPlaceholder,
         EnableSelection = EnableSelection,
+        EnableColumnFilters = EnableColumnFilters,
+        EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportFileName = ExportFileName,
         ShowSerialNumber = ShowSerialNumber,
+        Query = BuildQueryConfig(),
     });
+
+    private TableXQueryConfig? BuildQueryConfig()
+    {
+        var sort = SortSpec.TryParse(Sort, out var spec)
+            ? new[] { new TableXSortConfig { Field = spec.Field, Dir = spec.Direction == SortDirection.Descending ? SortSpec.DescendingToken : SortSpec.AscendingToken } }
+            : Array.Empty<TableXSortConfig>();
+
+        var search = string.IsNullOrWhiteSpace(Search) ? null : Search;
+
+        if (Page is null && PageSize is null && sort.Length == 0 && search is null)
+        {
+            return null;
+        }
+
+        return new TableXQueryConfig
+        {
+            Page = Page is > 0 ? Page.Value : 1,
+            PageSize = PageSize is null ? PageSizes.Default : PageSizes.Coerce(PageSize.Value),
+            Sort = sort,
+            Q = search,
+        };
+    }
 }

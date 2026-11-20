@@ -83,11 +83,12 @@ export function toODataParams(
   // Range filters: filter[age]=18..65 -> Age ge 18 and Age le 65
   if (query.filter) {
     for (const [key, value] of Object.entries(query.filter)) {
-      if (!value) continue;
+      if (!value || !value.trim()) continue;
+      const trimmedVal = value.trim();
       const field = options?.fieldMap?.[key] ?? key;
       if (!SAFE_ODATA_IDENTIFIER.test(field)) continue;
-      if (value.includes("..")) {
-        const [minStr, maxStr] = value.split("..");
+      if (trimmedVal.includes("..")) {
+        const [minStr, maxStr] = trimmedVal.split("..");
         const parts: string[] = [];
         if (minStr !== undefined && minStr.trim() !== "") {
           const trimmedMin = minStr.trim();
@@ -105,7 +106,7 @@ export function toODataParams(
           filterClauses.push(parts.join(" and "));
         }
       } else {
-        const escapedVal = value.replace(/'/g, "''");
+        const escapedVal = trimmedVal.replace(/'/g, "''");
         filterClauses.push(`${field} eq '${escapedVal}'`);
       }
     }

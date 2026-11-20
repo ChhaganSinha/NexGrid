@@ -50,6 +50,10 @@ export type { UseClientTableXOptions, UseClientNexGridOptions } from "./use-clie
 export {
   // In-memory client-side data querying
   queryClientData,
+  matchesFilterValue,
+  compareValues,
+  getSortField,
+  getFilterField,
   // Building and reading a query (REST & OData v4)
   defaultQuery,
   parseQuery,
@@ -77,4 +81,4 @@ export {
   DEFAULT_LOCALE,
   resolveLocale,
 } from "@nexgrid/core";
-export type { ClientQueryOptions } from "@nexgrid/core";
+export type { ClientQueryOptions, FilterMatchOptions } from "@nexgrid/core";

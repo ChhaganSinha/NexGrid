@@ -34,6 +34,8 @@ import {
   getCellValue,
   getColumnId,
   getColumnTitle,
+  getFilterField,
+  getSortField,
   getPageNumbers,
   getRecordRange,
   initialHiddenColumns,
@@ -46,6 +48,7 @@ import {
   isSortable,
   primarySort,
   resolveLocale,
+  searchableColumnIds,
   serialNumber,
   timestampedFilename,
   toExportColumns,
@@ -64,6 +67,7 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  type ClientQueryOptions,
   type Density,
   type PagedResponse,
   type QueryState,
@@ -170,6 +174,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private isExporting = false;
   private openMenu: MenuName | null = null;
   private openFilterColumn: string | null = null;
+  private mountedFilterPopoverKey: string | null = null;
+  private activeFilterPopoverEl: HTMLElement | null = null;
+  private headerPointerDown: {
+    colId: string;
+    sortField: string;
+    x: number;
+    y: number;
+    shiftKey: boolean;
+    dropped: boolean;
+  } | null = null;
   private readonly columnWidths: Record<string, number> = {};
   private focusMenuOnRender = false;
   private mounted: "grid" | "error" | null = null;
@@ -226,15 +240,6 @@ class NexGridController<TData> implements TableXHandle<TData> {
       (options.endpoint === undefined && options.onQueryChange === undefined);
     this.rawClientData = options.data ? [...options.data] : [];
 
-    if (this.isClientSide && this.rawClientData.length > 0) {
-      const paged = queryClientData(this.rawClientData, this.query);
-      this.data = paged.items;
-      this.total = paged.total;
-    } else {
-      this.data = options.data ?? [];
-      this.total = options.total ?? 0;
-    }
-
     if (options.storageKey) {
       const persisted = loadGridState(options.storageKey);
       if (persisted) {
@@ -242,7 +247,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
         if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
           const hiddenMap: Record<string, boolean> = {};
-          for (const col of this.columns) {
+          for (const col of flattenColumns(this.columns)) {
             const id = getColumnId(col);
             if (id) hiddenMap[id] = persisted.hiddenColumns.includes(id);
           }
@@ -266,6 +271,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
           }
         }
       }
+    }
+
+    if (this.isClientSide && this.rawClientData.length > 0) {
+      const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
+      this.data = paged.items;
+      this.total = paged.total;
+    } else {
+      this.data = options.data ?? [];
+      this.total = options.total ?? 0;
     }
 
     this.filterPillsBar = el("div", { class: "tbx-filter-pills-bar", style: { display: "none" } });
@@ -485,19 +499,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
     // ---- Global listeners --------------------------------------------------
     this.addGlobalListener(document, "pointerdown", this.handleDocumentPointerDown);
     this.addGlobalListener(document, "keydown", this.handleDocumentKeyDown);
+    this.tableWrap.addEventListener("scroll", () => {
+      if (this.openFilterColumn !== null) {
+        this.repositionActiveFilterPopover();
+      }
+    });
     if (typeof window !== "undefined") {
-      this.addGlobalListener(window, "scroll", (e: Event) => {
-        if (this.openFilterColumn !== null) {
-          const target = e.target as HTMLElement | null;
-          if (target?.closest?.(".tbx-filter-popover-options")) return;
-          this.openFilterColumn = null;
-          this.render();
-        }
-      });
       this.addGlobalListener(window, "resize", () => {
         if (this.openFilterColumn !== null) {
-          this.openFilterColumn = null;
-          this.render();
+          this.repositionActiveFilterPopover();
         }
       });
     }
@@ -506,6 +516,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.render();
 
     if (options.endpoint !== undefined) void this.fetchFromEndpoint();
+  }
+
+  private clientQueryOptions(extra?: Partial<ClientQueryOptions<TData>>): ClientQueryOptions<TData> {
+    const searchFields =
+      this.options.searchableFields ??
+      (searchableColumnIds(this.columns, this.hidden) as (keyof TData & string)[]);
+    return {
+      columns: this.columns,
+      ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+      ...extra,
+    };
   }
 
   // =========================================================================
@@ -519,7 +540,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (patch.data !== undefined) {
       this.rawClientData = [...patch.data];
       if (this.isClientSide) {
-        const paged = queryClientData(this.rawClientData, patch.query ?? this.query);
+        const paged = queryClientData(
+          this.rawClientData,
+          patch.query ?? this.query,
+          this.clientQueryOptions(),
+        );
         this.data = paged.items;
         this.total = paged.total;
       } else {
@@ -531,7 +556,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       queryChanged = !queryEquals(patch.query, this.query);
       this.query = patch.query;
       if (this.isClientSide && patch.data === undefined) {
-        const paged = queryClientData(this.rawClientData, this.query);
+        const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
         this.data = paged.items;
         this.total = paged.total;
       }
@@ -548,15 +573,21 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   setData(data: TData[]): void {
     if (this.destroyed) return;
-    this.rawClientData = [...data];
+    this.rawClientSideSync(data);
+    this.render();
+  }
+
+  private rawClientSideSync(data?: TData[]): void {
+    if (data !== undefined) {
+      this.rawClientData = [...data];
+    }
     if (this.isClientSide) {
-      const paged = queryClientData(this.rawClientData, this.query);
+      const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
       this.data = paged.items;
       this.total = paged.total;
-    } else {
+    } else if (data !== undefined) {
       this.data = data;
     }
-    this.render();
   }
 
   refresh(): void {
@@ -718,7 +749,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return;
     }
     if (this.isClientSide) {
-      const paged = queryClientData(this.rawClientData, this.query);
+      const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
       this.data = paged.items;
       this.total = paged.total;
       this.options.onQueryChange?.(next);
@@ -824,9 +855,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
     }
 
-    const allData = this.rawClientData ?? this.options.allData;
+    const allData =
+      this.options.allData ?? (this.isClientSide ? this.rawClientData : undefined);
     if (allData && allData.length > 0) {
-      const full = queryClientData(allData, this.query, { paginate: false });
+      const full = queryClientData(
+        allData,
+        this.query,
+        this.clientQueryOptions({ paginate: false }),
+      );
       return full.items;
     }
 
@@ -1059,6 +1095,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.renderToolbar();
     this.renderFilterPills();
     this.renderHead();
+    this.renderFilterPopover();
     this.renderBody();
     this.renderSummary();
     this.renderCards();
@@ -1102,6 +1139,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private mount(mode: "grid" | "error"): void {
     if (this.mounted === mode) return;
     this.mounted = mode;
+    this.mountedFilterPopoverKey = null;
+    this.activeFilterPopoverEl = null;
     if (mode === "error") {
       replaceChildren(this.root, [this.buildErrorCard()]);
     } else {
@@ -1138,6 +1177,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     this.columns = [...this.options.columns];
     this.hidden = initialHiddenColumns(this.leafCols());
+    if (this.isClientSide) {
+      this.rawClientSideSync();
+    }
     this.render();
   }
 
@@ -1196,8 +1238,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const filters = this.query.filter ?? {};
     for (const [key, val] of Object.entries(filters)) {
-      if (val === undefined || val === "") continue;
-      const col = this.leafCols().find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
+      if (val === undefined || val.trim() === "") continue;
+      const lowerKey = key.toLowerCase();
+      const col = this.leafCols().find(
+        (c) =>
+          getColumnId(c).toLowerCase() === lowerKey ||
+          getFilterField(c).toLowerCase() === lowerKey,
+      );
       const title = col ? (getColumnTitle(col) || key) : key;
       const pill = el("div", { class: "tbx-filter-pill" }, [
         el("span", { class: "tbx-filter-pill-label", text: `${title}:` }),
@@ -1233,7 +1280,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         ...this.query,
         page: 1,
         q: undefined,
-        filter: {},
+        filter: undefined,
       });
     });
 
@@ -1468,6 +1515,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
             // The menu deliberately stays open: hiding four columns should be
             // four clicks, not four round trips through the trigger button.
             this.hidden = { ...this.hidden, [id]: visible };
+            if (this.isClientSide) {
+              this.rawClientSideSync();
+            }
             this.saveState();
             this.render();
           },
@@ -1726,6 +1776,22 @@ class NexGridController<TData> implements TableXHandle<TData> {
     replaceChildren(this.thead, [el("tr", {}, row1Cells), el("tr", {}, row2Cells)]);
   }
 
+  private getColumnActiveFilter(column: TableXVanillaColumn<TData>): string | undefined {
+    const id = getColumnId(column);
+    const filterField = getFilterField(column);
+    const filterObj = this.query.filter;
+    if (!filterObj) return undefined;
+    if (filterObj[filterField] !== undefined) return filterObj[filterField];
+    if (filterObj[id] !== undefined) return filterObj[id];
+    const lowerFilter = filterField.toLowerCase();
+    const lowerId = id.toLowerCase();
+    for (const [k, v] of Object.entries(filterObj)) {
+      const kl = k.toLowerCase();
+      if (kl === lowerFilter || kl === lowerId) return v;
+    }
+    return undefined;
+  }
+
   private buildLeafTh(
     column: TableXVanillaColumn<TData>,
     rowSpan: number,
@@ -1736,10 +1802,19 @@ class NexGridController<TData> implements TableXHandle<TData> {
     firstRightPinnedId: string | null,
   ): HTMLElement {
     const id = getColumnId(column);
+    const sortField = getSortField(column);
     const sortable = isSortable(column) && this.options.enableSorting !== false;
     const filterable = isFilterable(column, this.options.enableColumnFilters !== false);
     const sorts = this.query.sort;
-    const sortIndex = sorts.findIndex((s) => s.field === id);
+    const lowerSortField = sortField.toLowerCase();
+    const lowerId = id.toLowerCase();
+    const sortIndex = sorts.findIndex(
+      (s) =>
+        s.field === sortField ||
+        s.field === id ||
+        s.field.toLowerCase() === lowerSortField ||
+        s.field.toLowerCase() === lowerId,
+    );
     const sortItem = sortIndex >= 0 ? sorts[sortIndex] : undefined;
     const sorted = sortable && sortItem ? sortItem.dir : null;
     const meta = column.meta ?? {};
@@ -1761,25 +1836,33 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const iconWrap = el("span", { class: "tbx-sort-icon-wrap" }, [glyph]);
       if (sorts.length > 1 && sortIndex >= 0) {
         iconWrap.appendChild(
-          el("span", { class: "tbx-sort-order", text: String(sortIndex + 1) }),
+          el("span", { class: "tbx-sort-order", attrs: { "aria-hidden": "true" }, text: String(sortIndex + 1) }),
         );
       }
       inner.appendChild(iconWrap);
     }
 
     if (filterable) {
-      const filterField = meta.serverFilterField || id;
-      const activeFilter = this.query.filter?.[filterField] ?? this.query.filter?.[id];
-      const isFilterActive = activeFilter !== undefined && activeFilter !== "";
-      const filterWrap = el("div", { class: "tbx-col-filter-wrap" });
+      const activeFilter = this.getColumnActiveFilter(column);
+      const isFilterActive = activeFilter !== undefined && activeFilter.trim() !== "";
+      const isFilterOpen = this.openFilterColumn === id;
+      const filterWrap = el("div", { class: "tbx-col-filter-wrap", attrs: { draggable: false } });
+      filterWrap.addEventListener("dragstart", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      const btnClasses = ["tbx-col-filter-btn"];
+      if (isFilterActive) btnClasses.push("tbx-col-filter-btn--active");
+      if (isFilterOpen) btnClasses.push("tbx-col-filter-btn--open");
       const filterBtn = el(
         "button",
         {
-          class: isFilterActive
-            ? "tbx-col-filter-btn tbx-col-filter-btn--active"
-            : "tbx-col-filter-btn",
+          class: btnClasses.join(" "),
           attrs: {
             type: "button",
+            "data-filter-col": id,
+            "aria-expanded": String(isFilterOpen),
+            "aria-haspopup": "dialog",
             "aria-label": `Options and filter for ${getColumnTitle(column) || id}`,
           },
         },
@@ -1791,12 +1874,6 @@ class NexGridController<TData> implements TableXHandle<TData> {
         this.render();
       });
       filterWrap.appendChild(filterBtn);
-
-      if (this.openFilterColumn === id) {
-        const popover = this.buildColumnFilterPopover(id, column, meta, activeFilter);
-        filterWrap.appendChild(popover);
-        this.positionFilterPopover(popover, filterBtn);
-      }
       inner.appendChild(filterWrap);
     }
 
@@ -1829,9 +1906,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const thStyle: Record<string, string | undefined> = {};
     if (effectiveWidth !== undefined) {
       thStyle.width = `${effectiveWidth}px`;
+    } else {
+      thStyle.minWidth = `${meta.minWidth ?? 120}px`;
     }
-    if (meta.minWidth !== undefined) {
-      thStyle.minWidth = `${meta.minWidth}px`;
+    if (meta.align !== undefined) {
+      thStyle.textAlign = meta.align;
     }
 
     const pinned = isPinned(column);
@@ -1847,10 +1926,30 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const th = el("th", { class: thClasses.join(" "), style: thStyle, attrs: thAttrs }, [inner]);
 
-    if (this.options.enableColumnReorder !== false && !isGroupChild) {
+    if (this.options.enableColumnReorder === true && !isGroupChild) {
       th.draggable = true;
       th.classList.add("tbx-th--draggable");
+      th.addEventListener("pointerdown", (e: PointerEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
+          this.headerPointerDown = null;
+          return;
+        }
+        this.headerPointerDown = {
+          colId: id,
+          sortField,
+          x: e.clientX ?? 0,
+          y: e.clientY ?? 0,
+          shiftKey: e.shiftKey,
+          dropped: false,
+        };
+      });
       th.addEventListener("dragstart", (e: DragEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
+          e.preventDefault();
+          return;
+        }
         this.draggedColumnId = id;
         th.classList.add("tbx-th--dragging");
         if (e.dataTransfer) {
@@ -1871,6 +1970,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         e.preventDefault();
         th.classList.remove("tbx-th--drag-over-left");
         if (!this.draggedColumnId || this.draggedColumnId === id) return;
+        if (this.headerPointerDown) this.headerPointerDown.dropped = true;
 
         const fromIdx = this.columns.findIndex((c) => getColumnId(c) === this.draggedColumnId);
         const toIdx = this.columns.findIndex((c) => getColumnId(c) === id);
@@ -1886,10 +1986,26 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.render();
         }
       });
-      th.addEventListener("dragend", () => {
+      th.addEventListener("dragend", (e: DragEvent) => {
+        const ptr = this.headerPointerDown;
+        this.headerPointerDown = null;
         this.draggedColumnId = null;
         th.classList.remove("tbx-th--dragging");
         th.classList.remove("tbx-th--drag-over-left");
+        if (
+          sortable &&
+          ptr &&
+          ptr.colId === id &&
+          !ptr.dropped &&
+          typeof e.clientX === "number" &&
+          e.clientX > 0 &&
+          Math.hypot(e.clientX - ptr.x, (e.clientY ?? 0) - ptr.y) < 6
+        ) {
+          const next = ptr.shiftKey
+            ? withToggledMultiSort(this.query, ptr.sortField)
+            : withToggledSort(this.query, ptr.sortField);
+          this.applyQuery(next);
+        }
       });
     }
 
@@ -1899,9 +2015,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (target?.closest(".tbx-col-filter-wrap") || target?.closest(".tbx-resize-handle")) {
           return;
         }
+        this.headerPointerDown = null;
         const next = event.shiftKey
-          ? withToggledMultiSort(this.query, id)
-          : withToggledSort(this.query, id);
+          ? withToggledMultiSort(this.query, sortField)
+          : withToggledSort(this.query, sortField);
         this.applyQuery(next);
       });
       th.addEventListener("keydown", (event: KeyboardEvent) => {
@@ -1910,14 +2027,18 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (target?.closest(".tbx-col-filter-wrap")) return;
         event.preventDefault();
         const next = event.shiftKey
-          ? withToggledMultiSort(this.query, id)
-          : withToggledSort(this.query, id);
+          ? withToggledMultiSort(this.query, sortField)
+          : withToggledSort(this.query, sortField);
         this.applyQuery(next);
       });
     }
 
     if (this.options.enableColumnResize !== false) {
-      const handle = el("div", { class: "tbx-resize-handle" });
+      const handle = el("div", { class: "tbx-resize-handle", attrs: { draggable: false } });
+      handle.addEventListener("dragstart", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       handle.addEventListener("pointerdown", (event: PointerEvent) => {
         event.preventDefault();
         event.stopPropagation();
@@ -2291,6 +2412,72 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
   }
 
+  private findFilterTriggerButton(id: string): HTMLElement | null {
+    const buttons = this.root.querySelectorAll<HTMLElement>(".tbx-col-filter-btn");
+    for (const btn of Array.from(buttons)) {
+      if (btn.getAttribute("data-filter-col") === id) return btn;
+    }
+    return null;
+  }
+
+  private renderFilterPopover(): void {
+    if (this.openFilterColumn === null) {
+      if (this.activeFilterPopoverEl) {
+        this.activeFilterPopoverEl.remove();
+        this.activeFilterPopoverEl = null;
+      }
+      this.mountedFilterPopoverKey = null;
+      return;
+    }
+
+    const col = this.leafCols().find((c) => getColumnId(c) === this.openFilterColumn);
+    if (!col) {
+      if (this.activeFilterPopoverEl) {
+        this.activeFilterPopoverEl.remove();
+        this.activeFilterPopoverEl = null;
+      }
+      this.mountedFilterPopoverKey = null;
+      this.openFilterColumn = null;
+      return;
+    }
+
+    const id = getColumnId(col);
+    const activeFilter = this.getColumnActiveFilter(col);
+    const cacheKey = `${id}:${activeFilter ?? ""}`;
+
+    if (
+      this.mountedFilterPopoverKey === cacheKey &&
+      this.activeFilterPopoverEl &&
+      this.root.contains(this.activeFilterPopoverEl)
+    ) {
+      this.repositionActiveFilterPopover();
+      return;
+    }
+
+    if (this.activeFilterPopoverEl) {
+      this.activeFilterPopoverEl.remove();
+    }
+
+    const popover = this.buildColumnFilterPopover(id, col, col.meta ?? {}, activeFilter);
+    this.activeFilterPopoverEl = popover;
+    this.mountedFilterPopoverKey = cacheKey;
+    this.root.appendChild(popover);
+    this.repositionActiveFilterPopover();
+  }
+
+  private repositionActiveFilterPopover(): void {
+    const popover = this.activeFilterPopoverEl;
+    const id = this.openFilterColumn;
+    if (!popover || !id) return;
+    const btn = this.findFilterTriggerButton(id);
+    if (!btn) {
+      this.openFilterColumn = null;
+      this.renderFilterPopover();
+      return;
+    }
+    this.positionFilterPopover(popover, btn);
+  }
+
   /**
    * Column filter popover supporting text, dropdown presets, date ranges, and numeric ranges.
    */
@@ -2306,15 +2493,36 @@ class NexGridController<TData> implements TableXHandle<TData> {
     popover.addEventListener("click", (e) => e.stopPropagation());
 
     const title = getColumnTitle(column) || id;
-    const filterField = meta.serverFilterField || id;
+    const filterField = getFilterField(column);
     const apply = (valToApply?: string) => {
       const val = (valToApply !== undefined ? valToApply : "").trim();
       this.openFilterColumn = null;
+      this.mountedFilterPopoverKey = null;
+      if (this.activeFilterPopoverEl) {
+        this.activeFilterPopoverEl.remove();
+        this.activeFilterPopoverEl = null;
+      }
       let nextQuery = withFilter(this.query, filterField, val || undefined);
       if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
         nextQuery = withFilter(nextQuery, id, undefined);
       }
       this.applyQuery(nextQuery);
+    };
+
+    const closePopover = () => {
+      this.openFilterColumn = null;
+      this.render();
+    };
+
+    const focusSafely = (inputEl: HTMLInputElement) => {
+      setTimeout(() => {
+        if (!this.root.contains(inputEl)) return;
+        try {
+          inputEl.focus?.({ preventScroll: true });
+        } catch {
+          inputEl.focus?.();
+        }
+      }, 10);
     };
 
     // 1. Date Range Filter
@@ -2328,11 +2536,32 @@ class NexGridController<TData> implements TableXHandle<TData> {
         class: "tbx-range-input",
         attrs: { type: "date", value: fromVal, "aria-label": "From date" },
       }) as HTMLInputElement;
+      fromInput.value = fromVal;
       const sep = el("span", { class: "tbx-range-sep", text: "to" });
       const toInput = el("input", {
         class: "tbx-range-input",
         attrs: { type: "date", value: toVal, "aria-label": "To date" },
       }) as HTMLInputElement;
+      toInput.value = toVal;
+
+      const submitDateRange = () => {
+        const from = fromInput.value.trim();
+        const to = toInput.value.trim();
+        if (!from && !to) apply("");
+        else apply(`${from}..${to}`);
+      };
+      const onRangeKey = (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitDateRange();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closePopover();
+        }
+      };
+      fromInput.addEventListener("keydown", onRangeKey);
+      toInput.addEventListener("keydown", onRangeKey);
+      focusSafely(fromInput);
 
       rangeInputs.appendChild(fromInput);
       rangeInputs.appendChild(sep);
@@ -2355,10 +2584,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }, [checkIcon(), el("span", { text: this.locale.applyFilter })]);
       applyBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const from = fromInput.value.trim();
-        const to = toInput.value.trim();
-        if (!from && !to) apply("");
-        else apply(`${from}..${to}`);
+        submitDateRange();
       });
 
       actionsWrap.appendChild(clearBtn);
@@ -2378,11 +2604,32 @@ class NexGridController<TData> implements TableXHandle<TData> {
         class: "tbx-range-input",
         attrs: { type: "number", placeholder: "Min", value: minVal, "aria-label": "Minimum" },
       }) as HTMLInputElement;
+      minInput.value = minVal;
       const sep = el("span", { class: "tbx-range-sep", text: "to" });
       const maxInput = el("input", {
         class: "tbx-range-input",
         attrs: { type: "number", placeholder: "Max", value: maxVal, "aria-label": "Maximum" },
       }) as HTMLInputElement;
+      maxInput.value = maxVal;
+
+      const submitNumRange = () => {
+        const min = minInput.value.trim();
+        const max = maxInput.value.trim();
+        if (!min && !max) apply("");
+        else apply(`${min}..${max}`);
+      };
+      const onRangeKey = (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitNumRange();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closePopover();
+        }
+      };
+      minInput.addEventListener("keydown", onRangeKey);
+      maxInput.addEventListener("keydown", onRangeKey);
+      focusSafely(minInput);
 
       rangeInputs.appendChild(minInput);
       rangeInputs.appendChild(sep);
@@ -2405,10 +2652,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }, [checkIcon(), el("span", { text: this.locale.applyFilter })]);
       applyBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const min = minInput.value.trim();
-        const max = maxInput.value.trim();
-        if (!min && !max) apply("");
-        else apply(`${min}..${max}`);
+        submitNumRange();
       });
 
       actionsWrap.appendChild(clearBtn);
@@ -2417,8 +2661,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return popover;
     }
 
-    // 3. Text / Dropdown filter
-    const placeholder = meta.filterPlaceholder || formatMessage(this.locale.filterColumnPlaceholder, { column: title });
+    // 3. Text / Number / Date / Dropdown filter
+    const placeholder =
+      meta.filterPlaceholder ||
+      formatMessage(this.locale.filterColumnPlaceholder, { column: title });
 
     let selectedVal: string = (currentValue ?? "").trim();
 
@@ -2431,21 +2677,21 @@ class NexGridController<TData> implements TableXHandle<TData> {
         "aria-label": `Filter ${title}`,
       },
     }) as HTMLInputElement;
+    input.value = selectedVal;
 
-    setTimeout(() => {
-      input.focus?.();
-      input.select?.();
-    }, 10);
+    focusSafely(input);
+
+    input.addEventListener("input", () => {
+      selectedVal = input.value;
+    });
 
     input.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        const valToApply = selectedVal !== undefined && selectedVal !== "" ? selectedVal : input.value;
-        apply(valToApply);
+        apply(input.value);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        this.openFilterColumn = null;
-        this.render();
+        closePopover();
       }
     });
 
@@ -2454,7 +2700,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (meta.filterOptions && meta.filterOptions.length > 0) {
       const optionsWrap = el("div", { class: "tbx-filter-popover-options" });
 
-      const renderOptions = (filterTerm: string) => {
+      const renderOptions = (filterTerm: string, userHasTyped: boolean) => {
         replaceChildren(optionsWrap, []);
         const term = filterTerm.trim().toLowerCase();
 
@@ -2471,12 +2717,19 @@ class NexGridController<TData> implements TableXHandle<TData> {
         });
         optionsWrap.appendChild(allOption);
 
-        const filtered = meta.filterOptions!.filter((opt) =>
-          !term || opt.toLowerCase().includes(term)
-        );
+        const filtered = userHasTyped
+          ? meta.filterOptions!.filter((opt) => !term || opt.toLowerCase().includes(term))
+          : meta.filterOptions!;
+
+        if (filtered.length === 0) {
+          optionsWrap.appendChild(
+            el("div", { class: "tbx-filter-empty", text: "No matching options" }),
+          );
+          return;
+        }
 
         for (const opt of filtered) {
-          const isSelected = selectedVal.toLowerCase() === opt.toLowerCase();
+          const isSelected = selectedVal.trim().toLowerCase() === opt.trim().toLowerCase();
           const optEl = el("div", {
             class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
             text: opt,
@@ -2491,10 +2744,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
         }
       };
 
-      renderOptions(input.value);
+      renderOptions(input.value, false);
       input.addEventListener("input", () => {
         selectedVal = input.value;
-        renderOptions(input.value);
+        renderOptions(input.value, true);
       });
 
       popover.appendChild(optionsWrap);
@@ -2527,8 +2780,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     );
     applyBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const valToApply = selectedVal !== undefined && selectedVal !== "" ? selectedVal : input.value;
-      apply(valToApply);
+      apply(input.value);
     });
     actions.appendChild(applyBtn);
 
@@ -2540,27 +2792,46 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private positionFilterPopover(popover: HTMLElement, btn: HTMLElement): void {
     if (typeof window === "undefined" || typeof btn.getBoundingClientRect !== "function") return;
     const btnRect = btn.getBoundingClientRect();
+    const rootRect = this.root.getBoundingClientRect();
     if (!btnRect || (btnRect.width === 0 && btnRect.height === 0 && btnRect.top === 0)) {
       return;
     }
+
+    if (typeof this.tableWrap?.getBoundingClientRect === "function") {
+      const wrapRect = this.tableWrap.getBoundingClientRect();
+      if (wrapRect && wrapRect.width > 0 && (btnRect.right < wrapRect.left + 4 || btnRect.left > wrapRect.right - 4)) {
+        this.openFilterColumn = null;
+        this.renderFilterPopover();
+        return;
+      }
+    }
+
     const popoverRect = popover.getBoundingClientRect();
     const margin = 6;
-    let top = btnRect.bottom + margin;
     const popoverHeight = popoverRect.height || 220;
-    if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
-      top = btnRect.top - popoverHeight - margin;
-    }
     const popoverWidth = popoverRect.width || 240;
-    let left = btnRect.right - popoverWidth;
-    if (left < 12) {
-      left = Math.max(12, btnRect.left);
+
+    let viewportTop = btnRect.bottom + margin;
+    const winHeight = window.innerHeight || 800;
+    const winWidth = window.innerWidth || 1024;
+    if (
+      viewportTop + popoverHeight > winHeight - 12 &&
+      btnRect.top - popoverHeight - margin > 12
+    ) {
+      viewportTop = btnRect.top - popoverHeight - margin;
     }
-    if (left + popoverWidth > window.innerWidth - 12) {
-      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+
+    let viewportLeft = btnRect.right - popoverWidth;
+    if (viewportLeft < 12) {
+      viewportLeft = Math.max(12, btnRect.left);
     }
-    popover.style.position = "fixed";
-    popover.style.top = `${Math.round(top)}px`;
-    popover.style.left = `${Math.round(left)}px`;
+    if (viewportLeft + popoverWidth > winWidth - 12) {
+      viewportLeft = Math.max(12, winWidth - popoverWidth - 12);
+    }
+
+    popover.style.position = "absolute";
+    popover.style.top = `${Math.round(viewportTop - rootRect.top)}px`;
+    popover.style.left = `${Math.round(viewportLeft - rootRect.left)}px`;
     popover.style.zIndex = "1000";
   }
 

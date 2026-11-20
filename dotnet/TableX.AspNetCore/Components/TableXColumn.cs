@@ -58,13 +58,25 @@ public class TableXColumn : ComponentBase
     [Parameter]
     public bool Exportable { get; set; } = true;
 
-    /// <summary>Marks the column as server-filterable.</summary>
+    /// <summary>Marks the column as server-filterable (or <c>false</c> to disable the filter menu on this column).</summary>
     [Parameter]
-    public bool Filterable { get; set; }
+    public bool? Filterable { get; set; }
 
     /// <summary>The filter key to send when it differs from <see cref="Field"/>.</summary>
     [Parameter]
     public string? FilterField { get; set; }
+
+    /// <summary>The sort key to send when it differs from <see cref="Field"/>.</summary>
+    [Parameter]
+    public string? SortField { get; set; }
+
+    /// <summary>Filter UI type (<c>text</c>, <c>select</c>, <c>number</c>, <c>date</c>, <c>number-range</c>, <c>date-range</c>).</summary>
+    [Parameter]
+    public string? FilterType { get; set; }
+
+    /// <summary>Custom placeholder text for the column filter input.</summary>
+    [Parameter]
+    public string? FilterPlaceholder { get; set; }
 
     /// <summary>Comma-separated allowed filter values (e.g. <c>"Active,Pending,Suspended"</c>).</summary>
     [Parameter]
@@ -87,8 +99,11 @@ public class TableXColumn : ComponentBase
             Hidden = Hidden ? true : null,
             Hideable = !Hideable ? false : null,
             Exportable = !Exportable ? false : null,
-            ServerFilterable = Filterable ? true : null,
-            ServerFilterField = FilterField,
+            ServerFilterable = Filterable,
+            ServerFilterField = string.IsNullOrWhiteSpace(FilterField) ? null : FilterField,
+            SortField = string.IsNullOrWhiteSpace(SortField) ? null : SortField,
+            FilterType = string.IsNullOrWhiteSpace(FilterType) ? null : FilterType.Trim().ToLowerInvariant(),
+            FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
         };
 

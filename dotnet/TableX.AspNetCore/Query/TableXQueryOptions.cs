@@ -13,6 +13,18 @@ using System.Linq.Expressions;
 namespace TableX.AspNetCore;
 
 /// <summary>
+/// Controls how string column filters registered on <see cref="TableXQueryOptions{T}"/> match values.
+/// </summary>
+public enum TableXStringFilterMode
+{
+    /// <summary>Case-insensitive exact match (suitable for discrete options / status columns).</summary>
+    Equals,
+
+    /// <summary>Case-insensitive substring match (suitable for free-text columns like Name or Email).</summary>
+    Contains,
+}
+
+/// <summary>
 /// Declares which members of <typeparamref name="T"/> a TableX request is
 /// allowed to sort by, search, and filter on.
 /// </summary>
@@ -37,11 +49,14 @@ public sealed class TableXQueryOptions<T>
 {
     private readonly Dictionary<string, LambdaExpression> _sortable = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, LambdaExpression> _filterable = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TableXStringFilterMode> _filterStringModes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Expression<Func<T, string?>>> _searchable = [];
 
     internal IReadOnlyDictionary<string, LambdaExpression> SortableMembers => _sortable;
 
     internal IReadOnlyDictionary<string, LambdaExpression> FilterableMembers => _filterable;
+
+    internal IReadOnlyDictionary<string, TableXStringFilterMode> FilterStringModes => _filterStringModes;
 
     internal IReadOnlyList<Expression<Func<T, string?>>> SearchableMembers => _searchable;
 
@@ -149,29 +164,83 @@ public sealed class TableXQueryOptions<T>
         ArgumentNullException.ThrowIfNull(selector);
 
         _filterable[key] = TableXExpressions.Retype(selector);
+        _filterStringModes[key] = TableXStringFilterMode.Equals;
         return this;
     }
 
     /// <summary>
-    /// Allow the per-column filter for a member, keyed by the member's own name.
+    /// Allow the per-column filter for one or more members, keyed by each member's own name.
     /// </summary>
-    /// <param name="selector">A simple member access, e.g. <c>s =&gt; s.Status</c>.</param>
+    /// <param name="members">Simple member accesses, e.g. <c>s =&gt; s.Status, s =&gt; s.Score</c>.</param>
     /// <returns>This instance, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="selector"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="selector"/> is not a simple member access.</exception>
-    public TableXQueryOptions<T> Filterable(Expression<Func<T, object?>> selector)
+    /// <exception cref="ArgumentNullException"><paramref name="members"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A selector is not a simple member access.</exception>
+    public TableXQueryOptions<T> Filterable(params Expression<Func<T, object?>>[] members)
     {
-        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(members);
 
-        if (!TableXExpressions.TryGetMemberName(selector.Body, out var name))
+        foreach (var selector in members)
         {
-            throw new ArgumentException(
-                "A filterable selector must be a simple member access such as 's => s.Status'. " +
-                "For a computed expression, use Filterable(key, selector) to name it explicitly.",
-                nameof(selector));
+            ArgumentNullException.ThrowIfNull(selector);
+
+            if (!TableXExpressions.TryGetMemberName(selector.Body, out var name))
+            {
+                throw new ArgumentException(
+                    "A filterable selector must be a simple member access such as 's => s.Status'. " +
+                    "For a computed expression, use Filterable(key, selector) to name it explicitly.",
+                    nameof(members));
+            }
+
+            _filterable[name] = TableXExpressions.Retype(selector);
+            _filterStringModes[name] = TableXStringFilterMode.Equals;
         }
 
-        _filterable[name] = TableXExpressions.Retype(selector);
+        return this;
+    }
+
+    /// <summary>
+    /// Allow case-insensitive substring column filtering (<c>Contains</c>) for one or more
+    /// string members, keyed by each member's own name. Ideal for free-text columns like
+    /// <c>Name</c> or <c>Email</c>.
+    /// </summary>
+    /// <param name="members">String member selectors, e.g. <c>s =&gt; s.Name, s =&gt; s.Email</c>.</param>
+    /// <returns>This instance, for chaining.</returns>
+    public TableXQueryOptions<T> FilterableContains(params Expression<Func<T, string?>>[] members)
+    {
+        ArgumentNullException.ThrowIfNull(members);
+
+        foreach (var selector in members)
+        {
+            ArgumentNullException.ThrowIfNull(selector);
+
+            if (!TableXExpressions.TryGetMemberName(selector.Body, out var name))
+            {
+                throw new ArgumentException(
+                    "A filterable selector must be a simple member access such as 's => s.Name'. " +
+                    "For a computed expression, use FilterableContains(key, selector) to name it explicitly.",
+                    nameof(members));
+            }
+
+            _filterable[name] = selector;
+            _filterStringModes[name] = TableXStringFilterMode.Contains;
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Allow case-insensitive substring column filtering (<c>Contains</c>) under an explicit key.
+    /// </summary>
+    /// <param name="key">The filter key the grid sends, matched case-insensitively.</param>
+    /// <param name="selector">The string member to search within.</param>
+    /// <returns>This instance, for chaining.</returns>
+    public TableXQueryOptions<T> FilterableContains(string key, Expression<Func<T, string?>> selector)
+    {
+        ValidateKey(key);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        _filterable[key] = selector;
+        _filterStringModes[key] = TableXStringFilterMode.Contains;
         return this;
     }
 

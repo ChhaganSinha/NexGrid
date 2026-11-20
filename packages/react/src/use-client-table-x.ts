@@ -60,8 +60,6 @@ export function useClientTableX<TData>(
     data: page.items,
     allData,
     fetchAllData,
-    clientSidePagination: true,
-    paginationMode: "client" as const,
     total: page.total,
     query,
     onQueryChange: setQuery,

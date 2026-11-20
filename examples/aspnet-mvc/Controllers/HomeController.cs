@@ -75,8 +75,15 @@ public sealed class HomeController : Controller
                 s => s.Name,
                 s => s.Email,
                 s => s.Department)
-            .Filterable("status", s => s.Status)
-            .Filterable("department", s => s.Department)
+            .FilterableContains(
+                s => s.Name,
+                s => s.Email)
+            .Filterable(
+                s => s.Department,
+                s => s.Status,
+                s => s.Score,
+                s => s.EnrolledAt,
+                s => s.Scholarship)
             // Worth setting on every grid: Skip/Take over an unordered query has
             // no defined row order, so without it a user can page forward and
             // see the same record twice.

@@ -71,6 +71,8 @@ export interface TableXOptions<TData> {
   clientSidePagination?: boolean;
   /** Explicit pagination mode: `"server"` (default with endpoint/onQueryChange) or `"client"`. */
   paginationMode?: "client" | "server";
+  /** Explicit list of row fields searched by global search in client-side mode. Defaults to visible columns. */
+  searchableFields?: (keyof TData & string)[];
   /**
    * Emitted whenever the user changes page, size, sort, search or a filter.
    *

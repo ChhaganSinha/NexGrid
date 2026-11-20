@@ -8,7 +8,10 @@ import {
   getColumnId,
   getColumnTitle,
   getCellValue,
+  getSortField,
+  getFilterField,
   isSortable,
+  isFilterable,
   isHideable,
   isExportable,
   isStructuralColumn,
@@ -169,4 +172,43 @@ test("searchableColumnIds returns the ROW FIELD when the id is a display slug", 
   assert.deepEqual(searchableColumnIds(columns), ["fullName", "lastLoginAt", "location"]);
   // Hiding still keys on the column ID, not the field it resolves to.
   assert.deepEqual(searchableColumnIds(columns, { lastLogin: true }), ["fullName", "location"]);
+});
+
+test("getCellValue prefers accessorFn and accessorKey over slug id, supports dot paths, and blocks prototype keys", () => {
+  const row = {
+    fullName: "Ada Lovelace",
+    profile: { address: { city: "London" } },
+  };
+  assert.equal(getCellValue({ id: "user", accessorKey: "fullName" }, row), "Ada Lovelace");
+  assert.equal(
+    getCellValue({ id: "computed", accessorFn: (r) => `${r.fullName} (${r.profile.address.city})` }, row),
+    "Ada Lovelace (London)",
+  );
+  assert.equal(getCellValue({ accessorKey: "profile.address.city" }, row), "London");
+  assert.equal(getCellValue({ accessorKey: "__proto__.polluted" }, row), undefined);
+  assert.equal(getCellValue({ accessorKey: "constructor.name" }, row), undefined);
+});
+
+test("isSortable and isFilterable honor all column and meta opt-out flags", () => {
+  assert.equal(isSortable({ accessorKey: "name", sortable: false }), false);
+  assert.equal(isSortable({ accessorKey: "name", meta: { sortable: false } }), false);
+  assert.equal(isSortable({ accessorKey: "name", meta: { enableSorting: false } }), false);
+
+  assert.equal(isFilterable({ accessorKey: "name" }, true), true);
+  assert.equal(isFilterable({ accessorKey: "name", meta: { filterable: false } }, true), false);
+  assert.equal(isFilterable({ accessorKey: "name", meta: { serverFilterable: false } }, true), false);
+  assert.equal(isFilterable({ accessorKey: "score", meta: { filterType: "number-range" } }, false), true);
+  assert.equal(isFilterable({ id: "actions" }, true), false);
+});
+
+test("getSortField and getFilterField resolve explicit overrides and accessorKey", () => {
+  const col = {
+    id: "studentCol",
+    accessorKey: "studentName",
+    meta: { sortField: "lastName", serverFilterField: "nameFilter" },
+  };
+  assert.equal(getSortField(col), "lastName");
+  assert.equal(getFilterField(col), "nameFilter");
+  assert.equal(getSortField({ id: "slug", accessorKey: "enrolledAt" }), "enrolledAt");
+  assert.equal(getFilterField({ id: "slug", accessorKey: "enrolledAt" }), "enrolledAt");
 });

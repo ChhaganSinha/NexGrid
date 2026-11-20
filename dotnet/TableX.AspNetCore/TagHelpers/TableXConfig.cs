@@ -82,6 +82,10 @@ internal sealed class TableXConfig
 
     public bool? EnableSelection { get; set; }
 
+    public bool? EnableColumnFilters { get; set; }
+
+    public bool? EnableSorting { get; set; }
+
     public bool? EnableExport { get; set; }
 
     public string? ExportFileName { get; set; }
@@ -143,6 +147,12 @@ internal sealed class TableXColumnMetaConfig
 
     public string? ServerFilterField { get; set; }
 
+    public string? SortField { get; set; }
+
+    public string? FilterType { get; set; }
+
+    public string? FilterPlaceholder { get; set; }
+
     public IReadOnlyList<string>? FilterOptions { get; set; }
 
     /// <summary>True when at least one hint was set; an all-null meta object is not written.</summary>
@@ -156,5 +166,8 @@ internal sealed class TableXColumnMetaConfig
         Exportable is not null ||
         ServerFilterable is not null ||
         ServerFilterField is not null ||
+        SortField is not null ||
+        FilterType is not null ||
+        FilterPlaceholder is not null ||
         FilterOptions is not null;
 }

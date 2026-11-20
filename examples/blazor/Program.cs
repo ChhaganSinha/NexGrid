@@ -44,11 +44,10 @@ var employees = Enumerable.Range(1, 150).Select(i => new Employee
 app.MapGet("/api/employees", (TableXQuery query) =>
 {
     return employees.AsQueryable().ToPagedResponse(query, options => options
-        .Sortable(e => e.Id, e => e.Name, e => e.Company, e => e.Status, e => e.Department, e => e.Score)
-        .Searchable(e => e.Name, e => e.Email, e => e.Company, e => e.Id)
-        .Filterable("status", e => e.Status)
-        .Filterable("company", e => e.Company)
-        .Filterable("department", e => e.Department)
+        .Sortable(e => e.Id, e => e.Name, e => e.Company, e => e.Status, e => e.Department, e => e.Mobile, e => e.Email, e => e.Score)
+        .Searchable(e => e.Name, e => e.Email, e => e.Company, e => e.Id, e => e.Mobile)
+        .FilterableContains(e => e.Id, e => e.Name, e => e.Mobile, e => e.Email)
+        .Filterable(e => e.Status, e => e.Company, e => e.Department, e => e.Score)
         .DefaultSort(e => e.Id, SortDirection.Ascending));
 });
 

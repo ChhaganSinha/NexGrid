@@ -155,3 +155,27 @@ test("totalPagesFor never returns zero", () => {
   assert.equal(totalPagesFor(11, 10), 2);
   assert.equal(totalPagesFor(1284, 25), 52);
 });
+
+test("withToggledSort and withToggledMultiSort match existing sort fields case-insensitively", () => {
+  const fromServer = { ...defaultQuery(), sort: [{ field: "Name", dir: "asc" }] };
+  const toggled = withToggledSort(fromServer, "name");
+  assert.deepEqual(toggled.sort, [{ field: "name", dir: "desc" }]);
+
+  const cleared = withToggledSort(toggled, "NAME");
+  assert.deepEqual(cleared.sort, []);
+
+  const multi = withToggledMultiSort(fromServer, "name");
+  assert.deepEqual(multi.sort, [{ field: "name", dir: "desc" }]);
+});
+
+test("withFilter trims values, drops whitespace/empty-range tokens, and deduplicates case-variant keys", () => {
+  const q1 = withFilter(defaultQuery(), "Status", "  Active  ");
+  assert.deepEqual(q1.filter, { Status: "Active" });
+
+  const q2 = withFilter(q1, "status", "Pending");
+  assert.deepEqual(q2.filter, { status: "Pending" });
+
+  assert.equal(withFilter(q2, "status", "   ").filter, undefined);
+  assert.equal(withFilter(q2, "status", "..").filter, undefined);
+  assert.equal(withFilter(q2, "status", "  ..  ").filter, undefined);
+});

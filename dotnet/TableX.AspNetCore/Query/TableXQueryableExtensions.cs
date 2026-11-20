@@ -129,14 +129,15 @@ public static class TableXQueryableExtensions
         TableXQuery query,
         TableXQueryOptions<T> options)
     {
-        var term = query.Q;
+        var term = query.Q?.Trim();
         if (string.IsNullOrEmpty(term) || options.SearchableMembers.Count == 0)
         {
             return source;
         }
 
         var row = Expression.Parameter(typeof(T), "row");
-        var termExpression = TableXExpressions.Parameterize(term, typeof(string));
+        var lowerTerm = term.ToLowerInvariant();
+        var termExpression = TableXExpressions.Parameterize(lowerTerm, typeof(string));
         var nullLiteral = Expression.Constant(null, typeof(string));
 
         Expression? predicate = null;
@@ -144,11 +145,13 @@ public static class TableXQueryableExtensions
         {
             var member = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], row);
 
-            // The null guard keeps LINQ to Objects from throwing on a null column
-            // and costs a harmless `IS NOT NULL` in SQL.
+            // Null guard + `ToLower().Contains(lowerTerm)` translates to
+            // `col IS NOT NULL AND LOWER(col) LIKE '%term%'` on EF Core (SQL Server,
+            // PostgreSQL, SQLite, MySQL) and runs case-insensitively on LINQ to Objects.
+            var lowered = Expression.Call(member, TableXExpressions.StringToLower);
             var clause = Expression.AndAlso(
                 Expression.NotEqual(member, nullLiteral),
-                Expression.Call(member, TableXExpressions.StringContains, termExpression));
+                Expression.Call(lowered, TableXExpressions.StringContains, termExpression));
 
             predicate = predicate is null ? clause : Expression.OrElse(predicate, clause);
         }
@@ -169,9 +172,15 @@ public static class TableXQueryableExtensions
         foreach (var entry in query.Filter)
         {
             // `filter[status]=` reaches the server when a picker is cleared. Core
-            // treats an empty value as "no filter", so it must not become
+            // treats an empty or whitespace value as "no filter", so it must not become
             // `WHERE Status = ''`.
-            if (string.IsNullOrEmpty(entry.Value))
+            if (string.IsNullOrWhiteSpace(entry.Value))
+            {
+                continue;
+            }
+
+            var rawVal = entry.Value.Trim();
+            if (rawVal == "..")
             {
                 continue;
             }
@@ -184,14 +193,18 @@ public static class TableXQueryableExtensions
 
             var returnType = selector.ReturnType;
             var underlyingType = Nullable.GetUnderlyingType(returnType) ?? returnType;
+            var isComparable =
+                (underlyingType.IsPrimitive && underlyingType != typeof(bool) && underlyingType != typeof(char)) ||
+                underlyingType == typeof(decimal) ||
+                underlyingType == typeof(DateTime) ||
+                underlyingType == typeof(DateOnly) ||
+                underlyingType == typeof(DateTimeOffset) ||
+                underlyingType == typeof(TimeOnly);
 
-            // Handle range filter syntax: "min..max", "min..", "..max"
-            if (entry.Value.Contains("..") &&
-                (underlyingType.IsPrimitive || underlyingType == typeof(decimal) ||
-                 underlyingType == typeof(DateTime) || underlyingType == typeof(DateOnly) ||
-                 underlyingType == typeof(DateTimeOffset)))
+            // 1. Range filter syntax: "min..max", "min..", "..max"
+            if (rawVal.Contains("..", StringComparison.Ordinal) && isComparable)
             {
-                var parts = entry.Value.Split([".."], StringSplitOptions.None);
+                var parts = rawVal.Split([".."], StringSplitOptions.None);
                 var minStr = parts[0].Trim();
                 var maxStr = parts.Length > 1 ? parts[1].Trim() : string.Empty;
 
@@ -207,6 +220,11 @@ public static class TableXQueryableExtensions
 
                 if (!string.IsNullOrEmpty(maxStr) && TableXExpressions.TryConvertFilterValue(maxStr, returnType, out var maxVal))
                 {
+                    if (TableXExpressions.IsDateOnlyFilterToken(maxStr))
+                    {
+                        maxVal = AdjustDateEndOfDay(maxVal, underlyingType);
+                    }
+
                     var lte = Expression.LessThanOrEqual(memberExpr, TableXExpressions.Parameterize(maxVal, returnType));
                     rangePredicate = rangePredicate is null ? lte : Expression.AndAlso(rangePredicate, lte);
                 }
@@ -218,19 +236,133 @@ public static class TableXQueryableExtensions
                 }
             }
 
-            if (!TableXExpressions.TryConvertFilterValue(entry.Value, selector.ReturnType, out var value))
+            // 2. Comparison prefix operators: >=, <=, !=, >, <, =
+            if (isComparable &&
+                TryParseOperatorFilter(rawVal, out var op, out var operand) &&
+                TableXExpressions.TryConvertFilterValue(operand, returnType, out var opVal))
+            {
+                var rowParam = Expression.Parameter(typeof(T), "row");
+                var memberExpr = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], rowParam);
+                var isDateOnlyOp = TableXExpressions.IsDateOnlyFilterToken(operand);
+
+                Expression opPredicate;
+                if (op == "=" && isDateOnlyOp && (underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset)))
+                {
+                    var endOfDay = AdjustDateEndOfDay(opVal, underlyingType);
+                    opPredicate = Expression.AndAlso(
+                        Expression.GreaterThanOrEqual(memberExpr, TableXExpressions.Parameterize(opVal, returnType)),
+                        Expression.LessThanOrEqual(memberExpr, TableXExpressions.Parameterize(endOfDay, returnType)));
+                }
+                else
+                {
+                    var adjustedVal = (op is "<=" or ">") && isDateOnlyOp
+                        ? AdjustDateEndOfDay(opVal, underlyingType)
+                        : opVal;
+                    var paramExpr = TableXExpressions.Parameterize(adjustedVal, returnType);
+                    opPredicate = op switch
+                    {
+                        ">=" => Expression.GreaterThanOrEqual(memberExpr, paramExpr),
+                        "<=" => Expression.LessThanOrEqual(memberExpr, paramExpr),
+                        "!=" => Expression.NotEqual(memberExpr, paramExpr),
+                        ">" => Expression.GreaterThan(memberExpr, paramExpr),
+                        "<" => Expression.LessThan(memberExpr, paramExpr),
+                        _ => Expression.Equal(memberExpr, paramExpr),
+                    };
+                }
+
+                source = source.Where(Expression.Lambda<Func<T, bool>>(opPredicate, rowParam));
+                continue;
+            }
+
+            // 3. Date-only value against DateTime / DateTimeOffset matches the full calendar day
+            if ((underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset)) &&
+                TableXExpressions.IsDateOnlyFilterToken(rawVal) &&
+                TableXExpressions.TryConvertFilterValue(rawVal, returnType, out var dayStart))
+            {
+                var dayEnd = AdjustDateEndOfDay(dayStart, underlyingType);
+                var rowParam = Expression.Parameter(typeof(T), "row");
+                var memberExpr = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], rowParam);
+                var dayPredicate = Expression.AndAlso(
+                    Expression.GreaterThanOrEqual(memberExpr, TableXExpressions.Parameterize(dayStart, returnType)),
+                    Expression.LessThanOrEqual(memberExpr, TableXExpressions.Parameterize(dayEnd, returnType)));
+                source = source.Where(Expression.Lambda<Func<T, bool>>(dayPredicate, rowParam));
+                continue;
+            }
+
+            // 4. String members: null-safe case-insensitive match (Equals or Contains)
+            if (underlyingType == typeof(string))
+            {
+                var rowParam = Expression.Parameter(typeof(T), "row");
+                var memberExpr = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], rowParam);
+                var nullLiteral = Expression.Constant(null, typeof(string));
+                var lowerFilter = rawVal.ToLowerInvariant();
+                var termParam = TableXExpressions.Parameterize(lowerFilter, typeof(string));
+                var loweredMember = Expression.Call(memberExpr, TableXExpressions.StringToLower);
+
+                var mode = options.FilterStringModes.TryGetValue(entry.Key, out var configuredMode)
+                    ? configuredMode
+                    : TableXStringFilterMode.Equals;
+
+                Expression matchExpr = mode == TableXStringFilterMode.Contains
+                    ? Expression.Call(loweredMember, TableXExpressions.StringContains, termParam)
+                    : Expression.Equal(loweredMember, termParam);
+
+                var safePredicate = Expression.AndAlso(Expression.NotEqual(memberExpr, nullLiteral), matchExpr);
+                source = source.Where(Expression.Lambda<Func<T, bool>>(safePredicate, rowParam));
+                continue;
+            }
+
+            // 5. Typed equality (Enum, Bool, Number, Guid, DateOnly, TimeOnly, exact timestamp)
+            if (!TableXExpressions.TryConvertFilterValue(rawVal, returnType, out var value))
             {
                 continue;
             }
 
             var row = Expression.Parameter(typeof(T), "row");
             var member = TableXExpressions.Rebind(selector.Body, selector.Parameters[0], row);
-            var comparison = Expression.Equal(member, TableXExpressions.Parameterize(value, selector.ReturnType));
+            var comparison = Expression.Equal(member, TableXExpressions.Parameterize(value, returnType));
 
             source = source.Where(Expression.Lambda<Func<T, bool>>(comparison, row));
         }
 
         return source;
+    }
+
+    private static object? AdjustDateEndOfDay(object? value, Type underlyingType)
+    {
+        if (underlyingType == typeof(DateTime) && value is DateTime dt)
+        {
+            return dt.Date.AddDays(1).AddTicks(-1);
+        }
+
+        if (underlyingType == typeof(DateTimeOffset) && value is DateTimeOffset dto)
+        {
+            return new DateTimeOffset(dto.Date.AddDays(1).AddTicks(-1), dto.Offset);
+        }
+
+        return value;
+    }
+
+    private static bool TryParseOperatorFilter(string rawVal, out string op, out string operand)
+    {
+        ReadOnlySpan<string> operators = [">=", "<=", "!=", ">", "<", "="];
+        foreach (var candidate in operators)
+        {
+            if (rawVal.StartsWith(candidate, StringComparison.Ordinal))
+            {
+                var rest = rawVal[candidate.Length..].Trim();
+                if (rest.Length > 0)
+                {
+                    op = candidate;
+                    operand = rest;
+                    return true;
+                }
+            }
+        }
+
+        op = string.Empty;
+        operand = string.Empty;
+        return false;
     }
 
     private static IQueryable<T> ApplySort<T>(

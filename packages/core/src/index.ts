@@ -27,6 +27,9 @@ export {
   STRUCTURAL_COLUMN_IDS,
   getColumnId,
   getColumnTitle,
+  getSortField,
+  getFilterField,
+  readPropertyByPath,
   getCellValue,
   getCellText,
   isSortable,
@@ -69,8 +72,8 @@ export {
   withFilter,
   totalPagesFor,
 } from "./query.js";
-export { queryClientData } from "./client-query.js";
-export type { ClientQueryOptions } from "./client-query.js";
+export { queryClientData, matchesFilterValue, compareValues } from "./client-query.js";
+export type { ClientQueryOptions, FilterMatchOptions } from "./client-query.js";
 
 // Pagination presentation
 export { getPageNumbers, getRecordRange, serialNumber } from "./pagination.js";

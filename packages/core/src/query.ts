@@ -29,9 +29,12 @@ export function primarySort(query: QueryState): SortSpec | undefined {
  */
 export function withToggledSort(query: QueryState, field: string): QueryState {
   const current = primarySort(query);
+  const isSameField =
+    current !== undefined &&
+    (current.field === field || current.field.toLowerCase() === field.toLowerCase());
   let sort: SortSpec[];
 
-  if (current?.field !== field) {
+  if (!isSameField) {
     sort = [{ field, dir: "asc" }];
   } else if (current.dir === "asc") {
     sort = [{ field, dir: "desc" }];
@@ -50,7 +53,10 @@ export function withToggledSort(query: QueryState, field: string): QueryState {
  * Resets to page 1.
  */
 export function withToggledMultiSort(query: QueryState, field: string): QueryState {
-  const existingIndex = query.sort.findIndex((s) => s.field === field);
+  const lowerField = field.toLowerCase();
+  const existingIndex = query.sort.findIndex(
+    (s) => s.field === field || s.field.toLowerCase() === lowerField,
+  );
   let sort: SortSpec[];
 
   if (existingIndex === -1) {
@@ -104,8 +110,15 @@ export function withFilter(
   value: string | undefined,
 ): QueryState {
   const filter = { ...(query.filter ?? {}) };
-  if (value === undefined || value === "") delete filter[field];
-  else filter[field] = value;
+  const lowerField = field.toLowerCase();
+  for (const existingKey of Object.keys(filter)) {
+    if (existingKey !== field && existingKey.toLowerCase() === lowerField) {
+      delete filter[existingKey];
+    }
+  }
+  const normalized = value === undefined ? "" : value.trim();
+  if (normalized === "" || normalized === "..") delete filter[field];
+  else filter[field] = normalized;
   return {
     ...query,
     filter: Object.keys(filter).length > 0 ? filter : undefined,

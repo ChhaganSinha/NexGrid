@@ -29,6 +29,8 @@ import {
   formatMessage,
   getColumnId,
   getColumnTitle,
+  getFilterField,
+  getSortField,
   getPageNumbers,
   getRecordRange,
   initialHiddenColumns,
@@ -154,20 +156,26 @@ interface ReactColumnFilterPopoverProps<TData, TRender> {
   title: string;
   activeFilter?: string;
   locale: TableXLocale;
+  rootRef: React.RefObject<HTMLDivElement | null>;
+  tableWrapRef: React.RefObject<HTMLDivElement | null>;
   onApply: (val: string | undefined) => void;
   onClose: () => void;
 }
 
 function ReactColumnFilterPopover<TData, TRender>({
+  id,
   meta,
   title,
   activeFilter,
   locale,
+  rootRef,
+  tableWrapRef,
   onApply,
   onClose,
 }: ReactColumnFilterPopoverProps<TData, TRender>): React.JSX.Element {
   const [selectedVal, setSelectedVal] = React.useState<string>(activeFilter ?? "");
   const [searchTerm, setSearchTerm] = React.useState<string>(activeFilter ?? "");
+  const [hasTyped, setHasTyped] = React.useState<boolean>(false);
   const [fromVal, setFromVal] = React.useState<string>(() => {
     if (meta.filterType === "date-range" && activeFilter) {
       return activeFilter.split("..")[0] || "";
@@ -194,46 +202,118 @@ function ReactColumnFilterPopover<TData, TRender>({
   });
 
   const popoverRef = React.useRef<HTMLDivElement>(null);
-  const [fixedStyle, setFixedStyle] = React.useState<React.CSSProperties | null>(null);
+  const primaryInputRef = React.useRef<HTMLInputElement>(null);
+  const [popoverStyle, setPopoverStyle] = React.useState<React.CSSProperties>({
+    position: "absolute",
+    top: 0,
+    left: 0,
+    zIndex: 1000,
+    visibility: "hidden",
+  });
 
-  React.useLayoutEffect(() => {
+  const updatePosition = React.useCallback(() => {
     const el = popoverRef.current;
-    if (!el || typeof window === "undefined") return;
-    const btn = el.parentElement?.querySelector(".tbx-col-filter-btn") as HTMLElement | null;
+    const rootEl = rootRef.current;
+    if (!el || !rootEl || typeof window === "undefined") return;
+
+    const buttons = rootEl.querySelectorAll<HTMLElement>(".tbx-col-filter-btn");
+    let btn: HTMLElement | null = null;
+    for (const candidate of Array.from(buttons)) {
+      if (candidate.getAttribute("data-filter-col") === id) {
+        btn = candidate;
+        break;
+      }
+    }
     if (!btn || typeof btn.getBoundingClientRect !== "function") return;
+
     const btnRect = btn.getBoundingClientRect();
+    const rootRect = rootEl.getBoundingClientRect();
     if (btnRect.width === 0 && btnRect.height === 0 && btnRect.top === 0) {
+      setPopoverStyle({ position: "absolute", top: 0, left: 0, zIndex: 1000 });
       return;
     }
+
+    const wrapEl = tableWrapRef.current;
+    if (wrapEl && typeof wrapEl.getBoundingClientRect === "function") {
+      const wrapRect = wrapEl.getBoundingClientRect();
+      if (wrapRect.width > 0 && (btnRect.right < wrapRect.left + 4 || btnRect.left > wrapRect.right - 4)) {
+        onClose();
+        return;
+      }
+    }
+
     const popoverRect = el.getBoundingClientRect();
     const margin = 6;
-    let top = btnRect.bottom + margin;
     const popoverHeight = popoverRect.height || 220;
-    if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
-      top = btnRect.top - popoverHeight - margin;
-    }
     const popoverWidth = popoverRect.width || 240;
-    let left = btnRect.right - popoverWidth;
-    if (left < 12) {
-      left = Math.max(12, btnRect.left);
-    }
-    if (left + popoverWidth > window.innerWidth - 12) {
-      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+
+    let viewportTop = btnRect.bottom + margin;
+    if (
+      viewportTop + popoverHeight > window.innerHeight - 12 &&
+      btnRect.top - popoverHeight - margin > 12
+    ) {
+      viewportTop = btnRect.top - popoverHeight - margin;
     }
 
-    setFixedStyle({
-      position: "fixed",
-      top: `${Math.round(top)}px`,
-      left: `${Math.round(left)}px`,
+    let viewportLeft = btnRect.right - popoverWidth;
+    if (viewportLeft < 12) {
+      viewportLeft = Math.max(12, btnRect.left);
+    }
+    if (viewportLeft + popoverWidth > window.innerWidth - 12) {
+      viewportLeft = Math.max(12, window.innerWidth - popoverWidth - 12);
+    }
+
+    setPopoverStyle({
+      position: "absolute",
+      top: `${Math.round(viewportTop - rootRect.top)}px`,
+      left: `${Math.round(viewportLeft - rootRect.left)}px`,
       zIndex: 1000,
     });
-  }, []);
+  }, [id, rootRef, tableWrapRef, onClose]);
+
+  React.useLayoutEffect(() => {
+    updatePosition();
+  }, [updatePosition]);
+
+  React.useEffect(() => {
+    const input = primaryInputRef.current;
+    if (input && typeof input.focus === "function") {
+      try {
+        input.focus({ preventScroll: true });
+      } catch {
+        input.focus();
+      }
+    }
+    const wrapEl = tableWrapRef.current;
+    const onReposition = () => updatePosition();
+    wrapEl?.addEventListener("scroll", onReposition, { passive: true });
+    window.addEventListener("resize", onReposition);
+    return () => {
+      wrapEl?.removeEventListener("scroll", onReposition);
+      window.removeEventListener("resize", onReposition);
+    };
+  }, [tableWrapRef, updatePosition]);
 
   if (meta.filterType === "date-range") {
+    const applyDateRange = () => {
+      const f = fromVal.trim();
+      const t = toVal.trim();
+      onApply(!f && !t ? undefined : `${f}..${t}`);
+      onClose();
+    };
+    const handleRangeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyDateRange();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
     return (
       <div
         ref={popoverRef}
-        style={fixedStyle ?? undefined}
+        style={popoverStyle}
         className="tbx-filter-popover"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -241,11 +321,13 @@ function ReactColumnFilterPopover<TData, TRender>({
       >
         <div className="tbx-range-inputs">
           <input
+            ref={primaryInputRef}
             type="date"
             className="tbx-range-input"
             value={fromVal}
             aria-label="From date"
             onChange={(e) => setFromVal(e.target.value)}
+            onKeyDown={handleRangeKey}
           />
           <span className="tbx-range-sep">to</span>
           <input
@@ -254,6 +336,7 @@ function ReactColumnFilterPopover<TData, TRender>({
             value={toVal}
             aria-label="To date"
             onChange={(e) => setToVal(e.target.value)}
+            onKeyDown={handleRangeKey}
           />
         </div>
         <div className="tbx-filter-popover-actions">
@@ -271,12 +354,7 @@ function ReactColumnFilterPopover<TData, TRender>({
           <button
             type="button"
             className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-            onClick={() => {
-              const f = fromVal.trim();
-              const t = toVal.trim();
-              onApply(!f && !t ? undefined : `${f}..${t}`);
-              onClose();
-            }}
+            onClick={applyDateRange}
           >
             <CheckIcon className="tbx-icon" />
             <span>{locale.applyFilter}</span>
@@ -287,10 +365,25 @@ function ReactColumnFilterPopover<TData, TRender>({
   }
 
   if (meta.filterType === "number-range") {
+    const applyNumberRange = () => {
+      const mi = minVal.trim();
+      const ma = maxVal.trim();
+      onApply(!mi && !ma ? undefined : `${mi}..${ma}`);
+      onClose();
+    };
+    const handleRangeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyNumberRange();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
     return (
       <div
         ref={popoverRef}
-        style={fixedStyle ?? undefined}
+        style={popoverStyle}
         className="tbx-filter-popover"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -298,12 +391,14 @@ function ReactColumnFilterPopover<TData, TRender>({
       >
         <div className="tbx-range-inputs">
           <input
+            ref={primaryInputRef}
             type="number"
             className="tbx-range-input"
             placeholder="Min"
             value={minVal}
             aria-label="Minimum"
             onChange={(e) => setMinVal(e.target.value)}
+            onKeyDown={handleRangeKey}
           />
           <span className="tbx-range-sep">to</span>
           <input
@@ -313,6 +408,7 @@ function ReactColumnFilterPopover<TData, TRender>({
             value={maxVal}
             aria-label="Maximum"
             onChange={(e) => setMaxVal(e.target.value)}
+            onKeyDown={handleRangeKey}
           />
         </div>
         <div className="tbx-filter-popover-actions">
@@ -330,12 +426,7 @@ function ReactColumnFilterPopover<TData, TRender>({
           <button
             type="button"
             className="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-            onClick={() => {
-              const mi = minVal.trim();
-              const ma = maxVal.trim();
-              onApply(!mi && !ma ? undefined : `${mi}..${ma}`);
-              onClose();
-            }}
+            onClick={applyNumberRange}
           >
             <CheckIcon className="tbx-icon" />
             <span>{locale.applyFilter}</span>
@@ -351,29 +442,32 @@ function ReactColumnFilterPopover<TData, TRender>({
 
   const filterOptions = meta.filterOptions;
   const filteredOpts = filterOptions
-    ? filterOptions.filter(
-        (opt) =>
-          !searchTerm || opt.toLowerCase().includes(searchTerm.toLowerCase().trim())
-      )
+    ? hasTyped
+      ? filterOptions.filter(
+          (opt) =>
+            !searchTerm.trim() || opt.toLowerCase().includes(searchTerm.toLowerCase().trim()),
+        )
+      : filterOptions
     : [];
 
   return (
     <div
       ref={popoverRef}
-      style={fixedStyle ?? undefined}
+      style={popoverStyle}
       className="tbx-filter-popover"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       <input
-        autoFocus
+        ref={primaryInputRef}
         type={meta.filterType === "date" ? "date" : meta.filterType === "number" ? "number" : "text"}
         className="tbx-filter-popover-input"
         value={searchTerm}
         placeholder={placeholder}
         aria-label={`Filter ${title}`}
         onChange={(e) => {
+          setHasTyped(true);
           setSearchTerm(e.target.value);
           setSelectedVal(e.target.value);
         }}
@@ -384,6 +478,7 @@ function ReactColumnFilterPopover<TData, TRender>({
             onApply(val || undefined);
             onClose();
           } else if (e.key === "Escape") {
+            e.preventDefault();
             onClose();
           }
         }}
@@ -395,29 +490,35 @@ function ReactColumnFilterPopover<TData, TRender>({
             onClick={() => {
               setSelectedVal("");
               setSearchTerm("");
+              setHasTyped(false);
               onApply(undefined);
               onClose();
             }}
           >
             {locale.filterAll}
           </div>
-          {filteredOpts.map((opt) => {
-            const isSelected = selectedVal.toLowerCase() === opt.toLowerCase();
-            return (
-              <div
-                key={opt}
-                className={`tbx-filter-option ${isSelected ? "tbx-filter-option--selected" : ""}`}
-                onClick={() => {
-                  setSelectedVal(opt);
-                  setSearchTerm(opt);
-                  onApply(opt);
-                  onClose();
-                }}
-              >
-                {opt}
-              </div>
-            );
-          })}
+          {filteredOpts.length === 0 ? (
+            <div className="tbx-filter-empty">No matching options</div>
+          ) : (
+            filteredOpts.map((opt) => {
+              const isSelected = selectedVal.trim().toLowerCase() === opt.trim().toLowerCase();
+              return (
+                <div
+                  key={opt}
+                  className={`tbx-filter-option ${isSelected ? "tbx-filter-option--selected" : ""}`}
+                  onClick={() => {
+                    setSelectedVal(opt);
+                    setSearchTerm(opt);
+                    setHasTyped(false);
+                    onApply(opt);
+                    onClose();
+                  }}
+                >
+                  {opt}
+                </div>
+              );
+            })
+          )}
         </div>
       ) : null}
       <div className="tbx-filter-popover-actions">
@@ -427,6 +528,7 @@ function ReactColumnFilterPopover<TData, TRender>({
           onClick={() => {
             setSelectedVal("");
             setSearchTerm("");
+            setHasTyped(false);
             onApply(undefined);
             onClose();
           }}
@@ -564,6 +666,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   );
   const [editingCell, setEditingCell] = React.useState<{ rowId: string; columnId: string } | null>(null);
   const [draggedColId, setDraggedColId] = React.useState<string | null>(null);
+  const headerPointerRef = React.useRef<{
+    colId: string;
+    sortField: string;
+    x: number;
+    y: number;
+    shiftKey: boolean;
+    dropped: boolean;
+  } | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
@@ -581,22 +691,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         setOpenFilterCol(null);
       }
     };
-    const onScrollOrResize = (event: Event) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest?.(".tbx-filter-popover-options")) {
-        return;
-      }
-      setOpenFilterCol(null);
-    };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
     };
   }, [openFilterCol]);
 
@@ -620,8 +719,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     // An empty list means "search everything" to the engine, so only pass one
     // when it has entries — with no visible column there is nothing to narrow
     // to anyway, and the old behaviour is the safer fallback.
-    () => (clientSearchFields.length > 0 ? { searchableFields: clientSearchFields } : undefined),
-    [clientSearchFields],
+    () => ({
+      columns: colList,
+      ...(clientSearchFields.length > 0 ? { searchableFields: clientSearchFields } : {}),
+    }),
+    [colList, clientSearchFields],
   );
 
   const clientPaged = React.useMemo(() => {
@@ -663,7 +765,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       if (persisted.columnWidths) setColWidths(persisted.columnWidths);
       if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
         const hiddenMap: Record<string, boolean> = {};
-        for (const col of columns) {
+        for (const col of flattenColumns(columns)) {
           const id = getColumnId(col);
           if (id) hiddenMap[id] = persisted.hiddenColumns.includes(id);
         }
@@ -1107,21 +1209,46 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableSummaryRow === true ||
     visible.some((col) => col.meta?.aggregation !== undefined);
 
+  const getColumnActiveFilter = (col: TableXColumn<TData, React.ReactNode>): string | undefined => {
+    const id = getColumnId(col);
+    const filterField = getFilterField(col);
+    const filterObj = query.filter;
+    if (!filterObj) return undefined;
+    if (filterObj[filterField] !== undefined) return filterObj[filterField];
+    if (filterObj[id] !== undefined) return filterObj[id];
+    const lowerFilter = filterField.toLowerCase();
+    const lowerId = id.toLowerCase();
+    for (const [k, v] of Object.entries(filterObj)) {
+      const kl = k.toLowerCase();
+      if (kl === lowerFilter || kl === lowerId) return v;
+    }
+    return undefined;
+  };
+
   const renderLeafTh = (
     col: TableXColumn<TData, React.ReactNode>,
     rowSpan = 1,
     isGroupChild = false,
   ) => {
     const id = getColumnId(col);
+    const sortField = getSortField(col);
     const sortable = isSortable(col) && enableSorting !== false;
-    const sortIndex = query.sort.findIndex((s: SortSpec) => s.field === id);
+    const lowerSortField = sortField.toLowerCase();
+    const lowerId = id.toLowerCase();
+    const sortIndex = query.sort.findIndex(
+      (s: SortSpec) =>
+        s.field === sortField ||
+        s.field === id ||
+        s.field.toLowerCase() === lowerSortField ||
+        s.field.toLowerCase() === lowerId,
+    );
     const sortItem = sortIndex >= 0 ? query.sort[sortIndex] : undefined;
     const sorted = sortable && sortItem !== undefined;
     const title = getColumnTitle(col) || id;
     const meta = col.meta;
-    const filterField = meta?.serverFilterField || id;
-    const activeFilter = query.filter?.[filterField] ?? query.filter?.[id];
-    const isFilterActive = activeFilter !== undefined && activeFilter !== "";
+    const activeFilter = getColumnActiveFilter(col);
+    const isFilterActive = activeFilter !== undefined && activeFilter.trim() !== "";
+    const isFilterOpen = openFilterCol === id;
 
     const customWidth = colWidths[id];
     const baseStyle = headerCellStyle(col);
@@ -1171,9 +1298,33 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         data-column-id={id}
         data-tbx-focus={sortable ? `sort:${id}` : undefined}
         draggable={enableColumnReorder && !isGroupChild}
+        onPointerDown={
+          enableColumnReorder && !isGroupChild
+            ? (e) => {
+                const t = e.target as HTMLElement | null;
+                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
+                  headerPointerRef.current = null;
+                  return;
+                }
+                headerPointerRef.current = {
+                  colId: id,
+                  sortField,
+                  x: e.clientX,
+                  y: e.clientY,
+                  shiftKey: e.shiftKey,
+                  dropped: false,
+                };
+              }
+            : undefined
+        }
         onDragStart={
           enableColumnReorder && !isGroupChild
             ? (e) => {
+                const t = e.target as HTMLElement | null;
+                if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) {
+                  e.preventDefault();
+                  return;
+                }
                 setDraggedColId(id);
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", id);
@@ -1192,6 +1343,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             ? (e) => {
                 e.preventDefault();
                 if (!draggedColId || draggedColId === id) return;
+                if (headerPointerRef.current) {
+                  headerPointerRef.current.dropped = true;
+                }
                 const fromIdx = colList.findIndex((c) => getColumnId(c) === draggedColId);
                 const toIdx = colList.findIndex((c) => getColumnId(c) === id);
                 if (fromIdx >= 0 && toIdx >= 0) {
@@ -1208,8 +1362,20 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         }
         onDragEnd={
           enableColumnReorder && !isGroupChild
-            ? () => {
+            ? (e) => {
+                const ptr = headerPointerRef.current;
+                headerPointerRef.current = null;
                 setDraggedColId(null);
+                if (
+                  sortable &&
+                  ptr &&
+                  ptr.colId === id &&
+                  !ptr.dropped &&
+                  e.clientX > 0 &&
+                  Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 6
+                ) {
+                  toggleSort(ptr.sortField, ptr.shiftKey);
+                }
               }
             : undefined
         }
@@ -1232,7 +1398,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             ? (event) => {
                 const t = event.target as HTMLElement | null;
                 if (t?.closest(".tbx-col-filter-wrap") || t?.closest(".tbx-resize-handle")) return;
-                toggleSort(id, event.shiftKey);
+                headerPointerRef.current = null;
+                toggleSort(sortField, event.shiftKey);
               }
             : undefined
         }
@@ -1243,7 +1410,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 const t = event.target as HTMLElement | null;
                 if (t?.closest(".tbx-col-filter-wrap")) return;
                 event.preventDefault();
-                toggleSort(id, event.shiftKey);
+                toggleSort(sortField, event.shiftKey);
               }
             : undefined
         }
@@ -1274,14 +1441,26 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           ) : null}
 
           {isFilterable(col, enableColumnFilters) ? (
-            <div className="tbx-col-filter-wrap">
+            <div
+              className="tbx-col-filter-wrap"
+              draggable={false}
+              onDragStart={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
               <button
                 type="button"
-                className={
-                  isFilterActive
-                    ? "tbx-col-filter-btn tbx-col-filter-btn--active"
-                    : "tbx-col-filter-btn"
-                }
+                data-filter-col={id}
+                aria-expanded={isFilterOpen}
+                aria-haspopup="dialog"
+                className={[
+                  "tbx-col-filter-btn",
+                  isFilterActive ? "tbx-col-filter-btn--active" : undefined,
+                  isFilterOpen ? "tbx-col-filter-btn--open" : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 aria-label={`Filter ${title}`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1290,25 +1469,6 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               >
                 <DotsVerticalIcon className="tbx-icon" />
               </button>
-
-              {openFilterCol === id ? (
-                <ReactColumnFilterPopover
-                  id={id}
-                  col={col}
-                  meta={meta ?? {}}
-                  title={title}
-                  activeFilter={activeFilter}
-                  locale={locale}
-                  onApply={(val) => {
-                    let nextQuery = withFilter(query, filterField, val);
-                    if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
-                      nextQuery = withFilter(nextQuery, id, undefined);
-                    }
-                    onQueryChange(nextQuery);
-                  }}
-                  onClose={() => setOpenFilterCol(null)}
-                />
-              ) : null}
             </div>
           ) : null}
         </div>
@@ -1316,6 +1476,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         {enableColumnResize ? (
           <div
             className="tbx-resize-handle"
+            draggable={false}
+            onDragStart={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onPointerDown={startResize}
             onDoubleClick={() => autoFitColumn(id)}
           />
@@ -1323,6 +1488,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       </th>
     );
   };
+
+  const activeFilterPopoverCol = React.useMemo(
+    () => (openFilterCol ? leafCols.find((c) => getColumnId(c) === openFilterCol) ?? null : null),
+    [openFilterCol, leafCols],
+  );
+  const activeFilterPopoverVal = activeFilterPopoverCol
+    ? getColumnActiveFilter(activeFilterPopoverCol)
+    : undefined;
 
   return (
     <div className={rootClasses.join(" ")} data-density={density} ref={rootRef}>
@@ -1631,7 +1804,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       ) : null}
 
       {/* ── ACTIVE FILTER PILLS BAR ────────────────────────────────────────── */}
-      {showFilterPills !== false && (Boolean(query.q?.trim()) || Object.keys(query.filter ?? {}).some((k) => query.filter?.[k])) ? (
+      {showFilterPills !== false &&
+      (Boolean(query.q?.trim()) ||
+        Object.keys(query.filter ?? {}).some((k) => Boolean(query.filter?.[k]?.trim()))) ? (
         <div className="tbx-filter-pills-bar">
           <span className="tbx-filter-pills-title">Active filters:</span>
           {query.q?.trim() ? (
@@ -1645,15 +1820,23 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 className="tbx-filter-pill-remove"
                 title="Clear search"
                 aria-label="Clear search"
-                onClick={() => onQueryChange(withSearch(query, ""))}
+                onClick={() => {
+                  setSearchText("");
+                  onQueryChange(withSearch(query, ""));
+                }}
               >
                 ✕
               </button>
             </div>
           ) : null}
           {Object.entries(query.filter ?? {}).map(([key, val]) => {
-            if (val === undefined || val === "") return null;
-            const col = leafCols.find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
+            if (val === undefined || val.trim() === "") return null;
+            const lowerKey = key.toLowerCase();
+            const col = leafCols.find(
+              (c) =>
+                getColumnId(c).toLowerCase() === lowerKey ||
+                getFilterField(c).toLowerCase() === lowerKey,
+            );
             const title = col ? getColumnTitle(col) || key : key;
             return (
               <div key={key} className="tbx-filter-pill">
@@ -1674,11 +1857,38 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           <button
             type="button"
             className="tbx-filter-pill-clear-all"
-            onClick={() => onQueryChange({ ...query, page: 1, q: undefined, filter: {} })}
+            onClick={() => {
+              setSearchText("");
+              onQueryChange({ ...query, page: 1, q: undefined, filter: undefined });
+            }}
           >
             Clear all
           </button>
         </div>
+      ) : null}
+
+      {activeFilterPopoverCol ? (
+        <ReactColumnFilterPopover
+          key={`${getColumnId(activeFilterPopoverCol)}:${activeFilterPopoverVal ?? ""}`}
+          id={getColumnId(activeFilterPopoverCol)}
+          col={activeFilterPopoverCol}
+          meta={activeFilterPopoverCol.meta ?? {}}
+          title={getColumnTitle(activeFilterPopoverCol) || getColumnId(activeFilterPopoverCol)}
+          activeFilter={activeFilterPopoverVal}
+          locale={locale}
+          rootRef={rootRef}
+          tableWrapRef={tableWrapRef}
+          onApply={(val) => {
+            const colId = getColumnId(activeFilterPopoverCol);
+            const filterField = getFilterField(activeFilterPopoverCol);
+            let nextQuery = withFilter(query, filterField, val);
+            if (filterField !== colId && nextQuery.filter?.[colId] !== undefined) {
+              nextQuery = withFilter(nextQuery, colId, undefined);
+            }
+            onQueryChange(nextQuery);
+          }}
+          onClose={() => setOpenFilterCol(null)}
+        />
       ) : null}
 
       {/* ── TABLE (>= 768px) ─────────────────────────────────────────────── */}

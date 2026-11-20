@@ -12,7 +12,7 @@
 
 import type { TableXReactColumn } from "@nexgrid/react";
 
-import type { Student } from "@/lib/student-types";
+import { DEPARTMENTS, STATUSES, type Student } from "@/lib/student-types";
 
 export interface StudentActions {
   onEdit: (student: Student) => void;
@@ -45,7 +45,7 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "department",
       header: "Department",
-      meta: { minWidth: 160 },
+      meta: { minWidth: 160, filterOptions: DEPARTMENTS },
     },
     {
       accessorKey: "status",
@@ -54,7 +54,7 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
         align: "center",
         width: 130,
         serverFilterable: true,
-        filterOptions: ["Active", "Pending", "Suspended", "Alumni"],
+        filterOptions: STATUSES,
       },
       // The badge is presentation only: exports still write "Active".
       cell: ({ getValue }) => {
@@ -65,12 +65,12 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "score",
       header: "Score",
-      meta: { align: "right", width: 90 },
+      meta: { align: "right", width: 110, filterType: "number-range" },
     },
     {
       accessorKey: "enrolledAt",
       header: "Enrolled",
-      meta: { width: 140 },
+      meta: { width: 150, filterType: "date-range" },
       // Sorting happens on the server against the raw ISO value, so the display
       // format is free.
       cell: ({ getValue }) => {
@@ -85,7 +85,7 @@ export function studentColumns(actions: StudentActions): TableXReactColumn<Stude
     {
       accessorKey: "scholarship",
       header: "Scholarship",
-      meta: { align: "center", width: 120 },
+      meta: { align: "center", width: 120, filterOptions: ["true", "false"] },
     },
     {
       // `actions` is a structural id: never sorted, never exported, never listed

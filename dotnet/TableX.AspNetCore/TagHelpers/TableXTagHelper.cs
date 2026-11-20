@@ -48,11 +48,15 @@ namespace TableX.AspNetCore;
 /// </para>
 /// </remarks>
 [HtmlTargetElement(TagName)]
-[RestrictChildren(TableXColumnTagHelper.TagName)]
+[HtmlTargetElement(AliasTagName)]
+[RestrictChildren(TableXColumnTagHelper.TagName, TableXColumnTagHelper.AliasTagName)]
 public class TableXTagHelper : TagHelper
 {
-    /// <summary>The element name this Tag Helper targets.</summary>
+    /// <summary>The primary element name this Tag Helper targets.</summary>
     public const string TagName = "nex-grid";
+
+    /// <summary>Alias element name (<c>&lt;table-x&gt;</c>).</summary>
+    public const string AliasTagName = "table-x";
 
     private const string MissingBundleMessage =
         "TableX: the browser bundle is not loaded. Reference " +
@@ -116,6 +120,14 @@ public class TableXTagHelper : TagHelper
     /// <summary>Show row selection checkboxes. Defaults to <see langword="false"/>.</summary>
     [HtmlAttributeName("enable-selection")]
     public bool? EnableSelection { get; set; }
+
+    /// <summary>Enable column-level filter menus in headers. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-column-filters")]
+    public bool? EnableColumnFilters { get; set; }
+
+    /// <summary>Enable column sorting globally. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-sorting")]
+    public bool? EnableSorting { get; set; }
 
     /// <summary>Show the Excel/CSV export menu. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-export")]
@@ -244,6 +256,8 @@ public class TableXTagHelper : TagHelper
         EnableSearch = EnableSearch,
         SearchPlaceholder = NullIfBlank(SearchPlaceholder),
         EnableSelection = EnableSelection,
+        EnableColumnFilters = EnableColumnFilters,
+        EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportFileName = NullIfBlank(ExportFileName),
         ShowSerialNumber = ShowSerialNumber,

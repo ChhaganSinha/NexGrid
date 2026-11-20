@@ -31,10 +31,16 @@ namespace TableX.AspNetCore;
 /// </example>
 /// </remarks>
 [HtmlTargetElement(TagName, ParentTag = TableXTagHelper.TagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(TagName, ParentTag = TableXTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(AliasTagName, ParentTag = TableXTagHelper.TagName, TagStructure = TagStructure.WithoutEndTag)]
+[HtmlTargetElement(AliasTagName, ParentTag = TableXTagHelper.AliasTagName, TagStructure = TagStructure.WithoutEndTag)]
 public class TableXColumnTagHelper : TagHelper
 {
-    /// <summary>The element name this Tag Helper targets.</summary>
+    /// <summary>The primary element name this Tag Helper targets.</summary>
     public const string TagName = "nex-grid-column";
+
+    /// <summary>Alias element name (<c>&lt;table-x-column&gt;</c>).</summary>
+    public const string AliasTagName = "table-x-column";
 
     /// <summary>
     /// The row property this column reads, and the column id used in
@@ -105,6 +111,21 @@ public class TableXColumnTagHelper : TagHelper
     [HtmlAttributeName("filter-field")]
     public string? FilterField { get; set; }
 
+    /// <summary>The sort key to send when it differs from <see cref="Field"/>.</summary>
+    [HtmlAttributeName("sort-field")]
+    public string? SortField { get; set; }
+
+    /// <summary>
+    /// Filter UI type: <c>text</c>, <c>select</c>, <c>number</c>, <c>date</c>,
+    /// <c>number-range</c>, or <c>date-range</c>.
+    /// </summary>
+    [HtmlAttributeName("filter-type")]
+    public string? FilterType { get; set; }
+
+    /// <summary>Custom placeholder text for the column filter input.</summary>
+    [HtmlAttributeName("filter-placeholder")]
+    public string? FilterPlaceholder { get; set; }
+
     /// <summary>
     /// Comma-separated allowed filter values, e.g. <c>"Active,Suspended,Alumni"</c>.
     /// Renders a picker instead of a free-text box. Blank entries are dropped.
@@ -152,7 +173,10 @@ public class TableXColumnTagHelper : TagHelper
             Hideable = Hideable,
             Exportable = Exportable,
             ServerFilterable = Filterable,
-            ServerFilterField = FilterField,
+            ServerFilterField = string.IsNullOrWhiteSpace(FilterField) ? null : FilterField,
+            SortField = string.IsNullOrWhiteSpace(SortField) ? null : SortField,
+            FilterType = string.IsNullOrWhiteSpace(FilterType) ? null : FilterType.Trim().ToLowerInvariant(),
+            FilterPlaceholder = string.IsNullOrWhiteSpace(FilterPlaceholder) ? null : FilterPlaceholder,
             FilterOptions = ParseFilterOptions(FilterOptions),
         };
 

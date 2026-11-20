@@ -246,53 +246,14 @@
         var SORTABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
         var SEARCHABLE = ["name", "email", "department"];
         var FILTERABLE = ["name", "email", "department", "status", "score", "enrolledAt", "scholarship"];
+        var FILTER_HINTS = {
+          department: { filterOptions: DEPARTMENTS },
+          status: { filterOptions: STATUSES },
+          score: { filterType: "number-range" },
+          enrolledAt: { filterType: "date-range" },
+          scholarship: { filterOptions: ["true", "false"] },
+        };
         var LATENCY_MS = 300;
-
-        function compare(a, b) {
-          if (typeof a === "number" && typeof b === "number") return a - b;
-          if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
-          return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b), undefined, {
-            numeric: true,
-            sensitivity: "base",
-          });
-        }
-
-        function matchesFilterValue(val, filterVal) {
-          if (val === null || val === undefined) return false;
-          var rawStr = String(val).trim().toLowerCase();
-          var wanted = filterVal.trim().toLowerCase();
-          if (rawStr === wanted) return true;
-          if (rawStr.indexOf(wanted) !== -1) return true;
-
-          var cleanWanted = wanted.replace(/%/g, "").trim();
-          var cleanRaw = rawStr.replace(/%/g, "").trim();
-          if (cleanRaw === cleanWanted || cleanRaw.indexOf(cleanWanted) !== -1) return true;
-
-          var numVal = Number(cleanRaw);
-          var numWanted = Number(cleanWanted);
-          if (!isNaN(numVal) && !isNaN(numWanted) && numVal === numWanted) {
-            return true;
-          }
-
-          if (typeof val === "boolean") {
-            if (val && (wanted === "true" || wanted === "yes" || wanted === "active")) return true;
-            if (!val && (wanted === "false" || wanted === "no")) return true;
-          }
-
-          if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) {
-            var d = new Date(val + "T00:00:00Z");
-            if (!isNaN(d.getTime())) {
-              var monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-              var fullMonthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-              var m = d.getUTCMonth();
-              var formatted = (monthNames[m] + " " + d.getUTCDate() + ", " + d.getUTCFullYear()).toLowerCase();
-              var formattedFull = (fullMonthNames[m] + " " + d.getUTCDate() + ", " + d.getUTCFullYear()).toLowerCase();
-              if (formatted.indexOf(wanted) !== -1 || formattedFull.indexOf(wanted) !== -1) return true;
-            }
-          }
-
-          return false;
-        }
 
         function queryStudents(query) {
           var matching = STUDENTS.slice();
@@ -312,8 +273,9 @@
           Object.keys(filter).forEach(function (field) {
             var value = filter[field];
             if (!value || FILTERABLE.indexOf(field) === -1) return;
+            var hint = FILTER_HINTS[field];
             matching = matching.filter(function (row) {
-              return matchesFilterValue(row[field], value);
+              return TableX.matchesFilterValue(row[field], value, hint);
             });
           });
 
@@ -323,11 +285,11 @@
           });
           matching.sort(function (left, right) {
             for (var i = 0; i < sorts.length; i++) {
-              var result = compare(left[sorts[i].field], right[sorts[i].field]);
-              if (result !== 0) return sorts[i].dir === "desc" ? -result : result;
+              var result = TableX.compareValues(left[sorts[i].field], right[sorts[i].field], sorts[i].dir);
+              if (result !== 0) return result;
             }
             // A stable tiebreaker, so paging never shows the same row twice.
-            return left.id - right.id;
+            return Number(left.id) - Number(right.id);
           });
 
           // 4. Page, clamped so a stale page number shows the last page.
@@ -417,7 +379,7 @@
           {
             accessorKey: "score",
             header: "Score",
-            meta: { align: "right", width: 90, filterable: true },
+            meta: { align: "right", width: 110, filterable: true, filterType: "number-range" },
             cell: function (ctx) {
               var score = Number(ctx.getValue());
               return el("span", {
@@ -429,7 +391,7 @@
           {
             accessorKey: "enrolledAt",
             header: "Enrolled Date",
-            meta: { width: 140, filterable: true },
+            meta: { width: 150, filterable: true, filterType: "date-range" },
             // Sorting happens against the raw ISO value, so the display format
             // is free to be whatever reads best.
             cell: function (ctx) {

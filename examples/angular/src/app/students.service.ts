@@ -13,7 +13,13 @@
 // Swapping this for a real API is a one-method change — see the README.
 
 import { Injectable } from "@angular/core";
-import type { PagedResponse, QueryState } from "@nexgrid/angular";
+import {
+  compareValues,
+  matchesFilterValue,
+  type FilterMatchOptions,
+  type PagedResponse,
+  type QueryState,
+} from "@nexgrid/angular";
 import { Observable, delay, of } from "rxjs";
 
 /** The row type this example pages through. */
@@ -54,7 +60,22 @@ const SORTABLE: readonly StudentField[] = [
   "scholarship",
 ];
 const SEARCHABLE: readonly StudentField[] = ["name", "email", "department"];
-const FILTERABLE: readonly StudentField[] = ["status", "department"];
+const FILTERABLE: readonly StudentField[] = [
+  "name",
+  "email",
+  "department",
+  "status",
+  "score",
+  "enrolledAt",
+  "scholarship",
+];
+const FILTER_HINTS: Partial<Record<StudentField, FilterMatchOptions>> = {
+  department: { filterOptions: DEPARTMENTS },
+  status: { filterOptions: STATUSES },
+  score: { filterType: "number-range" },
+  enrolledAt: { filterType: "date-range" },
+  scholarship: { filterOptions: ["true", "false"] },
+};
 
 /** Simulated network latency, in milliseconds. */
 const LATENCY_MS = 320;
@@ -105,15 +126,6 @@ function buildStudents(count: number): Student[] {
   }
 
   return rows;
-}
-
-function compare(a: unknown, b: unknown): number {
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
-  return String(a ?? "").localeCompare(String(b ?? ""), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
 }
 
 function isAllowed(field: string, allowlist: readonly StudentField[]): field is StudentField {
@@ -173,16 +185,16 @@ export class StudentsService {
 
     for (const [field, value] of Object.entries(query.filter ?? {})) {
       if (!value || !isAllowed(field, FILTERABLE)) continue;
-      const wanted = String(value).toLowerCase();
-      matching = matching.filter((row) => String(row[field]).toLowerCase() === wanted);
+      const hint = FILTER_HINTS[field];
+      matching = matching.filter((row) => matchesFilterValue(row[field], value, hint));
     }
 
     const sorts = (query.sort ?? []).filter((spec: { field: string }) => isAllowed(spec.field, SORTABLE));
     matching.sort((left, right) => {
       for (const spec of sorts) {
         const field = spec.field as StudentField;
-        const result = compare(left[field], right[field]);
-        if (result !== 0) return spec.dir === "desc" ? -result : result;
+        const result = compareValues(left[field], right[field], spec.dir);
+        if (result !== 0) return result;
       }
       // A stable tiebreaker, so paging never shows the same row twice.
       return left.id - right.id;

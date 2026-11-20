@@ -4,10 +4,17 @@ import React from "react";
 
 // Test the re-exported core engine and React rendering utilities
 import {
+  TableX,
+  useClientTableX,
   defaultQuery,
   withToggledSort,
   withToggledMultiSort,
+  withFilter,
   withPage,
+  matchesFilterValue,
+  compareValues,
+  getSortField,
+  getFilterField,
   queryClientData,
   parseQuery,
   serializeQuery,
@@ -61,5 +68,53 @@ test("queryClientData slices pages and returns all matching when paginate is fal
   const all = queryClientData(items, { page: 1, pageSize: 10, sort: [] }, { paginate: false });
   assert.equal(all.items.length, 45);
   assert.equal(all.total, 45);
+});
+
+test("React package exports sorting/filtering helpers and TableX / useClientTableX", () => {
+  assert.equal(typeof TableX, "function");
+  assert.equal(typeof useClientTableX, "function");
+
+  const columns = [
+    { id: "student", accessorKey: "name", header: "Student" },
+    {
+      accessorKey: "status",
+      header: "Status",
+      meta: { filterOptions: ["Active", "Inactive"] },
+    },
+    { accessorKey: "score", header: "Score", meta: { filterType: "number-range" } },
+  ];
+
+  assert.equal(getSortField(columns[0]), "name");
+  assert.equal(getFilterField(columns[0]), "name");
+  assert.equal(matchesFilterValue("Inactive", "Active", { filterOptions: ["Active", "Inactive"] }), false);
+  assert.ok(compareValues(-15, -3, "asc") < 0);
+
+  const rows = Array.from({ length: 35 }, (_, i) => ({
+    id: String(i + 1),
+    name: `Student ${i + 1}`,
+    status: i % 2 === 0 ? "Active" : "Inactive",
+    score: 60 + i,
+  }));
+
+  let q = defaultQuery();
+  q = withFilter(q, "status", "Active");
+  q = withFilter(q, "score", "70..90");
+  q = withToggledSort(q, "score");
+  q = withToggledSort(q, "score"); // desc
+
+  const paged = queryClientData(rows, q, { columns });
+  assert.ok(paged.total > 0 && paged.total < 35);
+  assert.ok(paged.items.every((r) => r.status === "Active" && r.score >= 70 && r.score <= 90));
+  assert.ok(paged.items[0].score >= paged.items[paged.items.length - 1].score);
+
+  const element = React.createElement(TableX, {
+    caption: "Students",
+    columns,
+    data: paged.items,
+    total: paged.total,
+    query: q,
+  });
+  assert.equal(element.type, TableX);
+  assert.equal(element.props.total, paged.total);
 });
 

@@ -30,6 +30,7 @@ import {
   Component,
   ContentChild,
   ContentChildren,
+  ElementRef,
   EventEmitter,
   Input,
   NgZone,
@@ -60,6 +61,8 @@ import {
   getCellValue,
   getColumnId,
   getColumnTitle,
+  getFilterField,
+  getSortField,
   getPageNumbers,
   getRecordRange,
   initialHiddenColumns,
@@ -69,6 +72,7 @@ import {
   isFilterable,
   primarySort,
   resolveLocale,
+  searchableColumnIds,
   serialNumber,
   timestampedFilename,
   toExportColumns,
@@ -130,7 +134,7 @@ type MenuName = "columns" | "density" | "export";
 const SEARCH_DEBOUNCE_MS = 350;
 
 @Component({
-  selector: "table-x, table-x",
+  selector: "table-x, nex-grid",
   standalone: true,
   imports: [NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -709,10 +713,6 @@ const SEARCH_DEBOUNCE_MS = 350;
                 class="tbx-th-inner"
                 [class.tbx-th-inner--center]="header.align === 'center'"
                 [class.tbx-th-inner--right]="header.align === 'right'"
-                [attr.role]="header.sortable ? 'button' : null"
-                [attr.tabindex]="header.sortable ? 0 : null"
-                (keydown.enter)="onHeaderKeydown($event, header)"
-                (keydown.space)="onHeaderKeydown($event, header)"
               >
                 <span>{{ header.title }}</span>
                 @if (header.sortable) {
@@ -773,13 +773,15 @@ const SEARCH_DEBOUNCE_MS = 350;
                 }
 
                 @if (header.serverFilterable) {
-                  <div class="tbx-col-filter-wrap">
+                  <div class="tbx-col-filter-wrap" (click)="$event.stopPropagation()">
                     <button
                       type="button"
                       class="tbx-col-filter-btn"
+                      [attr.data-filter-col]="header.id"
                       [class.tbx-col-filter-btn--active]="header.activeFilter !== undefined && header.activeFilter !== ''"
+                      [attr.aria-expanded]="openFilterColumn === header.id"
                       [attr.aria-label]="'Options and filter for ' + header.title"
-                      (click)="toggleFilterPopover(header.id, $event)"
+                      (click)="toggleFilterPopover(header, $event)"
                     >
                       <svg
                         class="tbx-icon"
@@ -796,80 +798,6 @@ const SEARCH_DEBOUNCE_MS = 350;
                         <circle cx="12" cy="19" r="1.5" />
                       </svg>
                     </button>
-
-                    @if (openFilterColumn === header.id) {
-                      <div class="tbx-filter-popover" [style]="filterPopoverStyles" (pointerdown)="$event.stopPropagation()" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
-                        <input
-                          #filterInput
-                          type="text"
-                          class="tbx-filter-popover-input"
-                          [value]="header.activeFilter ?? ''"
-                          [placeholder]="'Filter ' + header.title + '…'"
-                          (keydown.enter)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                        />
-                        @if (header.filterOptions && header.filterOptions.length > 0) {
-                          <div class="tbx-filter-popover-options">
-                            <div
-                              class="tbx-filter-option"
-                              [class.tbx-filter-option--selected]="!header.activeFilter"
-                              (click)="filterInput.value = ''; applyColumnFilter(header.id, undefined)"
-                            >
-                              {{ strings.filterAll }}
-                            </div>
-                            @for (opt of header.filterOptions; track opt) {
-                              <div
-                                class="tbx-filter-option"
-                                [class.tbx-filter-option--selected]="header.activeFilter === opt"
-                                (click)="filterInput.value = opt; applyColumnFilter(header.id, opt)"
-                              >
-                                {{ opt }}
-                              </div>
-                            }
-                          </div>
-                        }
-                        <div class="tbx-filter-popover-actions">
-                          <button
-                            type="button"
-                            class="tbx-filter-popover-btn"
-                            (click)="filterInput.value = ''; applyColumnFilter(header.id, undefined)"
-                          >
-                            <svg
-                              class="tbx-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                              <path d="M3 3v5h5" />
-                            </svg>
-                            <span>{{ strings.clearFilter }}</span>
-                          </button>
-                          <button
-                            type="button"
-                            class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
-                            (click)="applyColumnFilter(header.id, filterInput.value.trim() || undefined)"
-                          >
-                            <svg
-                              class="tbx-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M20 6 9 17l-5-5" />
-                            </svg>
-                            <span>{{ strings.applyFilter }}</span>
-                          </button>
-                        </div>
-                      </div>
-                    }
                   </div>
                 }
               </div>
@@ -925,11 +853,14 @@ const SEARCH_DEBOUNCE_MS = 350;
                     scope="col"
                     [attr.rowspan]="header.rowSpan && header.rowSpan > 1 ? header.rowSpan : null"
                     [class.tbx-th--sortable]="header.sortable"
+                    [attr.tabindex]="header.sortable ? 0 : null"
                     [attr.aria-sort]="header.ariaSort"
                     [style.width.px]="header.width"
                     [style.minWidth.px]="header.minWidth"
                     [style.textAlign]="header.align"
                     (click)="onHeaderActivate(header, $event)"
+                    (keydown.enter)="onHeaderKeydown($event, header)"
+                    (keydown.space)="onHeaderKeydown($event, header)"
                   >
                     <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
                   </th>
@@ -943,11 +874,14 @@ const SEARCH_DEBOUNCE_MS = 350;
                     class="tbx-th tbx-th--grouped-child"
                     scope="col"
                     [class.tbx-th--sortable]="header.sortable"
+                    [attr.tabindex]="header.sortable ? 0 : null"
                     [attr.aria-sort]="header.ariaSort"
                     [style.width.px]="header.width"
                     [style.minWidth.px]="header.minWidth"
                     [style.textAlign]="header.align"
                     (click)="onHeaderActivate(header, $event)"
+                    (keydown.enter)="onHeaderKeydown($event, header)"
+                    (keydown.space)="onHeaderKeydown($event, header)"
                   >
                     <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
                   </th>
@@ -1012,6 +946,119 @@ const SEARCH_DEBOUNCE_MS = 350;
           </tbody>
         </table>
       </div>
+
+      @if (activeFilterHeader) {
+        <div
+          class="tbx-filter-popover"
+          role="dialog"
+          [attr.aria-label]="'Filter ' + activeFilterHeader.title"
+          [style]="filterPopoverStyles"
+          (pointerdown)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (click)="$event.stopPropagation()"
+        >
+          @if (activeFilterHeader.filterType === 'date-range' || activeFilterHeader.filterType === 'number-range') {
+            <div class="tbx-range-inputs">
+              <input
+                [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
+                class="tbx-range-input"
+                [value]="filterRangeMin"
+                [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'From' : 'Min'"
+                [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'From date' : 'Minimum'"
+                (input)="onFilterRangeMinInput($event)"
+                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+              />
+              <span class="tbx-range-sep">to</span>
+              <input
+                [type]="activeFilterHeader.filterType === 'date-range' ? 'date' : 'number'"
+                class="tbx-range-input"
+                [value]="filterRangeMax"
+                [placeholder]="activeFilterHeader.filterType === 'date-range' ? 'To' : 'Max'"
+                [attr.aria-label]="activeFilterHeader.filterType === 'date-range' ? 'To date' : 'Maximum'"
+                (input)="onFilterRangeMaxInput($event)"
+                (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+                (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+              />
+            </div>
+          } @else {
+            <input
+              [type]="activeFilterHeader.filterType === 'date' ? 'date' : activeFilterHeader.filterType === 'number' ? 'number' : 'text'"
+              class="tbx-filter-popover-input"
+              [value]="filterInputText"
+              [placeholder]="activeFilterHeader.filterPlaceholder || ('Filter ' + activeFilterHeader.title + '…')"
+              (input)="onFilterTextInput($event)"
+              (keydown.enter)="$event.preventDefault(); submitActiveFilter()"
+              (keydown.escape)="$event.preventDefault(); closeFilterPopover()"
+            />
+            @if (activeFilterHeader.filterOptions && activeFilterHeader.filterOptions.length > 0) {
+              <div class="tbx-filter-popover-options" role="listbox">
+                <div
+                  class="tbx-filter-option"
+                  role="option"
+                  [attr.aria-selected]="!filterInputText.trim()"
+                  [class.tbx-filter-option--selected]="!filterInputText.trim()"
+                  (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
+                >
+                  {{ strings.filterAll }}
+                </div>
+                @for (opt of filteredPopoverOptions; track opt) {
+                  <div
+                    class="tbx-filter-option"
+                    role="option"
+                    [attr.aria-selected]="filterInputText === opt"
+                    [class.tbx-filter-option--selected]="filterInputText === opt"
+                    (click)="applyColumnFilter(activeFilterHeader.id, opt)"
+                  >
+                    {{ opt }}
+                  </div>
+                }
+              </div>
+            }
+          }
+          <div class="tbx-filter-popover-actions">
+            <button
+              type="button"
+              class="tbx-filter-popover-btn"
+              (click)="applyColumnFilter(activeFilterHeader.id, undefined)"
+            >
+              <svg
+                class="tbx-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>{{ strings.clearFilter }}</span>
+            </button>
+            <button
+              type="button"
+              class="tbx-filter-popover-btn tbx-filter-popover-btn--primary"
+              (click)="submitActiveFilter()"
+            >
+              <svg
+                class="tbx-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>{{ strings.applyFilter }}</span>
+            </button>
+          </div>
+        </div>
+      }
 
       <div class="tbx-cards">
         @if (isLoading) {
@@ -1234,7 +1281,10 @@ export class TableXComponent<TData>
   @Input() selectionMode: "multi" | "single" = "multi";
 
   /** Enable column-level filter menus on column headers. */
-  @Input({ transform: booleanAttribute }) enableColumnFilters = false;
+  @Input({ transform: booleanAttribute }) enableColumnFilters = true;
+
+  /** Explicit fields searched by global search (`q`) in client mode. */
+  @Input() searchableFields?: (keyof TData & string)[];
 
   /** Enable dragging column borders to resize columns. */
   @Input({ transform: booleanAttribute }) enableColumnResize = true;
@@ -1388,7 +1438,13 @@ export class TableXComponent<TData>
   protected currentDensity: Density = "default";
   protected openMenu: "columns" | "density" | "export" | null = null;
   protected openFilterColumn: string | null = null;
+  protected activeFilterHeader: NexGridHeaderView | null = null;
   protected filterPopoverStyles: Record<string, string> | null = null;
+  protected filterInputText = "";
+  protected filterRangeMin = "";
+  protected filterRangeMax = "";
+  protected filterHasTyped = false;
+  protected filteredPopoverOptions: readonly string[] = [];
   protected columnWidths: Record<string, number> = {};
   protected isExporting = false;
   protected searchText = "";
@@ -1448,6 +1504,7 @@ export class TableXComponent<TData>
   // Internal state
   // ---------------------------------------------------------------------
 
+  private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly zone = inject(NgZone);
   private readonly document = inject(DOCUMENT);
@@ -1461,6 +1518,7 @@ export class TableXComponent<TData>
   private selectedIds: ReadonlySet<string> = new Set<string>();
   private cellTemplates = new Map<string, TemplateRef<NexGridCellTemplateContext<TData>>>();
   private detachMenuListeners: (() => void) | null = null;
+  private detachFilterListeners: (() => void) | null = null;
 
   /**
    * The search value we last pushed to the host. Lets an ECHO of our own
@@ -1489,7 +1547,22 @@ export class TableXComponent<TData>
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["locale"]) this.strings = resolveLocale(this.locale);
     if (changes["density"]) this.currentDensity = this.density;
-    if (changes["columns"] && !this.columnsSeeded && this.columns.length > 0) {
+    if (changes["columns"] && this.columnsSeeded && this.columns.length > 0) {
+      const colMap = new Map(this.columns.map((c) => [getColumnId(c), c]));
+      const updatedOrder: TableXAngularColumn<TData>[] = [];
+      for (const existing of this.orderedColumns) {
+        const id = getColumnId(existing);
+        const fresh = colMap.get(id);
+        if (fresh) {
+          updatedOrder.push(fresh);
+          colMap.delete(id);
+        }
+      }
+      for (const remaining of colMap.values()) {
+        updatedOrder.push(remaining);
+      }
+      this.orderedColumns = updatedOrder;
+    } else if (changes["columns"] && !this.columnsSeeded && this.columns.length > 0) {
       this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
       this.orderedColumns = [...this.columns];
       if (this.storageKey) {
@@ -1549,6 +1622,8 @@ export class TableXComponent<TData>
     this.searchInput$.complete();
     this.detachMenuListeners?.();
     this.detachMenuListeners = null;
+    this.detachFilterListeners?.();
+    this.detachFilterListeners = null;
   }
 
   // ---------------------------------------------------------------------
@@ -1640,7 +1715,7 @@ export class TableXComponent<TData>
   }
 
   // ---------------------------------------------------------------------
-  // Sorting
+  // Sorting & Column Filtering
   // ---------------------------------------------------------------------
 
   protected onHeaderActivate(header: NexGridHeaderView, event?: MouseEvent | KeyboardEvent | Event): void {
@@ -1649,10 +1724,11 @@ export class TableXComponent<TData>
       return;
     }
     if (!header.sortable) return;
+    const sortField = header.sortField || header.id;
     const isMulti =
       event instanceof MouseEvent || event instanceof KeyboardEvent ? event.shiftKey : false;
     this.emitQuery(
-      isMulti ? withToggledMultiSort(this.query, header.id) : withToggledSort(this.query, header.id),
+      isMulti ? withToggledMultiSort(this.query, sortField) : withToggledSort(this.query, sortField),
     );
   }
 
@@ -1663,50 +1739,195 @@ export class TableXComponent<TData>
     this.onHeaderActivate(header, event);
   }
 
-  protected toggleFilterPopover(id: string, event: Event): void {
+  protected toggleFilterPopover(header: NexGridHeaderView, event: Event): void {
     event.stopPropagation();
-    this.openFilterColumn = this.openFilterColumn === id ? null : id;
+    const id = header.id;
     if (this.openFilterColumn === id) {
-      const btn = (event.currentTarget || event.target) as HTMLElement | null;
-      if (btn && typeof btn.getBoundingClientRect === "function") {
-        const btnRect = btn.getBoundingClientRect();
-        if (btnRect.width > 0) {
-          const margin = 6;
-          let top = btnRect.bottom + margin;
-          const popoverHeight = 220;
-          if (top + popoverHeight > window.innerHeight - 12 && btnRect.top - popoverHeight - margin > 12) {
-            top = btnRect.top - popoverHeight - margin;
-          }
-          const popoverWidth = 240;
-          let left = btnRect.right - popoverWidth;
-          if (left < 12) {
-            left = Math.max(12, btnRect.left);
-          }
-          if (left + popoverWidth > window.innerWidth - 12) {
-            left = Math.max(12, window.innerWidth - popoverWidth - 12);
-          }
-          this.filterPopoverStyles = {
-            position: "fixed",
-            top: `${Math.round(top)}px`,
-            left: `${Math.round(left)}px`,
-            "z-index": "1000",
-          };
-        } else {
-          this.filterPopoverStyles = null;
-        }
-      }
+      this.closeFilterPopover();
+      return;
+    }
+    this.closeMenus();
+    this.openFilterColumn = id;
+    this.filterHasTyped = false;
+    const activeVal = header.activeFilter ?? "";
+    if (header.filterType === "date-range" || header.filterType === "number-range") {
+      const parts = activeVal.split("..");
+      this.filterRangeMin = parts[0] ?? "";
+      this.filterRangeMax = parts[1] ?? "";
+      this.filterInputText = "";
     } else {
-      this.filterPopoverStyles = null;
+      this.filterInputText = activeVal;
+      this.filterRangeMin = "";
+      this.filterRangeMax = "";
     }
     this.recompute();
+    const btn = (event.currentTarget || event.target) as HTMLElement | null;
+    this.updateFilterPopoverPosition(btn);
+    this.attachFilterListeners();
+    this.cdr.markForCheck();
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        const input = this.hostRef.nativeElement?.querySelector?.(
+          ".tbx-filter-popover input",
+        ) as HTMLInputElement | null;
+        input?.focus?.({ preventScroll: true });
+      });
+    }
+  }
+
+  protected closeFilterPopover(): void {
+    if (this.openFilterColumn === null && !this.detachFilterListeners) return;
+    this.openFilterColumn = null;
+    this.activeFilterHeader = null;
+    this.filterPopoverStyles = null;
+    this.detachFilterListeners?.();
+    this.detachFilterListeners = null;
+    this.cdr.markForCheck();
+  }
+
+  private updateFilterPopoverPosition(anchorBtn?: HTMLElement | null): void {
+    if (!this.openFilterColumn) {
+      this.filterPopoverStyles = null;
+      return;
+    }
+    const rootEl = this.hostRef.nativeElement;
+    const btn =
+      anchorBtn ??
+      (Array.from(rootEl?.querySelectorAll?.(".tbx-col-filter-btn") ?? []).find(
+        (el) => el.getAttribute("data-filter-col") === this.openFilterColumn,
+      ) as HTMLElement | undefined) ??
+      null;
+
+    if (!rootEl || !btn || typeof btn.getBoundingClientRect !== "function" || typeof rootEl.getBoundingClientRect !== "function") {
+      this.filterPopoverStyles = null;
+      return;
+    }
+
+    const rootRect = rootEl.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    if (btnRect.width <= 0 || rootRect.width <= 0) {
+      this.filterPopoverStyles = null;
+      return;
+    }
+
+    const margin = 6;
+    const popoverWidth = 240;
+    const popoverHeight = 220;
+    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewportH = typeof window !== "undefined" ? window.innerHeight : 768;
+
+    let viewportTop = btnRect.bottom + margin;
+    if (viewportTop + popoverHeight > viewportH - 12 && btnRect.top - popoverHeight - margin > 12) {
+      viewportTop = btnRect.top - popoverHeight - margin;
+    }
+
+    let viewportLeft = btnRect.right - popoverWidth;
+    if (viewportLeft < 12) {
+      viewportLeft = Math.max(12, btnRect.left);
+    }
+    if (viewportLeft + popoverWidth > viewportW - 12) {
+      viewportLeft = Math.max(12, viewportW - popoverWidth - 12);
+    }
+
+    this.filterPopoverStyles = {
+      position: "absolute",
+      top: `${Math.round(viewportTop - rootRect.top)}px`,
+      left: `${Math.round(viewportLeft - rootRect.left)}px`,
+      right: "auto",
+      "z-index": "60",
+    };
+  }
+
+  private attachFilterListeners(): void {
+    this.detachFilterListeners?.();
+    const rootEl = this.hostRef.nativeElement;
+    const tableWrap = rootEl?.querySelector?.(".tbx-table-wrap") as HTMLElement | null;
+
+    const onPointerDown = (event: Event): void => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      const popover = rootEl?.querySelector?.(".tbx-filter-popover");
+      if (popover?.contains(target)) return;
+      const el = target as HTMLElement;
+      if (el.closest?.(".tbx-col-filter-wrap")) return;
+      this.zone.run(() => this.closeFilterPopover());
+    };
+
+    const onKeydown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        this.zone.run(() => this.closeFilterPopover());
+      }
+    };
+
+    const onReposition = (): void => {
+      this.zone.run(() => {
+        this.updateFilterPopoverPosition();
+        this.cdr.markForCheck();
+      });
+    };
+
+    this.zone.runOutsideAngular(() => {
+      this.document.addEventListener("pointerdown", onPointerDown);
+      this.document.addEventListener("keydown", onKeydown);
+      tableWrap?.addEventListener("scroll", onReposition, { passive: true });
+      if (typeof window !== "undefined") {
+        window.addEventListener("resize", onReposition, { passive: true });
+      }
+    });
+
+    this.detachFilterListeners = () => {
+      this.document.removeEventListener("pointerdown", onPointerDown);
+      this.document.removeEventListener("keydown", onKeydown);
+      tableWrap?.removeEventListener("scroll", onReposition);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", onReposition);
+      }
+    };
+  }
+
+  protected onFilterTextInput(event: Event): void {
+    this.filterInputText = eventValue(event);
+    this.filterHasTyped = true;
+    this.syncFilteredPopoverOptions();
+  }
+
+  protected onFilterRangeMinInput(event: Event): void {
+    this.filterRangeMin = eventValue(event);
+  }
+
+  protected onFilterRangeMaxInput(event: Event): void {
+    this.filterRangeMax = eventValue(event);
+  }
+
+  private syncFilteredPopoverOptions(): void {
+    const opts = this.activeFilterHeader?.filterOptions ?? [];
+    if (!this.filterHasTyped || !this.filterInputText.trim()) {
+      this.filteredPopoverOptions = opts;
+      return;
+    }
+    const q = this.filterInputText.trim().toLowerCase();
+    this.filteredPopoverOptions = opts.filter((opt) => opt.toLowerCase().includes(q));
+  }
+
+  protected submitActiveFilter(): void {
+    const header = this.activeFilterHeader;
+    if (!header) return;
+    if (header.filterType === "date-range" || header.filterType === "number-range") {
+      const min = this.filterRangeMin.trim();
+      const max = this.filterRangeMax.trim();
+      const combined = min || max ? `${min}..${max}` : undefined;
+      this.applyColumnFilter(header.id, combined);
+      return;
+    }
+    this.applyColumnFilter(header.id, this.filterInputText.trim() || undefined);
   }
 
   protected applyColumnFilter(id: string, value: string | undefined): void {
     const cols = flattenColumns(this.columns);
     const col = cols.find((c) => getColumnId(c) === id);
-    const filterField = col?.meta?.serverFilterField || id;
-    this.openFilterColumn = null;
-    this.filterPopoverStyles = null;
+    const filterField = col ? getFilterField(col) : id;
+    this.closeFilterPopover();
     let nextQuery = withFilter(this.query, filterField, value);
     if (filterField !== id && nextQuery.filter?.[id] !== undefined) {
       nextQuery = withFilter(nextQuery, id, undefined);
@@ -1718,7 +1939,8 @@ export class TableXComponent<TData>
     event.preventDefault();
     event.stopPropagation();
     const startX = event.clientX;
-    const targetTh = (event.currentTarget as HTMLElement)?.parentElement as HTMLElement | null;
+    const targetTh = ((event.currentTarget as HTMLElement)?.closest?.("th") ??
+      (event.currentTarget as HTMLElement)?.parentElement) as HTMLElement | null;
     const startWidth = targetTh ? targetTh.getBoundingClientRect().width : (header.width ?? 120);
 
     const onMove = (moveEvent: PointerEvent) => {
@@ -1810,7 +2032,12 @@ export class TableXComponent<TData>
     );
     for (const [key, val] of Object.entries(filters)) {
       if (val === undefined || val === "") continue;
-      const col = cols.find((c) => getColumnId(c) === key || c.meta?.serverFilterField === key);
+      const keyLower = key.toLowerCase();
+      const col = cols.find(
+        (c) =>
+          getColumnId(c).toLowerCase() === keyLower ||
+          getFilterField(c).toLowerCase() === keyLower,
+      );
       const title = col ? (getColumnTitle(col) || key) : key;
       entries.push({ key, title, val: String(val) });
     }
@@ -1828,7 +2055,8 @@ export class TableXComponent<TData>
 
   protected clearAllFilters(): void {
     this.clearSearch();
-    this.emitQuery({ ...this.query, page: 1, q: undefined, filter: {} });
+    this.closeFilterPopover();
+    this.emitQuery({ ...this.query, page: 1, q: undefined, filter: undefined });
   }
 
   // ---------------------------------------------------------------------
@@ -2013,7 +2241,17 @@ export class TableXComponent<TData>
 
     const all = this.allData ?? (this.clientSidePagination || this.paginationMode === "client" ? this.data : undefined);
     if (all && all.length > 0) {
-      const full = queryClientData(all, this.query, { paginate: false });
+      const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+      const leafCols = flattenColumns(rawColumns);
+      const searchFields =
+        this.searchableFields && this.searchableFields.length > 0
+          ? this.searchableFields
+          : (searchableColumnIds(leafCols) as (keyof TData & string)[]);
+      const full = queryClientData(all, this.query, {
+        paginate: false,
+        columns: rawColumns,
+        ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+      });
       return full.items;
     }
 
@@ -2111,26 +2349,41 @@ export class TableXComponent<TData>
     isGroupChild = false,
   ): NexGridHeaderView {
     const id = getColumnId(column);
-    const sortable = isSortable(column);
-    const sortIndex = this.query.sort.findIndex((s) => s.field === id);
+    const effectiveSortable = isSortable(column) && this.enableSorting !== false;
+    const sortField = getSortField(column);
+    const sortFieldLower = sortField.toLowerCase();
+    const idLower = id.toLowerCase();
+    const sortIndex = this.query.sort.findIndex(
+      (s) => s.field.toLowerCase() === sortFieldLower || s.field.toLowerCase() === idLower,
+    );
     const sortItem = sortIndex >= 0 ? this.query.sort[sortIndex] : undefined;
-    const direction = sortable && sortItem ? sortItem.dir : null;
+    const direction = effectiveSortable && sortItem ? sortItem.dir : null;
     const sortOrder = this.query.sort.length > 1 && sortIndex >= 0 ? sortIndex + 1 : null;
     const customWidth = this.columnWidths[id];
     const width = customWidth !== undefined ? customWidth : (column.meta?.width ?? null);
-    const filterField = column.meta?.serverFilterField || id;
-    const activeFilter = this.query.filter?.[filterField] ?? this.query.filter?.[id];
+    const filterField = getFilterField(column);
+    const filterFieldLower = filterField.toLowerCase();
+    let activeFilter = this.query.filter?.[filterField] ?? this.query.filter?.[id];
+    if (activeFilter === undefined && this.query.filter) {
+      const matchKey = Object.keys(this.query.filter).find(
+        (k) => k.toLowerCase() === filterFieldLower || k.toLowerCase() === idLower,
+      );
+      if (matchKey) activeFilter = this.query.filter[matchKey];
+    }
     return {
       key,
       id,
+      sortField,
       title: headerText(column) || id || "Column",
-      sortable: sortable && this.enableSorting !== false,
+      sortable: effectiveSortable,
       sortState: direction ?? "none",
       sortOrder,
       serverFilterable: isFilterable(column, this.enableColumnFilters !== false),
       filterOptions: column.meta?.filterOptions,
+      filterType: column.meta?.filterType,
+      filterPlaceholder: column.meta?.filterPlaceholder,
       activeFilter,
-      ariaSort: !sortable
+      ariaSort: !effectiveSortable
         ? null
         : direction === "asc"
           ? "ascending"
@@ -2188,8 +2441,24 @@ export class TableXComponent<TData>
       });
     }
 
+    this.activeFilterHeader = this.openFilterColumn
+      ? (this.headers.find((h) => h.id === this.openFilterColumn) ?? null)
+      : null;
+    if (this.activeFilterHeader) {
+      this.syncFilteredPopoverOptions();
+    }
+
     const isClient = this.clientSidePagination || this.paginationMode === "client";
-    const clientPaged = isClient ? queryClientData(this.data, this.query) : null;
+    const searchFields =
+      this.searchableFields && this.searchableFields.length > 0
+        ? this.searchableFields
+        : (searchableColumnIds(leafCols) as (keyof TData & string)[]);
+    const clientPaged = isClient
+      ? queryClientData(this.data, this.query, {
+          columns: rawColumns,
+          ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+        })
+      : null;
     const displayData = clientPaged ? clientPaged.items : this.data;
     const effectiveTotal = clientPaged ? clientPaged.total : this.total;
 
