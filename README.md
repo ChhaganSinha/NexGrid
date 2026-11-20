@@ -10,7 +10,7 @@ One Engine · One Stylesheet · One Server Contract · Four Frameworks
 [![npm version](https://img.shields.io/npm/v/@nexgrid/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@nexgrid/react)
 [![NuGet version](https://img.shields.io/nuget/v/TableX.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/TableX.AspNetCore)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen?style=flat-square)](packages/core/test)
+[![Tests](https://img.shields.io/badge/tests-189%20passing-brightgreen?style=flat-square)](packages/core/test)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
 [**Explore Documentation**](docs/README.md) · [**View Examples**](examples/README.md) · [**Getting Started**](docs/getting-started.md) · [**Changelog**](CHANGELOG.md)
@@ -93,20 +93,22 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 - 🔍 **Debounced Global Search** — 350 ms debounced search with automatic clear button.
 - 🔄 **Three-State Sorting** — Familiar cycle: `Ascending → Descending → Cleared`. Multi-column sorting supported.
 - 📄 **Numbered Pagination & Jump** — Smart ellipsis, page size selector (`10, 25, 50, 100`), jump-to-page input, and live range summary (`Showing 21 to 40 of 1,284 entries`).
-- 🔍 **3-Dot Column Filters & Range Inputs** — Column popovers (⋮) supporting text search, dropdown lists, `From..To` date pickers, and `Min..Max` numeric range filtering.
-- 📌 **Sticky / Pinned Columns** — Freeze columns left or right with automatic pixel offset calculation and scroll elevation divider shadows.
-- ⚡ **Bulk Actions Floating Bar** — Contextual bottom-docked pill bar with selection count badge, fast Excel/CSV export, and customizable batch actions.
-- 📂 **Row Expansion (Master-Detail)** — Accordion expandable rows with animated rotating chevrons `[ ❯ ]` for rich nested sub-views.
+- 🔍 **3-Dot Column Filters, Multi-Select Checkboxes & Quick-Action Menus** — Column popovers (`⋮`) supporting text search, single-select dropdowns, multi-select OR checkbox filters (`Active|Pending`), `From..To` date pickers, `Min..Max` numeric ranges, and 1-click quick actions (Sort Asc/Desc, Pin Left/Right/Unpin, Group/Ungroup, Hide Column).
+- 📌 **Sticky / Pinned Columns** — Freeze columns left or right (declaratively or interactively at runtime, persisted in `storageKey`) with automatic pixel offset calculation and scroll elevation divider shadows.
+- ⚡ **Virtual Scrolling (`enableVirtualization`)** — Smooth 60fps DOM windowing for 10,000+ rows with top/bottom table spacers that preserve sticky headers, sticky summary footers, and sticky pinned columns.
+- 🗂️ **Collapsible Row Grouping (`groupBy`)** — Group rows by any column (declaratively or from the column `⋮` menu) with collapsible group headers, row count pills, and automatic per-group summary chips.
+- ☑️ **Select All Across All Pages** — Multi-row selection with indeterminate page checkbox, cross-page *"Select all {total} matching records"* banner, and full-dataset bulk export.
+- ⚡ **Bulk Actions Floating Bar** — Contextual bottom-docked pill bar with selection count badge, fast `.xlsx`/`.csv` export, and customizable batch actions.
+- 📂 **Row Expansion (Master-Detail)** — Accordion expandable rows with animated rotating chevrons `[ ❯ ]` for rich nested sub-views across React, Angular (`*nexGridExpandedRow`), and Vanilla JS.
 - 🧮 **Summary / Aggregation Footer** — Compute `sum`, `avg`, `count`, `min`, `max`, or custom aggregations in `<tfoot>`.
 - ✏️ **Inline Cell Editing** — Double-click editing for text, numbers, and dropdowns with <kbd>Enter</kbd>/Save and <kbd>Esc</kbd>/Cancel.
 - 🔀 **Column Drag-and-Drop Reordering** — Drag header tabs horizontally to reorder columns on the fly.
-- 🎛️ **Full Feature Customization** — Toggle any button or UI region on/off (`showToolbar`, `showFooter`, `enableSearch`, `enableColumns`, `enableDensity`, `enableExport`, `enablePagination`, `enableRowsPerPage`, `enableJumpToPage`, `enableColumnFilters`, `enableSorting`, `showSerialNumber`).
-- ☑️ **Row Selection** — Single and multi-row selection with "Select All on Page" checkbox and active selection badge.
+- 🎛️ **Full Feature Customization** — Toggle any button or UI region on/off (`showToolbar`, `showFooter`, `enableSearch`, `enableColumns`, `enableDensity`, `enableExport`, `enablePagination`, `enableRowsPerPage`, `enableJumpToPage`, `enableColumnFilters`, `enableColumnMenu`, `enableSorting`, `showSerialNumber`).
 - 👁️ **Column Visibility & Alignment** — Dropdown menu to toggle column visibility on the fly; custom left/center/right alignment.
 - 📏 **Density Switching** — Compact (36px), Standard (44px), and Comfortable (52px) row height modes.
-- 🔢 **Automatic Serial Numbers** — Built-in `S.No.` column that seamlessly counts across pages.
+- 🔢 **Automatic Serial Numbers** — Built-in `S.No.` column that seamlessly counts across pages and virtual scroll offsets.
 - 📊 **Multi-Format Exports** —
-  - **Formatted Excel (.xlsx / .xls)** with automatic status badge styling and colored cell tags.
+  - **Native OpenXML Excel (`.xlsx`) & Legacy `.xls`** — Zero-dependency binary `.xlsx` workbook writer with frozen headers, auto-sized columns, native numeric cells, zebra striping, and colored status badges (opens cleanly in Excel without format-mismatch prompts).
   - **RFC 4180 CSV** with UTF-8 BOM.
   - **Copy to Clipboard** with formatted TSV.
   - Full-dataset export support (fetches all filtered pages in the background, not just on-screen rows).

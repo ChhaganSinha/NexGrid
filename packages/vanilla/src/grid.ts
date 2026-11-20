@@ -41,6 +41,7 @@ import {
   getSortField,
   getPageNumbers,
   getRecordRange,
+  groupRows,
   initialHiddenColumns,
   isEditable,
   isExportable,
@@ -195,6 +196,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   } | null = null;
   private readonly columnWidths: Record<string, number> = {};
   private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
+  private activeGroupBy: string | undefined;
+  private collapsedGroups = new Set<string>();
   private focusMenuOnRender = false;
   private mounted: "grid" | "error" | null = null;
   private destroyed = false;
@@ -243,6 +246,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.columns = options.columns;
     this.query = options.query ?? defaultQuery();
     this.density = options.density ?? "default";
+    this.activeGroupBy = options.groupBy?.trim() || undefined;
     this.hidden = initialHiddenColumns(flattenColumns(this.columns));
     this.isLoading = options.isLoading ?? false;
     this.isError = options.error ?? false;
@@ -260,6 +264,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (persisted.columnWidths) Object.assign(this.columnWidths, persisted.columnWidths);
         if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
           this.pinnedColumns = { ...persisted.pinnedColumns };
+        }
+        if (persisted.groupBy !== undefined) {
+          this.activeGroupBy = persisted.groupBy || undefined;
         }
         if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
           const hiddenMap: Record<string, boolean> = {};
@@ -611,6 +618,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     if (patch.isLoading !== undefined) this.isLoading = patch.isLoading;
     if (patch.error !== undefined) this.isError = patch.error;
+    if (patch.groupBy !== undefined) {
+      this.activeGroupBy = patch.groupBy?.trim() || undefined;
+      this.collapsedGroups.clear();
+    }
 
     if (queryChanged && this.options.endpoint !== undefined) {
       void this.fetchFromEndpoint();
@@ -1307,6 +1318,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       columnOrder: this.columns.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
       pinnedColumns: { ...this.pinnedColumns },
+      groupBy: this.activeGroupBy ?? "",
     });
   }
 
@@ -1319,6 +1331,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
       delete this.columnWidths[key];
     }
     this.pinnedColumns = {};
+    this.activeGroupBy = this.options.groupBy?.trim() || undefined;
+    this.collapsedGroups.clear();
     this.columns = [...this.options.columns];
     this.hidden = initialHiddenColumns(this.leafCols());
     if (this.isClientSide) {
@@ -2284,7 +2298,84 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const rows: HTMLElement[] = [];
-    if (this.options.enableVirtualization) {
+    if (this.activeGroupBy) {
+      const groups = groupRows(this.data, this.activeGroupBy, this.columns, {
+        yes: this.locale.booleanYes,
+        no: this.locale.booleanNo,
+      });
+      for (const grp of groups) {
+        const isCollapsed = this.collapsedGroups.has(grp.key);
+        const toggleBtn = el(
+          "button",
+          {
+            class: isCollapsed ? "tbx-group-toggle" : "tbx-group-toggle tbx-group-toggle--open",
+            attrs: {
+              type: "button",
+              "aria-expanded": String(!isCollapsed),
+              "aria-label": `${isCollapsed ? "Expand" : "Collapse"} ${grp.displayValue}`,
+            },
+          },
+          [chevronRightIcon("tbx-icon")],
+        );
+
+        const innerChildren: ElementChild[] = [
+          toggleBtn,
+          el("span", { class: "tbx-group-label", text: `${grp.columnTitle}:` }),
+          el("strong", { class: "tbx-group-value", text: grp.displayValue }),
+          el("span", { class: "tbx-group-count", text: grp.count.toLocaleString() }),
+        ];
+
+        if (grp.summaries.length > 0) {
+          const sumWrap = el(
+            "span",
+            { class: "tbx-group-summaries" },
+            grp.summaries.map((s) =>
+              el("span", { class: "tbx-group-summary-chip" }, [
+                el("span", { text: s.label }),
+                el("strong", { text: s.value }),
+              ]),
+            ),
+          );
+          innerChildren.push(sumWrap);
+        }
+
+        const grpRow = el(
+          "tr",
+          {
+            class: "tbx-group-row",
+            attrs: { "data-group-key": grp.key },
+          },
+          [
+            el(
+              "td",
+              { class: "tbx-group-cell", attrs: { colspan: String(colSpan) } },
+              [el("div", { class: "tbx-group-inner" }, innerChildren)],
+            ),
+          ],
+        );
+        grpRow.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (this.collapsedGroups.has(grp.key)) {
+            this.collapsedGroups.delete(grp.key);
+          } else {
+            this.collapsedGroups.add(grp.key);
+          }
+          this.renderBody();
+        });
+        rows.push(grpRow);
+
+        if (!isCollapsed) {
+          for (const entry of grp.entries) {
+            const built = this.buildRow(entry.row, entry.originalIndex, cols, colSpan);
+            if (Array.isArray(built)) {
+              rows.push(...built);
+            } else {
+              rows.push(built);
+            }
+          }
+        }
+      }
+    } else if (this.options.enableVirtualization) {
       const win = computeVirtualWindow({
         totalRows: this.data.length,
         scrollTop: this.virtualScrollTop,
@@ -2712,7 +2803,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
           s.field.toLowerCase() === id.toLowerCase(),
       )?.dir ?? "";
     const pinState = isPinned(col, this.pinnedColumns) || "none";
-    const cacheKey = `${id}:${activeFilter ?? ""}:${sortDir}:${pinState}`;
+    const cacheKey = `${id}:${activeFilter ?? ""}:${sortDir}:${pinState}:${this.activeGroupBy ?? ""}`;
 
     if (
       this.mountedFilterPopoverKey === cacheKey &&
@@ -2889,6 +2980,37 @@ class NexGridController<TData> implements TableXHandle<TData> {
             this.saveState();
             this.render();
           });
+        }
+
+        const colAccessKey = column.accessorKey !== undefined ? String(column.accessorKey) : "";
+        const isGroupedByThis =
+          Boolean(this.activeGroupBy) &&
+          (this.activeGroupBy!.toLowerCase() === id.toLowerCase() ||
+            (colAccessKey !== "" && this.activeGroupBy!.toLowerCase() === colAccessKey.toLowerCase()));
+        if (isGroupedByThis) {
+          makeMenuBtn("ungroup", this.locale.ungroupColumn ?? "Ungroup", null, true, () => {
+            this.activeGroupBy = undefined;
+            this.collapsedGroups.clear();
+            this.openFilterColumn = null;
+            this.options.onGroupByChange?.(undefined);
+            this.saveState();
+            this.render();
+          });
+        } else {
+          makeMenuBtn(
+            "group-by",
+            this.locale.groupByColumn ?? "Group by column",
+            null,
+            false,
+            () => {
+              this.activeGroupBy = id;
+              this.collapsedGroups.clear();
+              this.openFilterColumn = null;
+              this.options.onGroupByChange?.(id);
+              this.saveState();
+              this.render();
+            },
+          );
         }
       }
 

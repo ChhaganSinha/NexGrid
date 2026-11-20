@@ -86,6 +86,7 @@ export interface GridStateSnapshot {
   columnOrder?: string[];
   columnWidths?: Record<string, number>;
   pinnedColumns?: Record<string, "left" | "right" | "none">;
+  groupBy?: string;
 }
 
 /**

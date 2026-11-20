@@ -50,6 +50,7 @@ export type { UseClientTableXOptions, UseClientNexGridOptions } from "./use-clie
 export {
   // In-memory client-side data querying
   queryClientData,
+  groupRows,
   matchesFilterValue,
   compareValues,
   getSortField,
@@ -94,6 +95,9 @@ export {
 export type {
   ClientQueryOptions,
   FilterMatchOptions,
+  RowGroup,
+  RowGroupEntry,
+  RowGroupSummary,
   VirtualWindow,
   VirtualWindowInput,
 } from "@nexgrid/core";

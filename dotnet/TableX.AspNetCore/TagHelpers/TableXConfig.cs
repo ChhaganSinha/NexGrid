@@ -160,6 +160,8 @@ internal sealed class TableXConfig
 
     public int? VirtualHeight { get; set; }
 
+    public string? GroupBy { get; set; }
+
     public bool? EnableSorting { get; set; }
 
     public bool? EnableExport { get; set; }

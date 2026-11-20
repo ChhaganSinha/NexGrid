@@ -157,6 +157,10 @@ export interface TableXProps<TData> {
   virtualHeight?: number;
   /** Extra buffer rows rendered above and below the virtual viewport. Default `6`. */
   virtualOverscan?: number;
+  /** Group displayed rows by a column id or property name, rendering collapsible group header rows. */
+  groupBy?: string;
+  /** Called when the active `groupBy` column changes via the column quick-action menu. */
+  onGroupByChange?: (columnId: string | undefined) => void;
   /** Called when column order changes via drag-and-drop reordering. */
   onColumnOrderChange?: (newOrder: string[]) => void;
   /** Called when a cell's value is committed via inline cell editing. */

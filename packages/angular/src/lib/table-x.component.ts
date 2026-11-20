@@ -69,6 +69,7 @@ import {
   getSortField,
   getPageNumbers,
   getRecordRange,
+  groupRows,
   initialHiddenColumns,
   isEditable,
   isHideable,
@@ -136,6 +137,7 @@ import {
   type NexGridCellView,
   type TableXColumnToggle,
   type NexGridDensityOption,
+  type NexGridGroupView,
   type NexGridHeaderView,
   type NexGridPagerItem,
   type NexGridRangePart,
@@ -999,12 +1001,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                 <td class="tbx-state" [attr.colspan]="columnSpan">{{ strings.emptyText }}</td>
               </tr>
             } @else {
-              @if (virtualTopSpacer > 0) {
-                <tr class="tbx-virtual-spacer" aria-hidden="true">
-                  <td [attr.colspan]="columnSpan" [style.height.px]="virtualTopSpacer"></td>
-                </tr>
-              }
-              @for (row of rows; track row.key) {
+              <ng-template #bodyRowTpl let-row>
                 <tr
                   class="tbx-row"
                   [class.tbx-row--selected]="row.selected"
@@ -1181,11 +1178,73 @@ const SEARCH_DEBOUNCE_MS = 350;
                     </td>
                   </tr>
                 }
-              }
-              @if (virtualBottomSpacer > 0) {
-                <tr class="tbx-virtual-spacer" aria-hidden="true">
-                  <td [attr.colspan]="columnSpan" [style.height.px]="virtualBottomSpacer"></td>
-                </tr>
+              </ng-template>
+
+              @if (rowGroups.length > 0) {
+                @for (grp of rowGroups; track grp.key) {
+                  <tr
+                    class="tbx-group-row"
+                    [attr.data-group-key]="grp.key"
+                    (click)="toggleGroupCollapse(grp.key, $event)"
+                  >
+                    <td class="tbx-group-cell" [attr.colspan]="columnSpan">
+                      <div class="tbx-group-inner">
+                        <button
+                          type="button"
+                          class="tbx-group-toggle"
+                          [class.tbx-group-toggle--open]="!grp.collapsed"
+                          [attr.aria-expanded]="!grp.collapsed"
+                          [attr.aria-label]="(grp.collapsed ? 'Expand ' : 'Collapse ') + grp.displayValue"
+                        >
+                          <svg
+                            class="tbx-icon"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                        </button>
+                        <span class="tbx-group-label">{{ grp.columnTitle }}:</span>
+                        <strong class="tbx-group-value">{{ grp.displayValue }}</strong>
+                        <span class="tbx-group-count">{{ grp.count }}</span>
+                        @if (grp.summaries.length > 0) {
+                          <span class="tbx-group-summaries">
+                            @for (sum of grp.summaries; track sum.columnId) {
+                              <span class="tbx-group-summary-chip">
+                                <span>{{ sum.label }}</span>
+                                <strong>{{ sum.value }}</strong>
+                              </span>
+                            }
+                          </span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                  @if (!grp.collapsed) {
+                    @for (row of grp.rows; track row.key) {
+                      <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: row }"></ng-container>
+                    }
+                  }
+                }
+              } @else {
+                @if (virtualTopSpacer > 0) {
+                  <tr class="tbx-virtual-spacer" aria-hidden="true">
+                    <td [attr.colspan]="columnSpan" [style.height.px]="virtualTopSpacer"></td>
+                  </tr>
+                }
+                @for (row of rows; track row.key) {
+                  <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: row }"></ng-container>
+                }
+                @if (virtualBottomSpacer > 0) {
+                  <tr class="tbx-virtual-spacer" aria-hidden="true">
+                    <td [attr.colspan]="columnSpan" [style.height.px]="virtualBottomSpacer"></td>
+                  </tr>
+                }
               }
             }
           </tbody>
@@ -1331,6 +1390,27 @@ const SEARCH_DEBOUNCE_MS = 350;
                 >
                   <span>{{ strings.unpinColumn ?? 'Unpin column' }}</span>
                 </button>
+              }
+              @if (activeFilterHeader.canPin) {
+                @if (isColumnGrouped(activeFilterHeader.id)) {
+                  <button
+                    type="button"
+                    data-col-action="ungroup"
+                    class="tbx-col-menu-btn tbx-col-menu-btn--active"
+                    (click)="setGroupByColumn(undefined)"
+                  >
+                    <span>{{ strings.ungroupColumn ?? 'Ungroup' }}</span>
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    data-col-action="group-by"
+                    class="tbx-col-menu-btn"
+                    (click)="setGroupByColumn(activeFilterHeader.id)"
+                  >
+                    <span>{{ strings.groupByColumn ?? 'Group by column' }}</span>
+                  </button>
+                }
               }
               @if (activeFilterHeader.canHide) {
                 <button
@@ -1887,6 +1967,9 @@ export class TableXComponent<TData>
   /** Extra buffer rows rendered above and below the virtual viewport. */
   @Input() virtualOverscan = 6;
 
+  /** Group displayed rows by a column id or property name, rendering collapsible group header rows. */
+  @Input() groupBy?: string;
+
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
 
@@ -1964,6 +2047,9 @@ export class TableXComponent<TData>
   /** Observed => replaces the built-in export entirely. */
   @Output() readonly exportAll = new EventEmitter<void>();
 
+  /** Emitted when the active `groupBy` column changes via the column quick-action menu. */
+  @Output() readonly groupByChange = new EventEmitter<string | undefined>();
+
   /** Emitted with the ordered array of column IDs whenever columns are reordered via drag-and-drop. */
   @Output() readonly columnOrderChange = new EventEmitter<string[]>();
 
@@ -2030,6 +2116,7 @@ export class TableXComponent<TData>
   protected topHeaderCells: NexGridHeaderView[] = [];
   protected bottomHeaderCells: NexGridHeaderView[] = [];
   protected rows: NexGridRowView<TData>[] = [];
+  protected rowGroups: NexGridGroupView<TData>[] = [];
   protected hasSummary = false;
   protected summaryCells: TableXSummaryCellView[] = [];
   protected columnToggles: TableXColumnToggle[] = [];
@@ -2102,6 +2189,8 @@ export class TableXComponent<TData>
 
   private hiddenColumns: Readonly<Record<string, boolean>> = {};
   private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
+  private activeGroupBy: string | undefined;
+  private collapsedGroupKeys = new Set<string>();
   private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
   private hasBoundQuery = false;
@@ -2185,6 +2274,9 @@ export class TableXComponent<TData>
           if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
             this.pinnedColumns = { ...persisted.pinnedColumns };
           }
+          if (persisted.groupBy !== undefined) {
+            this.activeGroupBy = persisted.groupBy || undefined;
+          }
           if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
             const hiddenMap: Record<string, boolean> = {};
             for (const col of flattenColumns(this.columns)) {
@@ -2213,6 +2305,10 @@ export class TableXComponent<TData>
         }
       }
       this.columnsSeeded = true;
+    }
+    if (changes["groupBy"]) {
+      this.activeGroupBy = this.groupBy?.trim() || undefined;
+      this.collapsedGroupKeys.clear();
     }
     if (changes["query"]) {
       this.hasBoundQuery = true;
@@ -2650,6 +2746,38 @@ export class TableXComponent<TData>
     this.cdr.markForCheck();
   }
 
+  protected isColumnGrouped(id: string): boolean {
+    if (!this.activeGroupBy) return false;
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const col = cols.find((c) => getColumnId(c) === id);
+    const accessKey = col?.accessorKey !== undefined ? String(col.accessorKey) : "";
+    const activeLower = this.activeGroupBy.toLowerCase();
+    return activeLower === id.toLowerCase() || (accessKey !== "" && activeLower === accessKey.toLowerCase());
+  }
+
+  protected setGroupByColumn(columnId: string | undefined): void {
+    this.activeGroupBy = columnId;
+    this.collapsedGroupKeys.clear();
+    this.closeFilterPopover();
+    this.saveState();
+    this.recompute();
+    this.groupByChange.emit(columnId);
+    this.cdr.markForCheck();
+  }
+
+  protected toggleGroupCollapse(groupKey: string, event: Event): void {
+    event.stopPropagation();
+    if (this.collapsedGroupKeys.has(groupKey)) {
+      this.collapsedGroupKeys.delete(groupKey);
+    } else {
+      this.collapsedGroupKeys.add(groupKey);
+    }
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
   protected hideColumnFromMenu(id: string): void {
     this.hiddenColumns = { ...this.hiddenColumns, [id]: true };
     this.closeFilterPopover();
@@ -2764,6 +2892,7 @@ export class TableXComponent<TData>
       columnOrder: cols.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
       pinnedColumns: { ...this.pinnedColumns },
+      groupBy: this.activeGroupBy ?? "",
     });
   }
 
@@ -2775,6 +2904,8 @@ export class TableXComponent<TData>
     this.currentDensity = "default";
     this.columnWidths = {};
     this.pinnedColumns = {};
+    this.activeGroupBy = this.groupBy?.trim() || undefined;
+    this.collapsedGroupKeys.clear();
     this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
     this.orderedColumns = [...this.columns];
     this.openMenu = null;
@@ -3521,15 +3652,16 @@ export class TableXComponent<TData>
     const pageSize = this.query.pageSize;
     const rowKeys = new Set<string>();
 
-    const virtualWin = this.enableVirtualization
-      ? computeVirtualWindow({
-          totalRows: displayData.length,
-          scrollTop: this.virtualScrollTop,
-          viewportHeight: this.virtualHeight,
-          density: this.currentDensity,
-          overscan: this.virtualOverscan,
-        })
-      : null;
+    const virtualWin =
+      this.enableVirtualization && !this.activeGroupBy
+        ? computeVirtualWindow({
+            totalRows: displayData.length,
+            scrollTop: this.virtualScrollTop,
+            viewportHeight: this.virtualHeight,
+            density: this.currentDensity,
+            overscan: this.virtualOverscan,
+          })
+        : null;
     this.virtualTopSpacer = virtualWin ? virtualWin.topSpacerHeight : 0;
     this.virtualBottomSpacer = virtualWin ? virtualWin.bottomSpacerHeight : 0;
     const windowedData = virtualWin
@@ -3587,6 +3719,27 @@ export class TableXComponent<TData>
         cells,
       };
     });
+
+    if (this.activeGroupBy && displayData.length > 0) {
+      const rowByIndex = new Map<number, NexGridRowView<TData>>();
+      for (const r of this.rows) {
+        rowByIndex.set(r.rowIndex, r);
+      }
+      const groups = groupRows(displayData, this.activeGroupBy, rawColumns, labels);
+      this.rowGroups = groups.map((grp) => ({
+        key: grp.key,
+        displayValue: grp.displayValue,
+        columnTitle: grp.columnTitle,
+        count: grp.count,
+        collapsed: this.collapsedGroupKeys.has(grp.key),
+        summaries: grp.summaries,
+        rows: grp.entries
+          .map((e) => rowByIndex.get(e.originalIndex))
+          .filter((r): r is NexGridRowView<TData> => r !== undefined),
+      }));
+    } else {
+      this.rowGroups = [];
+    }
 
     this.hasSummary =
       this.enableSummaryRow || visible.some((col) => col.meta?.aggregation !== undefined);

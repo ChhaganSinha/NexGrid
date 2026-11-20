@@ -2428,6 +2428,110 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+/* ---- Row Grouping (`groupBy`) ---- */
+.tbx-group-row {
+  background: var(--tbx-card-2);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease;
+}
+
+.tbx-group-row:hover {
+  background: var(--tbx-muted);
+}
+
+.tbx-group-cell {
+  padding: 8px 14px !important;
+  border-bottom: 1px solid var(--tbx-border);
+  font-size: 13px;
+  color: var(--tbx-fg);
+}
+
+.tbx-group-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tbx-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tbx-muted-fg);
+  cursor: pointer;
+  transition: transform 150ms ease, color 120ms ease;
+}
+
+.tbx-group-toggle--open {
+  transform: rotate(90deg);
+}
+
+[dir="rtl"] .tbx-group-toggle > svg {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .tbx-group-toggle--open {
+  transform: rotate(-90deg);
+}
+
+.tbx-group-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tbx-muted-fg);
+}
+
+.tbx-group-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tbx-fg);
+}
+
+.tbx-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--tbx-primary) 14%, transparent);
+  color: var(--tbx-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tbx-group-summaries {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.tbx-group-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--tbx-card);
+  border: 1px solid var(--tbx-border);
+  font-size: 11px;
+  color: var(--tbx-muted-fg);
+}
+
+.tbx-group-summary-chip strong {
+  color: var(--tbx-fg);
+  font-weight: 600;
+}
+
 /* ---- Select All Across Pages Banner ---- */
 .tbx-select-all-banner {
   display: flex;

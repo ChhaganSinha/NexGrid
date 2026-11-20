@@ -10,7 +10,12 @@
 // plain property reads, and gives every `@for` a stable `track` key.
 
 import type { TemplateRef } from "@angular/core";
-import { getCellText, getColumnId, type TableXColumn } from "@nexgrid/core";
+import {
+  getCellText,
+  getColumnId,
+  type RowGroupSummary,
+  type TableXColumn,
+} from "@nexgrid/core";
 
 import type { TableXCellTemplateContext, TableXExpandedRowTemplateContext } from "./types";
 
@@ -194,10 +199,22 @@ export interface TableXRangePart {
   value: string;
 }
 
+/** One collapsible group section in `<tbody>` when `groupBy` is active. */
+export interface TableXGroupView<TData> {
+  key: string;
+  displayValue: string;
+  columnTitle: string;
+  count: number;
+  collapsed: boolean;
+  summaries: readonly RowGroupSummary[];
+  rows: TableXRowView<TData>[];
+}
+
 // Backwards-compatible aliases
 export type NexGridHeaderView = TableXHeaderView;
 export type NexGridCellView<TData> = TableXCellView<TData>;
 export type NexGridRowView<TData> = TableXRowView<TData>;
+export type NexGridGroupView<TData> = TableXGroupView<TData>;
 export type NexGridSummaryCellView = TableXSummaryCellView;
 export type NexGridPagerItem = TableXPagerItem;
 export type NexGridColumnToggle = TableXColumnToggle;

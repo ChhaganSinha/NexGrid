@@ -36,6 +36,7 @@ import {
   getSortField,
   getPageNumbers,
   getRecordRange,
+  groupRows,
   initialHiddenColumns,
   isEditable,
   isExportable,
@@ -168,6 +169,7 @@ interface ReactColumnFilterPopoverProps<TData, TRender> {
   sortable: boolean;
   activeSortDir: "asc" | "desc" | null;
   currentPin: "left" | "right" | false;
+  isGroupedByThis: boolean;
   canHide: boolean;
   locale: Required<TableXLocale>;
   rootRef: React.RefObject<HTMLDivElement | null>;
@@ -175,6 +177,7 @@ interface ReactColumnFilterPopoverProps<TData, TRender> {
   onApply: (val: string | undefined) => void;
   onSortDir: (dir: "asc" | "desc" | null) => void;
   onPin: (side: "left" | "right" | "none") => void;
+  onGroupBy: (columnId: string | undefined) => void;
   onHide: () => void;
   onClose: () => void;
 }
@@ -190,6 +193,7 @@ function ReactColumnFilterPopover<TData, TRender>({
   sortable,
   activeSortDir,
   currentPin,
+  isGroupedByThis,
   canHide,
   locale,
   rootRef,
@@ -197,6 +201,7 @@ function ReactColumnFilterPopover<TData, TRender>({
   onApply,
   onSortDir,
   onPin,
+  onGroupBy,
   onHide,
   onClose,
 }: ReactColumnFilterPopoverProps<TData, TRender>): React.JSX.Element {
@@ -402,6 +407,33 @@ function ReactColumnFilterPopover<TData, TRender>({
           >
             <span>{locale.unpinColumn}</span>
           </button>
+        ) : null}
+        {isPinCapable ? (
+          isGroupedByThis ? (
+            <button
+              type="button"
+              data-col-action="ungroup"
+              className="tbx-col-menu-btn tbx-col-menu-btn--active"
+              onClick={() => {
+                onGroupBy(undefined);
+                onClose();
+              }}
+            >
+              <span>{locale.ungroupColumn}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-col-action="group-by"
+              className="tbx-col-menu-btn"
+              onClick={() => {
+                onGroupBy(id);
+                onClose();
+              }}
+            >
+              <span>{locale.groupByColumn}</span>
+            </button>
+          )
         ) : null}
         {canHide ? (
           <button
@@ -855,6 +887,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableVirtualization = false,
     virtualHeight = DEFAULT_VIRTUAL_HEIGHT,
     virtualOverscan,
+    groupBy: groupByProp,
+    onGroupByChange,
     onColumnOrderChange,
     onCellEdit,
     storageKey,
@@ -926,6 +960,16 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   );
   const [editingCell, setEditingCell] = React.useState<{ rowId: string; columnId: string } | null>(null);
   const [draggedColId, setDraggedColId] = React.useState<string | null>(null);
+  const [activeGroupBy, setActiveGroupBy] = React.useState<string | undefined>(
+    () => groupByProp?.trim() || undefined,
+  );
+  const [collapsedGroups, setCollapsedGroups] = React.useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  React.useEffect(() => {
+    setActiveGroupBy(groupByProp?.trim() || undefined);
+    setCollapsedGroups(new Set());
+  }, [groupByProp]);
   const headerPointerRef = React.useRef<{
     colId: string;
     sortField: string;
@@ -1039,6 +1083,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       if (persisted.pinnedColumns && typeof persisted.pinnedColumns === "object") {
         setPinnedCols(persisted.pinnedColumns);
       }
+      if (persisted.groupBy !== undefined) {
+        setActiveGroupBy(persisted.groupBy || undefined);
+      }
       if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
         const hiddenMap: Record<string, boolean> = {};
         for (const col of flattenColumns(columns)) {
@@ -1087,8 +1134,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       columnOrder: colList.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
       pinnedColumns: pinnedCols,
+      groupBy: activeGroupBy ?? "",
     });
-  }, [storageKey, hydratedKey, density, hiddenCols, colList, colWidths, pinnedCols]);
+  }, [storageKey, hydratedKey, density, hiddenCols, colList, colWidths, pinnedCols, activeGroupBy]);
 
   const columnsMenu = useDropdown();
   const densityMenu = useDropdown();
@@ -1101,6 +1149,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     setDensity(initialDensity);
     setColWidths({});
     setPinnedCols({});
+    setActiveGroupBy(groupByProp?.trim() || undefined);
+    setCollapsedGroups(new Set());
     setColList(columns);
     setHiddenCols(initialHiddenColumns(flattenColumns(columns)));
     columnsMenu.close();
@@ -1197,9 +1247,28 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     (showSerialNumber ? 1 : 0) +
     (enableSelection ? 1 : 0);
 
+  const groupedRows = React.useMemo(
+    () =>
+      activeGroupBy
+        ? groupRows(rows, activeGroupBy, colList, {
+            yes: locale.booleanYes,
+            no: locale.booleanNo,
+          })
+        : null,
+    [activeGroupBy, rows, colList, locale.booleanYes, locale.booleanNo],
+  );
+  const toggleGroupCollapse = (groupKey: string): void => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
   const virtualWin = React.useMemo(
     () =>
-      enableVirtualization
+      enableVirtualization && !activeGroupBy
         ? computeVirtualWindow({
             totalRows: rows.length,
             scrollTop: virtualScrollTop,
@@ -2264,10 +2333,18 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           )?.dir ?? null;
         const popFilterable = isFilterable(activeFilterPopoverCol, enableColumnFilters);
         const popPin = isPinned(activeFilterPopoverCol, pinnedCols);
+        const popAccessKey =
+          activeFilterPopoverCol.accessorKey !== undefined
+            ? String(activeFilterPopoverCol.accessorKey)
+            : "";
+        const popIsGrouped =
+          Boolean(activeGroupBy) &&
+          (activeGroupBy!.toLowerCase() === popId.toLowerCase() ||
+            (popAccessKey !== "" && activeGroupBy!.toLowerCase() === popAccessKey.toLowerCase()));
         const popCanHide = isHideable(activeFilterPopoverCol) && isColumnsVisible && visible.length > 1;
         return (
           <ReactColumnFilterPopover
-            key={`${popId}:${activeFilterPopoverVal ?? ""}`}
+            key={`${popId}:${activeFilterPopoverVal ?? ""}:${activeGroupBy ?? ""}`}
             id={popId}
             col={activeFilterPopoverCol}
             meta={activeFilterPopoverCol.meta ?? {}}
@@ -2278,6 +2355,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             sortable={popSortable}
             activeSortDir={popSortDir}
             currentPin={popPin}
+            isGroupedByThis={popIsGrouped}
             canHide={popCanHide}
             locale={locale}
             rootRef={rootRef}
@@ -2299,6 +2377,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             }}
             onPin={(side) => {
               setPinnedCols((prev) => ({ ...prev, [popId]: side }));
+            }}
+            onGroupBy={(nextGroupCol) => {
+              setActiveGroupBy(nextGroupCol);
+              setCollapsedGroups(new Set());
+              onGroupByChange?.(nextGroupCol);
             }}
             onHide={() => {
               setHiddenCols((prev) => ({ ...prev, [popId]: true }));
@@ -2494,8 +2577,69 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                     />
                   </tr>
                 ) : null}
-                {renderedRows.map((row, sliceIdx) => {
-                  const index = virtualStartOffset + sliceIdx;
+                {(groupedRows
+                  ? groupedRows.flatMap((grp) => {
+                      const isCollapsed = collapsedGroups.has(grp.key);
+                      const groupHeaderRow = (
+                        <tr
+                          key={`grp-row-${grp.key}`}
+                          className="tbx-group-row"
+                          data-group-key={grp.key}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleGroupCollapse(grp.key);
+                          }}
+                        >
+                          <td className="tbx-group-cell" colSpan={Math.max(1, columnCount)}>
+                            <div className="tbx-group-inner">
+                              <button
+                                type="button"
+                                className={
+                                  isCollapsed
+                                    ? "tbx-group-toggle"
+                                    : "tbx-group-toggle tbx-group-toggle--open"
+                                }
+                                aria-expanded={!isCollapsed}
+                                aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${grp.displayValue}`}
+                              >
+                                <ChevronRightIcon className="tbx-icon" />
+                              </button>
+                              <span className="tbx-group-label">{grp.columnTitle}:</span>
+                              <strong className="tbx-group-value">{grp.displayValue}</strong>
+                              <span className="tbx-group-count">{grp.count.toLocaleString()}</span>
+                              {grp.summaries.length > 0 ? (
+                                <span className="tbx-group-summaries">
+                                  {grp.summaries.map((s) => (
+                                    <span key={s.columnId} className="tbx-group-summary-chip">
+                                      <span>{s.label}</span>
+                                      <strong>{s.value}</strong>
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      if (isCollapsed) return [{ kind: "group" as const, node: groupHeaderRow }];
+                      return [
+                        { kind: "group" as const, node: groupHeaderRow },
+                        ...grp.entries.map((entry) => ({
+                          kind: "row" as const,
+                          row: entry.row,
+                          index: entry.originalIndex,
+                        })),
+                      ];
+                    })
+                  : renderedRows.map((row, sliceIdx) => ({
+                      kind: "row" as const,
+                      row,
+                      index: virtualStartOffset + sliceIdx,
+                    }))
+                ).map((item) => {
+                  if (item.kind === "group") return item.node;
+                  const row = item.row;
+                  const index = item.index;
                   const id = pageRowIds[index] ?? String(index);
                   const isSelected = allAcrossSelected || selectedIds.has(id);
                   const isExpanded = expandedRows.has(id);

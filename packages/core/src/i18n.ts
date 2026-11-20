@@ -77,6 +77,10 @@ export interface TableXLocale {
   allAcrossPagesSelected?: string;
   /** Clear selection link label. */
   clearSelection?: string;
+  /** Column menu quick action: Group by column. */
+  groupByColumn?: string;
+  /** Column menu quick action: Ungroup. */
+  ungroupColumn?: string;
 }
 export type NexGridLocale = TableXLocale;
 
@@ -138,6 +142,8 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
   selectAllAcrossPages: "Select all {total} matching records",
   allAcrossPagesSelected: "All {total} matching records across all pages are selected.",
   clearSelection: "Clear selection",
+  groupByColumn: "Group by column",
+  ungroupColumn: "Ungroup",
 };
 
 /**
@@ -162,6 +168,8 @@ export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXL
     selectAllAcrossPages: partial.selectAllAcrossPages ?? DEFAULT_LOCALE.selectAllAcrossPages,
     allAcrossPagesSelected: partial.allAcrossPagesSelected ?? DEFAULT_LOCALE.allAcrossPagesSelected,
     clearSelection: partial.clearSelection ?? DEFAULT_LOCALE.clearSelection,
+    groupByColumn: partial.groupByColumn ?? DEFAULT_LOCALE.groupByColumn,
+    ungroupColumn: partial.ungroupColumn ?? DEFAULT_LOCALE.ungroupColumn,
   };
 }
 

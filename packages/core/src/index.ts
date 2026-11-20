@@ -91,6 +91,10 @@ export {
 } from "./virtual.js";
 export type { VirtualWindow, VirtualWindowInput } from "./virtual.js";
 
+// Client-side row grouping
+export { groupRows } from "./grouping.js";
+export type { RowGroup, RowGroupEntry, RowGroupSummary } from "./grouping.js";
+
 // Wire format (REST & OData v4)
 export { toSearchParams, serializeQuery, parseQuery, buildQueryUrl } from "./serialize.js";
 export { toODataParams, buildODataUrl, fromODataResponse } from "./odata.js";

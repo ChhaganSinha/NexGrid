@@ -195,6 +195,12 @@
     public int? VirtualHeight { get; set; }
 
     /// <summary>
+    /// Group displayed rows by a column <c>Field</c>, rendering collapsible group headers.
+    /// </summary>
+    [Parameter]
+    public string? GroupBy { get; set; }
+
+    /// <summary>
     /// Enable column sorting globally. Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
@@ -382,6 +388,7 @@
         EnableColumnReorder = EnableColumnReorder,
         EnableVirtualization = EnableVirtualization,
         VirtualHeight = VirtualHeight,
+        GroupBy = string.IsNullOrWhiteSpace(GroupBy) ? null : GroupBy,
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportMode = TableXConfigSerializer.ToToken(ExportMode),

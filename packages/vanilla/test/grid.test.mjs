@@ -1382,6 +1382,59 @@ test("enableVirtualization windows 10,000 rows with top/bottom spacers and prese
   handle.destroy();
 });
 
+test("groupBy renders collapsible group header rows with counts, summaries, and menu group/ungroup toggle", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const columns = [
+    { accessorKey: "name", header: "Employee" },
+    { accessorKey: "dept", header: "Department" },
+    { accessorKey: "score", header: "Score", meta: { aggregation: "avg", aggregationLabel: "Avg:" } },
+  ];
+  const rows = [
+    { id: "1", name: "Alice", dept: "Engineering", score: 90 },
+    { id: "2", name: "Bob", dept: "Sales", score: 80 },
+    { id: "3", name: "Charlie", dept: "Engineering", score: 100 },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Grouped Employees",
+    columns,
+    data: rows,
+    clientSidePagination: true,
+    groupBy: "dept",
+  });
+
+  const groupRowsEls = container.querySelectorAll(".tbx-group-row");
+  assert.equal(groupRowsEls.length, 2, "Renders Engineering and Sales group header rows");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 3, "All 3 member rows start expanded");
+  assert.ok(groupRowsEls[0].textContent.includes("Engineering"));
+  assert.ok(groupRowsEls[0].textContent.includes("95"), "Shows Engineering Avg: 95 summary chip");
+
+  // Collapse Engineering group
+  groupRowsEls[0].dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(container.querySelectorAll(".tbx-row").length, 1, "Collapsing Engineering hides its 2 rows");
+
+  // Expand Engineering group again
+  container.querySelectorAll(".tbx-group-row")[0].dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(container.querySelectorAll(".tbx-row").length, 3, "Expanding Engineering restores its 2 rows");
+
+  // Ungroup via Department column ⋮ menu quick action
+  const deptMenuBtn = container
+    .querySelectorAll(".tbx-col-filter-btn")
+    .find((b) => b.getAttribute("data-filter-col") === "dept");
+  deptMenuBtn.dispatchEvent(new MockMouseEvent("click"));
+  const ungroupBtn = container
+    .querySelector(".tbx-filter-popover")
+    .querySelectorAll(".tbx-col-menu-btn")
+    .find((b) => b.getAttribute("data-col-action") === "ungroup");
+  assert.ok(ungroupBtn, "Ungroup quick action appears on active grouped column");
+  ungroupBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(container.querySelectorAll(".tbx-group-row").length, 0, "Table returns to flat rows on Ungroup");
+
+  handle.destroy();
+});
+
 
 
 

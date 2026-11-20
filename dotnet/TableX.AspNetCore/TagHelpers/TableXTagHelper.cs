@@ -155,6 +155,10 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("virtual-height")]
     public int? VirtualHeight { get; set; }
 
+    /// <summary>Group displayed rows by a column <c>field</c> or <c>id</c>, rendering collapsible group headers.</summary>
+    [HtmlAttributeName("group-by")]
+    public string? GroupBy { get; set; }
+
     /// <summary>Enable column sorting globally. Defaults to <see langword="true"/>.</summary>
     [HtmlAttributeName("enable-sorting")]
     public bool? EnableSorting { get; set; }
@@ -369,6 +373,7 @@ public class TableXTagHelper : TagHelper
         EnableColumnReorder = EnableColumnReorder,
         EnableVirtualization = EnableVirtualization,
         VirtualHeight = VirtualHeight,
+        GroupBy = NullIfBlank(GroupBy),
         EnableSorting = EnableSorting,
         EnableExport = EnableExport,
         ExportMode = TableXConfigSerializer.ToToken(
