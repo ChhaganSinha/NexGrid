@@ -21,8 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `toXlsxBytes` and `downloadXlsx` (`@nexgrid/core`), making `.xlsx` the default Excel export format with frozen header panes, auto-fitted column widths, native numeric cells, OWASP formula-injection defense, and colored ARGB status badges (retaining `format: "xls"` / `toExcelHtml` compatibility).
 - **DOM Row Virtualization (`enableVirtualization`, `virtualHeight`, `virtualOverscan`)**:
   - Added `computeVirtualWindow` and native `<table>` top/bottom spacer windowing for smooth 60fps scrolling over 10,000+ rows while preserving sticky headers, summary footers, and pinned columns.
-- **Collapsible Client-Side Row Grouping (`groupBy`)**:
-  - Added `groupRows` and `groupBy` across all adapters and `.NET`, rendering collapsible `<tr class="tbx-group-row">` headers with row counts and automatic per-group aggregation summary chips.
+- **Collapsible Client-Side & Multi-Column Nested Row Grouping (`groupBy`)**:
+  - Added `groupRows`, `normalizeGroupBy`, and `buildNestedGroupItems` across all adapters and `.NET`, supporting both single (`groupBy="dept"`) and multi-column nested (`groupBy={["region", "dept"]}` / `"Add to grouping"`) collapsible group headers with row counts and per-group summary chips.
+- **Vue 3 & Nuxt Adapter (`@nexgrid/vue`)**:
+  - New workspace package `packages/vue` providing SSR-ready `<TableX />` / `<NexGrid />` components, `useClientTableX` / `useClientNexGrid` reactive composables, `v-model:query` support, and scoped `#cell-[id]`, `#expanded-row`, `#bulk-actions`, and `#toolbar` slots.
+- **Zero-Dependency Native Binary PDF 1.4 Export (`toPdfBytes`, `downloadPdf`)**:
+  - Added `"pdf"` to `EXPORT_FORMATS`, toolbar export menus, Bulk Actions bars, and `TableXExportMode.Pdf` in `.NET`, generating multi-page landscape A4 PDF 1.4 reports with repeated headers, zebra striping, and badge pills without external dependencies.
+- **Hierarchical Tree Data & Pinned Data Rows**:
+  - Added `enableTreeData`, `childrenKey`, `getSubRows`, `defaultExpandedDepth`, `flattenTreeRows`, and `pinnedTopRows` / `pinnedBottomRows` across all adapters and `.NET`.
+- **Full-Row Editing, `date` & `boolean` Editors, Validation & Dirty Markers**:
+  - Added `editMode: "cell" | "row"`, `onRowEdit`, `editType: "date" | "boolean"`, `meta.validateCell` inline error blocking (`.tbx-cell-edit-error`), and `.tbx-td--dirty` modified cell indicators.
+- **Spreadsheet Keyboard Navigation, Context Menu, Range Selection, Saved Views, Row Reorder & Infinite Scroll**:
+  - Added arrow/Home/End/PageUp/PageDown cell focus (`enableKeyboardNavigation`), `Shift+Click` contiguous row range selection, right-click `.tbx-context-menu` (`enableContextMenu`, `contextMenuItems`), rectangular cell range selection (`enableRangeSelection`) with `.tbx-fill-handle`, footer `Count · Sum · Avg` stats badge, and `Ctrl+C` / `Ctrl+V` multi-cell TSV copy/paste, toolbar Saved Views (`enableSavedViews`), `⋮⋮` drag-and-drop row reordering (`enableRowReorder`, `onRowOrderChange`), and infinite scroll / `Load more` mode (`enableInfiniteScroll`, `onLoadMore`).
 
 ### Fixed
 

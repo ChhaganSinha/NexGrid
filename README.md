@@ -2,15 +2,15 @@
 
 # ⚡ TableX
 
-### **A professional, server-driven data grid for React, Next.js, Angular, vanilla JavaScript, and ASP.NET Core.**
+### **A professional, server-driven data grid for React, Next.js, Vue 3, Nuxt, Angular, vanilla JavaScript, and ASP.NET Core.**
 
-One Engine · One Stylesheet · One Server Contract · Four Frameworks
+One Engine · One Stylesheet · One Server Contract · Five Frameworks
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/@nexgrid/react?label=npm%20package&color=crimson&style=flat-square)](https://www.npmjs.com/package/@nexgrid/react)
 [![NuGet version](https://img.shields.io/nuget/v/TableX.AspNetCore?label=nuget%20package&color=004880&style=flat-square)](https://www.nuget.org/packages/TableX.AspNetCore)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-189%20passing-brightgreen?style=flat-square)](packages/core/test)
+[![Tests](https://img.shields.io/badge/tests-201%20passing-brightgreen?style=flat-square)](packages/core/test)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
 [**Explore Documentation**](docs/README.md) · [**View Examples**](examples/README.md) · [**Getting Started**](docs/getting-started.md) · [**Changelog**](CHANGELOG.md)
@@ -74,6 +74,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | [`@nexgrid/core`](packages/core) | Framework-agnostic engine, contracts, math, theme | `npm install @nexgrid/core` |
 | [`@nexgrid/react`](packages/react) | React 18+, React 19, Next.js (App Router) | `npm install @nexgrid/react` |
+| [`@nexgrid/vue`](packages/vue) | Vue 3.3+, Nuxt 3+ (SSR & Composition API) | `npm install @nexgrid/vue` |
 | [`@nexgrid/angular`](packages/angular) | Angular 17+, Angular 18, Angular 19 | `npm install @nexgrid/angular` |
 | [`@nexgrid/vanilla`](packages/vanilla) | Zero-dependency DOM renderer / IIFE Global | `npm install @nexgrid/vanilla` |
 | [`TableX.AspNetCore`](dotnet/TableX.AspNetCore) | ASP.NET Core 8+ Razor Class Library & TagHelpers | `dotnet add package TableX.AspNetCore` |
@@ -82,7 +83,7 @@ sequenceDiagram
 
 ## ✨ Features
 
-Every feature works identically across React, Angular, Vanilla JS, and ASP.NET Core:
+Every feature works identically across React, Vue 3, Angular, Vanilla JS, and ASP.NET Core:
 
 - 🗂️ **Column Header Grouping (Multi-Level / Stacked Headers)** — Group related sub-columns beneath parent category headers with automatic `colSpan` & `rowSpan` calculation, responsive layouts, and full sorting/filter support.
 - 💾 **Grid State Persistence (`storageKey`)** — Automatically saves custom column widths, drag-and-drop column order, hidden columns, and row density to `localStorage`, with a 1-click "Reset to default view" option.
@@ -96,12 +97,19 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 - 🔍 **3-Dot Column Filters, Multi-Select Checkboxes & Quick-Action Menus** — Column popovers (`⋮`) supporting text search, single-select dropdowns, multi-select OR checkbox filters (`Active|Pending`), `From..To` date pickers, `Min..Max` numeric ranges, and 1-click quick actions (Sort Asc/Desc, Pin Left/Right/Unpin, Group/Ungroup, Hide Column).
 - 📌 **Sticky / Pinned Columns** — Freeze columns left or right (declaratively or interactively at runtime, persisted in `storageKey`) with automatic pixel offset calculation and scroll elevation divider shadows.
 - ⚡ **Virtual Scrolling (`enableVirtualization`)** — Smooth 60fps DOM windowing for 10,000+ rows with top/bottom table spacers that preserve sticky headers, sticky summary footers, and sticky pinned columns.
-- 🗂️ **Collapsible Row Grouping (`groupBy`)** — Group rows by any column (declaratively or from the column `⋮` menu) with collapsible group headers, row count pills, and automatic per-group summary chips.
+- 🗂️ **Collapsible Multi-Column Row Grouping (`groupBy`)** — Group rows by single or nested columns (`groupBy={["region", "dept"]}` or from the column `⋮` menu's *Group by* / *Add to grouping*) with collapsible indented group headers, row count pills, and automatic per-group summary chips.
+- 🌳 **Hierarchical Tree Data (`enableTreeData`)** — Expand/collapse nested parent-child rows via `childrenKey` or `getSubRows` with `defaultExpandedDepth` and indented chevron disclosures.
+- 📌 **Pinned / Frozen Data Rows (`pinnedTopRows` & `pinnedBottomRows`)** — Freeze benchmark, target, or summary rows at the top and bottom of `<tbody>`.
+- ⌨️ **Spreadsheet Keyboard Navigation & Rectangular Cell Range Selection (`enableRangeSelection`)** — Arrow/Home/End/PageUp/PageDown cell focus, `Enter`/`F2` editing, `Space` row toggle, `Shift+Click` contiguous row range selection, rectangular drag/Shift-arrow cell range selection, `.tbx-fill-handle` drag-fill, live status-bar `Count · Sum · Avg` chip, and `Ctrl+C` / `Ctrl+V` multi-cell TSV clipboard copy/paste.
+- 🖱️ **Right-Click Cell & Row Context Menu (`enableContextMenu`)** — Quick actions on right-click (*Copy cell*, *Copy row*, *Filter by value*, *Pin/Unpin column*, *Hide column*, plus custom `contextMenuItems`).
+- 🔖 **Saved Views / Filter Presets (`enableSavedViews`)** — Save, switch, and delete named presets capturing `query` (search, sort, filters), hidden/pinned columns, `groupBy`, and `density` in `localStorage`.
+- ↕️ **Drag-and-Drop Row Reordering (`enableRowReorder`)** — Reorder rows interactively with a dedicated `⋮⋮` drag handle column and `onRowOrderChange` callback.
+- ♾️ **Infinite Scroll / Cursor Pagination (`enableInfiniteScroll`)** — Seamless scroll-threshold loading and *Load more* footer button via `hasMore`, `isLoadingMore`, `nextCursor`, and `onLoadMore`.
 - ☑️ **Select All Across All Pages** — Multi-row selection with indeterminate page checkbox, cross-page *"Select all {total} matching records"* banner, and full-dataset bulk export.
-- ⚡ **Bulk Actions Floating Bar** — Contextual bottom-docked pill bar with selection count badge, fast `.xlsx`/`.csv` export, and customizable batch actions.
-- 📂 **Row Expansion (Master-Detail)** — Accordion expandable rows with animated rotating chevrons `[ ❯ ]` for rich nested sub-views across React, Angular (`*nexGridExpandedRow`), and Vanilla JS.
+- ⚡ **Bulk Actions Floating Bar** — Contextual bottom-docked pill bar with selection count badge, fast `.xlsx`/`.csv`/`.pdf` export, and customizable batch actions.
+- 📂 **Row Expansion (Master-Detail)** — Accordion expandable rows with animated rotating chevrons `[ ❯ ]` for rich nested sub-views across React, Vue (`#expanded-row`), Angular (`*nexGridExpandedRow`), and Vanilla JS.
 - 🧮 **Summary / Aggregation Footer** — Compute `sum`, `avg`, `count`, `min`, `max`, or custom aggregations in `<tfoot>`.
-- ✏️ **Inline Cell Editing** — Double-click editing for text, numbers, and dropdowns with <kbd>Enter</kbd>/Save and <kbd>Esc</kbd>/Cancel.
+- ✏️ **Inline Cell & Full-Row Editing with Validation** — Single-cell (`editMode="cell"`) or full-row (`editMode="row"`) editing for `text`, `number`, `select`, `date`, and `boolean` columns, `validateCell` error blocking, and `.tbx-td--dirty` modified cell markers.
 - 🔀 **Column Drag-and-Drop Reordering** — Drag header tabs horizontally to reorder columns on the fly.
 - 🎛️ **Full Feature Customization** — Toggle any button or UI region on/off (`showToolbar`, `showFooter`, `enableSearch`, `enableColumns`, `enableDensity`, `enableExport`, `enablePagination`, `enableRowsPerPage`, `enableJumpToPage`, `enableColumnFilters`, `enableColumnMenu`, `enableSorting`, `showSerialNumber`).
 - 👁️ **Column Visibility & Alignment** — Dropdown menu to toggle column visibility on the fly; custom left/center/right alignment.
@@ -109,6 +117,7 @@ Every feature works identically across React, Angular, Vanilla JS, and ASP.NET C
 - 🔢 **Automatic Serial Numbers** — Built-in `S.No.` column that seamlessly counts across pages and virtual scroll offsets.
 - 📊 **Multi-Format Exports** —
   - **Native OpenXML Excel (`.xlsx`) & Legacy `.xls`** — Zero-dependency binary `.xlsx` workbook writer with frozen headers, auto-sized columns, native numeric cells, zebra striping, and colored status badges (opens cleanly in Excel without format-mismatch prompts).
+  - **Native Binary PDF Report (`.pdf`)** — Zero-dependency multi-page landscape A4 PDF 1.4 report writer (`toPdfBytes`, `downloadPdf`, `exportMode="pdf"`) with repeated table headers, zebra rows, and colored status badge pills.
   - **RFC 4180 CSV** with UTF-8 BOM.
   - **Copy to Clipboard** with formatted TSV.
   - Full-dataset export support (fetches all filtered pages in the background, not just on-screen rows).
