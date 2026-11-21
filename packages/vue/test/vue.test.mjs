@@ -96,6 +96,41 @@ test("Vue TableX SSR renders scoped slots, tree data, pinned rows, nested groupB
   assert.ok(html.includes("Views"), "Renders Saved Views toolbar button");
   assert.ok(html.includes("Export PDF"), "Renders direct PDF export button");
   assert.ok(html.includes("tbx-row-drag-handle"), "Renders row drag handle");
+  assert.ok(html.includes("tbx-resize-handle"), "Renders column resize handle");
   assert.ok(html.includes("tbx-load-more-btn"), "Renders infinite scroll Load More button");
   assert.ok(html.includes("tbx-summary-row"), "Renders summary footer row");
+  assert.ok(html.includes("tbx-card-head"), "Renders mobile card header");
+});
+
+test("Vue TableX renders split export mode, sticky pinned header/summary offsets, and nested group headers", async () => {
+  const columns = [
+    { accessorKey: "region", header: "Region" },
+    { accessorKey: "team", header: "Team", meta: { pinned: "left" } },
+    { accessorKey: "revenue", header: "Revenue", meta: { align: "right", aggregation: "sum" } },
+  ];
+
+  const app = createSSRApp({
+    setup() {
+      return () =>
+        h(TableX, {
+          caption: "Sales Breakdown",
+          columns,
+          data: [
+            { id: "1", region: "APAC", team: "Core", revenue: 120 },
+            { id: "2", region: "APAC", team: "Enterprise", revenue: 300 },
+          ],
+          clientSidePagination: true,
+          enableSelection: true,
+          enableSummaryRow: true,
+          exportMode: "split",
+          groupBy: ["region", "team"],
+        });
+    },
+  });
+
+  const html = await renderToString(app);
+  assert.ok(html.includes("tbx-split-btn"), "Renders split export button group");
+  assert.ok(html.includes('data-group-depth="1"'), "Renders multi-level nested group depth 1");
+  assert.ok(html.includes("tbx-th--select tbx-th--pinned-left"), "Pins structural select header cell");
+  assert.ok(html.includes("tbx-summary-cell tbx-td--pinned-left"), "Pins summary footer cell");
 });

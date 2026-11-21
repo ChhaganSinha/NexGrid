@@ -364,7 +364,6 @@ export const TableX = defineComponent({
         virtualScrollTop.value = 0;
         if (tableWrapRef.value) tableWrapRef.value.scrollTop = 0;
       }
-      props.onQueryChange?.(next);
       emit("update:query", next);
       emit("queryChange", next);
     };
@@ -416,7 +415,14 @@ export const TableX = defineComponent({
 
     const openMenu = ref<"columns" | "density" | "export" | "views" | null>(null);
     const openFilterCol = ref<string | null>(null);
+    const filterPopoverStyle = ref<Record<string, string>>({
+      position: "absolute",
+      top: "44px",
+      right: "12px",
+      zIndex: "1000",
+    });
     const filterSearchText = ref("");
+    const filterHasTyped = ref(false);
     const filterRangeMin = ref("");
     const filterRangeMax = ref("");
     const filterMultiSet = ref<Set<string>>(new Set());
@@ -453,6 +459,7 @@ export const TableX = defineComponent({
 
     let isDraggingRange = false;
     let isFillingRange = false;
+    let resizeCleanup: (() => void) | null = null;
     let lastSelectedRowIdx: number | null = null;
     let shiftClickRow = false;
     let draggedRowIdx: number | null = null;
@@ -462,6 +469,62 @@ export const TableX = defineComponent({
     const jumpText = ref(String(Math.max(1, activeQuery.value.page)));
     const virtualScrollTop = ref(0);
     const isExporting = ref(false);
+
+    const updateFilterPopoverPos = (colId: string | null = openFilterCol.value): void => {
+      if (!colId) return;
+      const rootEl = rootRef.value;
+      if (!rootEl || typeof rootEl.querySelector !== "function") return;
+      let btn: HTMLElement | null = null;
+      const candidates = rootEl.querySelectorAll("[data-filter-col]");
+      for (let i = 0; i < candidates.length; i++) {
+        const el = candidates[i] as HTMLElement;
+        if (el.getAttribute("data-filter-col") === colId) {
+          btn = el;
+          break;
+        }
+      }
+      if (!btn || typeof btn.getBoundingClientRect !== "function") return;
+      const btnRect = btn.getBoundingClientRect();
+      const rootRect = rootEl.getBoundingClientRect();
+      if (btnRect.width === 0 && btnRect.height === 0 && btnRect.top === 0) {
+        filterPopoverStyle.value = { position: "absolute", top: "44px", right: "12px", zIndex: "1000" };
+        return;
+      }
+      const wrapEl = tableWrapRef.value;
+      if (wrapEl && typeof wrapEl.getBoundingClientRect === "function") {
+        const wrapRect = wrapEl.getBoundingClientRect();
+        if (wrapRect.width > 0 && (btnRect.right < wrapRect.left + 4 || btnRect.left > wrapRect.right - 4)) {
+          openFilterCol.value = null;
+          return;
+        }
+      }
+      const popEl = rootEl.querySelector(".tbx-filter-popover") as HTMLElement | null;
+      const popRect = popEl?.getBoundingClientRect?.();
+      const margin = 6;
+      const popH = popRect?.height || 240;
+      const popW = popRect?.width || 240;
+      const winH = typeof window !== "undefined" ? window.innerHeight || 800 : 800;
+      const winW = typeof window !== "undefined" ? window.innerWidth || 1024 : 1024;
+
+      let viewportTop = btnRect.bottom + margin;
+      if (viewportTop + popH > winH - 12 && btnRect.top - popH - margin > 12) {
+        viewportTop = btnRect.top - popH - margin;
+      }
+      let viewportLeft = btnRect.right - popW;
+      if (viewportLeft < 12) viewportLeft = Math.max(12, btnRect.left);
+      if (viewportLeft + popW > winW - 12) viewportLeft = Math.max(12, winW - popW - 12);
+
+      filterPopoverStyle.value = {
+        position: "absolute",
+        top: `${Math.round(viewportTop - rootRect.top)}px`,
+        left: `${Math.round(viewportLeft - rootRect.left)}px`,
+        zIndex: "1000",
+      };
+    };
+
+    const onWindowResize = (): void => {
+      if (openFilterCol.value) updateFilterPopoverPos();
+    };
 
     watch(
       () => activeQuery.value.q,
@@ -542,14 +605,21 @@ export const TableX = defineComponent({
         document.addEventListener("pointerup", onGlobalPointerUp);
         document.addEventListener("keydown", onGlobalKeyDown);
       }
+      if (typeof window !== "undefined") {
+        window.addEventListener("resize", onWindowResize);
+      }
     });
 
     onBeforeUnmount(() => {
       if (searchTimer) clearTimeout(searchTimer);
+      resizeCleanup?.();
       if (typeof document !== "undefined") {
         document.removeEventListener("pointerdown", onGlobalPointerDown, true);
         document.removeEventListener("pointerup", onGlobalPointerUp);
         document.removeEventListener("keydown", onGlobalKeyDown);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", onWindowResize);
       }
     });
 
@@ -669,14 +739,12 @@ export const TableX = defineComponent({
     });
 
     const emitNotice = (type: TableXNoticeType, message: string): void => {
-      props.onNotify?.({ type, message });
       emit("notify", { type, message });
     };
 
     const emitSelection = (): void => {
       const list = Array.from(selectedIds.value);
-      props.onSelectionChange?.(list, allAcrossSelected.value);
-      emit("selectionChange", { ids: list, allAcrossSelected: allAcrossSelected.value });
+      emit("selectionChange", list, allAcrossSelected.value);
     };
 
     const deselectAll = (): void => {
@@ -789,7 +857,6 @@ export const TableX = defineComponent({
         if (ch.oldValue !== ch.newValue) {
           nextDirty.add(`${rid}::${cid}`);
           const payload = { row, columnId: cid, oldValue: ch.oldValue, newValue: ch.newValue };
-          props.onCellEdit?.(payload);
           emit("cellEdit", payload);
         }
       }
@@ -798,8 +865,77 @@ export const TableX = defineComponent({
       rowEditDraft.value = {};
       cellValidationError.value = null;
       const rowPayload: RowEditEvent<unknown> = { row, updatedRow, changes };
-      props.onRowEdit?.(rowPayload);
       emit("rowEdit", rowPayload);
+    };
+
+    const applyFillHandleToRow = (targetRowIdx: number): void => {
+      if (!cellRange.value) return;
+      const startRow = cellRange.value.minRow;
+      const endRow = Math.max(startRow, Math.min(rows.value.length - 1, targetRowIdx));
+      const sourceRow = rows.value[startRow];
+      if (!sourceRow) return;
+
+      const nextDirty = new Set(dirtyCells.value);
+      for (let c = cellRange.value.minCol; c <= cellRange.value.maxCol; c++) {
+        const col = visible.value[c];
+        if (!col || !isEditable(col)) continue;
+        const cid = getColumnId(col);
+        const sourceVal = getCellValue(col, sourceRow);
+
+        for (let r = startRow + 1; r <= endRow; r++) {
+          const targetRow = rows.value[r];
+          if (!targetRow) continue;
+          const oldVal = getCellValue(col, targetRow);
+          const coerced = coerceEditedValue(sourceVal, col.meta?.editType);
+          if (validateEditedCell(col, coerced, targetRow) !== null) continue;
+          writeMutatedRow(targetRow, col, cid, coerced);
+          if (oldVal !== coerced) {
+            nextDirty.add(`${rowIdFn.value(targetRow)}::${cid}`);
+            emit("cellEdit", {
+              row: targetRow,
+              columnId: cid,
+              oldValue: oldVal,
+              newValue: coerced,
+            });
+          }
+        }
+      }
+      dirtyCells.value = nextDirty;
+      cellRange.value = { ...cellRange.value, maxRow: endRow };
+    };
+
+    const autoFitColumn = (colId: string): void => {
+      const col = leafCols.value.find((c) => getColumnId(c) === colId);
+      const minW = col?.meta?.minWidth ?? 60;
+      const rootEl = rootRef.value;
+      if (!rootEl || typeof rootEl.querySelectorAll !== "function") {
+        const titleLen = (col ? getColumnTitle(col) || colId : colId).length;
+        const maxChars = rows.value.reduce<number>((acc, r) => {
+          if (!col) return acc;
+          return Math.max(acc, getCellText(getCellValue(col, r), boolLabels.value).length);
+        }, titleLen);
+        colWidths.value = { ...colWidths.value, [colId]: Math.min(520, Math.max(minW, maxChars * 8 + 44)) };
+        savePersisted();
+        return;
+      }
+      let best = minW;
+      const ths = rootEl.querySelectorAll("[data-column-id]");
+      for (let i = 0; i < ths.length; i++) {
+        const th = ths[i] as HTMLElement;
+        if (th.getAttribute("data-column-id") === colId) {
+          const inner = th.querySelector(".tbx-th-inner") as HTMLElement | null;
+          best = Math.max(best, (inner?.scrollWidth ?? th.scrollWidth) + 28);
+        }
+      }
+      const tds = rootEl.querySelectorAll("[data-col-id]");
+      for (let i = 0; i < tds.length; i++) {
+        const td = tds[i] as HTMLElement;
+        if (td.getAttribute("data-col-id") === colId) {
+          best = Math.max(best, td.scrollWidth + 24);
+        }
+      }
+      colWidths.value = { ...colWidths.value, [colId]: Math.min(520, Math.round(best)) };
+      savePersisted();
     };
 
     const collectExportRows = async (): Promise<readonly unknown[]> => {
@@ -1027,7 +1163,6 @@ export const TableX = defineComponent({
           if (oldVal !== coerced) {
             nextDirty.add(`${rowIdFn.value(targetRow)}::${cid}`);
             const payload = { row: targetRow, columnId: cid, oldValue: oldVal, newValue: coerced };
-            props.onCellEdit?.(payload);
             emit("cellEdit", payload);
           }
         }
@@ -1062,7 +1197,6 @@ export const TableX = defineComponent({
                     type: "button",
                     class: "tbx-btn",
                     onClick: () => {
-                      props.onRetry?.();
                       emit("retry");
                     },
                   },
@@ -1080,6 +1214,8 @@ export const TableX = defineComponent({
       const allPageSelected =
         allAcrossSelected.value ||
         (pageRowIds.value.length > 0 && pageRowIds.value.every((id) => selectedIds.value.has(id)));
+      const somePageSelected =
+        !allPageSelected && pageRowIds.value.some((id) => selectedIds.value.has(id));
       const effectiveSelectedCount = allAcrossSelected.value
         ? Math.max(total.value, selectedIds.value.size)
         : selectedIds.value.size;
@@ -1136,11 +1272,43 @@ export const TableX = defineComponent({
         const customW = colWidths.value[cid];
         const w = customW ?? col.meta?.width;
 
+        const startResize = (ev: PointerEvent): void => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          resizeCleanup?.();
+          const startX = ev.clientX;
+          const targetEl = ev.currentTarget as HTMLElement | null;
+          const thEl = (targetEl?.closest?.("th") as HTMLElement | null) ?? targetEl?.parentElement ?? null;
+          const startW = thEl?.getBoundingClientRect?.().width || (customW ?? col.meta?.width ?? 120);
+          const minW = col.meta?.minWidth ?? 60;
+
+          const onMove = (moveEv: PointerEvent) => {
+            const nextW = Math.max(minW, Math.round(startW + (moveEv.clientX - startX)));
+            colWidths.value = { ...colWidths.value, [cid]: nextW };
+          };
+          const cleanup = () => {
+            if (typeof document !== "undefined") {
+              document.removeEventListener("pointermove", onMove);
+              document.removeEventListener("pointerup", cleanup);
+              document.body?.classList?.remove("tbx-resizing");
+            }
+            resizeCleanup = null;
+            savePersisted();
+          };
+          resizeCleanup = cleanup;
+          if (typeof document !== "undefined") {
+            document.body?.classList?.add("tbx-resizing");
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", cleanup);
+          }
+        };
+
         return h(
           "th",
           {
             key: cid,
             scope: "col",
+            "data-column-id": cid,
             rowspan: rowSpan > 1 ? rowSpan : undefined,
             "aria-sort": !sortable
               ? undefined
@@ -1167,7 +1335,12 @@ export const TableX = defineComponent({
               ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
             },
             draggable: props.enableColumnReorder && !isGroupChild ? "true" : undefined,
-            onDragstart: () => {
+            onDragstart: (ev: DragEvent) => {
+              const t = ev.target as HTMLElement | null;
+              if (t?.closest?.(".tbx-col-filter-wrap, .tbx-resize-handle")) {
+                ev.preventDefault();
+                return;
+              }
               draggedColId = cid;
             },
             onDragover: (ev: DragEvent) => ev.preventDefault(),
@@ -1179,7 +1352,6 @@ export const TableX = defineComponent({
               if (fromIdx >= 0 && toIdx >= 0) {
                 colList.value = reorderArrayItem(colList.value, fromIdx, toIdx);
                 const order = colList.value.map(getColumnId);
-                props.onColumnOrderChange?.(order);
                 emit("columnOrderChange", order);
                 savePersisted();
               }
@@ -1224,49 +1396,83 @@ export const TableX = defineComponent({
                   : null,
                 isFilterable(col, props.enableColumnFilters) ||
                 (!isStructuralColumn(col) && cid !== "" && props.enableColumnMenu !== false)
-                  ? h("div", { class: "tbx-col-filter-wrap" }, [
-                      h(
-                        "button",
-                        {
-                          type: "button",
-                          "data-filter-col": cid,
-                          class: [
-                            "tbx-col-filter-btn",
-                            activeFilter ? "tbx-col-filter-btn--active" : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" "),
-                          "aria-label": `Filter ${title}`,
-                          onClick: (ev: MouseEvent) => {
-                            ev.stopPropagation();
-                            if (openFilterCol.value === cid) {
-                              openFilterCol.value = null;
-                              return;
-                            }
-                            openFilterCol.value = cid;
-                            const af = activeFilter ?? "";
-                            if (col.meta?.filterType === "date-range" || col.meta?.filterType === "number-range") {
-                              const [mi = "", ma = ""] = af.split("..");
-                              filterRangeMin.value = mi;
-                              filterRangeMax.value = ma;
-                              filterSearchText.value = "";
-                            } else if (isMultiSelectFilter(col) && col.meta?.filterOptions) {
-                              const toks = parseMultiFilterValues(af, true).map((t) => t.toLowerCase());
-                              filterMultiSet.value = new Set(
-                                col.meta.filterOptions.filter((o) => toks.includes(o.trim().toLowerCase())),
-                              );
-                              filterSearchText.value = "";
-                            } else {
-                              filterSearchText.value = af;
-                            }
-                          },
+                  ? h(
+                      "div",
+                      {
+                        class: "tbx-col-filter-wrap",
+                        draggable: "false",
+                        onDragstart: (ev: DragEvent) => {
+                          ev.preventDefault();
+                          ev.stopPropagation();
                         },
-                        [dotsVerticalIcon()],
-                      ),
-                    ])
+                      },
+                      [
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            "data-filter-col": cid,
+                            "aria-expanded": String(openFilterCol.value === cid),
+                            "aria-haspopup": "dialog",
+                            class: [
+                              "tbx-col-filter-btn",
+                              activeFilter?.trim() ? "tbx-col-filter-btn--active" : undefined,
+                              openFilterCol.value === cid ? "tbx-col-filter-btn--open" : undefined,
+                            ]
+                              .filter(Boolean)
+                              .join(" "),
+                            "aria-label": `Filter ${title}`,
+                            onClick: (ev: MouseEvent) => {
+                              ev.stopPropagation();
+                              if (openFilterCol.value === cid) {
+                                openFilterCol.value = null;
+                                return;
+                              }
+                              openFilterCol.value = cid;
+                              filterHasTyped.value = false;
+                              const af = activeFilter ?? "";
+                              if (col.meta?.filterType === "date-range" || col.meta?.filterType === "number-range") {
+                                const [mi = "", ma = ""] = af.split("..");
+                                filterRangeMin.value = mi;
+                                filterRangeMax.value = ma;
+                                filterSearchText.value = "";
+                              } else if (isMultiSelectFilter(col) && col.meta?.filterOptions) {
+                                const toks = parseMultiFilterValues(af, true).map((t) => t.toLowerCase());
+                                filterMultiSet.value = new Set(
+                                  col.meta.filterOptions.filter((o) => toks.includes(o.trim().toLowerCase())),
+                                );
+                                filterSearchText.value = "";
+                              } else {
+                                filterSearchText.value = af;
+                              }
+                              updateFilterPopoverPos(cid);
+                              if (typeof requestAnimationFrame === "function") {
+                                requestAnimationFrame(() => updateFilterPopoverPos(cid));
+                              }
+                            },
+                          },
+                          [dotsVerticalIcon()],
+                        ),
+                      ],
+                    )
                   : null,
               ],
             ),
+            props.enableColumnResize
+              ? h("div", {
+                  class: "tbx-resize-handle",
+                  draggable: "false",
+                  onDragstart: (ev: DragEvent) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                  },
+                  onPointerdown: startResize,
+                  onDblclick: (ev: MouseEvent) => {
+                    ev.stopPropagation();
+                    autoFitColumn(cid);
+                  },
+                })
+              : null,
           ],
         );
       };
@@ -1525,7 +1731,6 @@ export const TableX = defineComponent({
               }
               editingCell.value = null;
               const payload = { row, columnId: cid, oldValue: oldVal, newValue: nextVal };
-              props.onCellEdit?.(payload);
               emit("cellEdit", payload);
             };
             const editor =
@@ -1641,6 +1846,7 @@ export const TableX = defineComponent({
               "td",
               {
                 key: cid || `col-${colIdx}`,
+                "data-col-id": cid,
                 tabindex: !pinnedVariant && props.enableKeyboardNavigation ? (isFocused ? 0 : -1) : undefined,
                 class: [
                   "tbx-td",
@@ -1686,6 +1892,8 @@ export const TableX = defineComponent({
                             rowIndex: index,
                             colIndex: colIdx,
                           });
+                        } else if (isFillingRange) {
+                          applyFillHandleToRow(index);
                         }
                       }
                     : undefined,
@@ -1767,13 +1975,11 @@ export const TableX = defineComponent({
                       toIndex: index,
                       rows: nextList,
                     };
-                    props.onRowOrderChange?.(payload);
                     emit("rowOrderChange", payload);
                   }
                 : undefined,
             onClick: clickable
               ? () => {
-                  props.onRowClick?.(row);
                   emit("rowClick", row);
                 }
               : undefined,
@@ -2052,7 +2258,6 @@ export const TableX = defineComponent({
                                         props.storageKey,
                                       );
                                       newViewName.value = "";
-                                      props.onSavedViewsChange?.([...savedViewsList.value]);
                                       emit("savedViewsChange", [...savedViewsList.value]);
                                     },
                                   },
@@ -2091,7 +2296,6 @@ export const TableX = defineComponent({
                                               v.id,
                                               props.storageKey,
                                             );
-                                            props.onSavedViewsChange?.([...savedViewsList.value]);
                                             emit("savedViewsChange", [...savedViewsList.value]);
                                           },
                                         },
@@ -2246,24 +2450,61 @@ export const TableX = defineComponent({
                           ],
                         )
                       : h("div", { class: "tbx-menu-wrap" }, [
-                          h(
-                            "button",
-                            {
-                              type: "button",
-                              class: "tbx-btn tbx-btn--export",
-                              disabled: isExporting.value,
-                              "aria-haspopup": "menu",
-                              "aria-expanded": String(openMenu.value === "export"),
-                              onClick: () => {
-                                openMenu.value = openMenu.value === "export" ? null : "export";
-                              },
-                            },
-                            [
-                              downloadTrayIcon(),
-                              h("span", isExporting.value ? loc.exportingButton : loc.exportButton),
-                              chevronDownIcon("tbx-icon tbx-chevron"),
-                            ],
-                          ),
+                          resolvedExportMode === "split"
+                            ? h("div", { class: "tbx-split-btn" }, [
+                                h(
+                                  "button",
+                                  {
+                                    type: "button",
+                                    class: "tbx-btn tbx-btn--export",
+                                    disabled: isExporting.value,
+                                    "aria-label": isExporting.value
+                                      ? loc.exportingButton
+                                      : loc.exportExcelButton,
+                                    onClick: () => void runExport("excel"),
+                                  },
+                                  [
+                                    downloadTrayIcon(),
+                                    h(
+                                      "span",
+                                      isExporting.value ? loc.exportingButton : loc.exportExcelButton,
+                                    ),
+                                  ],
+                                ),
+                                h(
+                                  "button",
+                                  {
+                                    type: "button",
+                                    class: "tbx-btn tbx-btn--export",
+                                    disabled: isExporting.value,
+                                    "aria-haspopup": "menu",
+                                    "aria-expanded": String(openMenu.value === "export"),
+                                    "aria-label": "More export options",
+                                    onClick: () => {
+                                      openMenu.value = openMenu.value === "export" ? null : "export";
+                                    },
+                                  },
+                                  [chevronDownIcon("tbx-icon tbx-chevron")],
+                                ),
+                              ])
+                            : h(
+                                "button",
+                                {
+                                  type: "button",
+                                  class: "tbx-btn tbx-btn--export",
+                                  disabled: isExporting.value,
+                                  "aria-haspopup": "menu",
+                                  "aria-expanded": String(openMenu.value === "export"),
+                                  onClick: () => {
+                                    openMenu.value = openMenu.value === "export" ? null : "export";
+                                  },
+                                },
+                                [
+                                  downloadTrayIcon(),
+                                  h("span", isExporting.value ? loc.exportingButton : loc.exportButton),
+                                  chevronDownIcon("tbx-icon tbx-chevron"),
+                                ],
+                              ),
                           openMenu.value === "export"
                             ? h("div", { class: "tbx-menu tbx-menu--end", role: "menu" }, [
                                 h(
@@ -2448,6 +2689,7 @@ export const TableX = defineComponent({
                 : undefined,
               onScroll: (ev: Event) => {
                 contextMenu.value = null;
+                if (openFilterCol.value) updateFilterPopoverPos();
                 const el = ev.currentTarget as HTMLElement | null;
                 if (!el) return;
                 if (props.enableVirtualization) {
@@ -2455,7 +2697,6 @@ export const TableX = defineComponent({
                 }
                 if (isInfiniteMode.value && props.hasMore && !props.isLoading && !props.isLoadingMore) {
                   if (el.scrollHeight - el.scrollTop - el.clientHeight <= 120) {
-                    props.onLoadMore?.(props.nextCursor);
                     emit("loadMore", props.nextCursor);
                   }
                 }
@@ -2468,16 +2709,35 @@ export const TableX = defineComponent({
                     props.enableRowReorder
                       ? h("th", {
                           rowspan: headerRows.value.hasGroups ? 2 : undefined,
-                          class: "tbx-th tbx-th--row-drag",
-                          style: { width: "36px" },
+                          class: [
+                            "tbx-th tbx-th--row-drag",
+                            leftOffsets.has("__row_drag") ? "tbx-th--pinned-left" : undefined,
+                            lastLeftPinnedId === "__row_drag" ? "tbx-pinned-border-left" : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(" "),
+                          style: {
+                            width: "36px",
+                            ...(leftOffsets.has("__row_drag") ? { left: `${leftOffsets.get("__row_drag")}px` } : {}),
+                          },
                           scope: "col",
+                          "aria-label": "Row reorder",
                         })
                       : null,
                     hasExpandCol.value
                       ? h("th", {
                           rowspan: headerRows.value.hasGroups ? 2 : undefined,
-                          class: "tbx-th tbx-th--expand",
-                          style: { width: "40px" },
+                          class: [
+                            "tbx-th tbx-th--expand",
+                            leftOffsets.has("__expand") ? "tbx-th--pinned-left" : undefined,
+                            lastLeftPinnedId === "__expand" ? "tbx-pinned-border-left" : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(" "),
+                          style: {
+                            width: "40px",
+                            ...(leftOffsets.has("__expand") ? { left: `${leftOffsets.get("__expand")}px` } : {}),
+                          },
                           scope: "col",
                         })
                       : null,
@@ -2486,7 +2746,16 @@ export const TableX = defineComponent({
                           "th",
                           {
                             rowspan: headerRows.value.hasGroups ? 2 : undefined,
-                            class: "tbx-th tbx-th--select",
+                            class: [
+                              "tbx-th tbx-th--select",
+                              leftOffsets.has("__select") ? "tbx-th--pinned-left" : undefined,
+                              lastLeftPinnedId === "__select" ? "tbx-pinned-border-left" : undefined,
+                            ]
+                              .filter(Boolean)
+                              .join(" "),
+                            style: leftOffsets.has("__select")
+                              ? { left: `${leftOffsets.get("__select")}px` }
+                              : undefined,
                             scope: "col",
                           },
                           props.selectionMode !== "single"
@@ -2495,6 +2764,7 @@ export const TableX = defineComponent({
                                   type: "checkbox",
                                   class: "tbx-checkbox",
                                   checked: allPageSelected,
+                                  ".indeterminate": somePageSelected,
                                   "aria-label": loc.selectAllLabel,
                                   onChange: () => {
                                     if (allAcrossSelected.value) {
@@ -2520,7 +2790,16 @@ export const TableX = defineComponent({
                           "th",
                           {
                             rowspan: headerRows.value.hasGroups ? 2 : undefined,
-                            class: "tbx-th tbx-th--serial",
+                            class: [
+                              "tbx-th tbx-th--serial",
+                              leftOffsets.has("__serial") ? "tbx-th--pinned-left" : undefined,
+                              lastLeftPinnedId === "__serial" ? "tbx-pinned-border-left" : undefined,
+                            ]
+                              .filter(Boolean)
+                              .join(" "),
+                            style: leftOffsets.has("__serial")
+                              ? { left: `${leftOffsets.get("__serial")}px` }
+                              : undefined,
                             scope: "col",
                           },
                           loc.serialHeader,
@@ -2556,15 +2835,66 @@ export const TableX = defineComponent({
                 !props.isLoading && hasSummary && rows.value.length > 0
                   ? h("tfoot", [
                       h("tr", { class: "tbx-summary-row" }, [
-                        props.enableRowReorder ? h("td", { class: "tbx-summary-cell" }) : null,
-                        hasExpandCol.value ? h("td", { class: "tbx-summary-cell" }) : null,
+                        props.enableRowReorder
+                          ? h("td", {
+                              class: [
+                                "tbx-summary-cell",
+                                leftOffsets.has("__row_drag") ? "tbx-td--pinned-left" : undefined,
+                                lastLeftPinnedId === "__row_drag" ? "tbx-pinned-border-left" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
+                              style: {
+                                width: "36px",
+                                ...(leftOffsets.has("__row_drag") ? { left: `${leftOffsets.get("__row_drag")}px` } : {}),
+                              },
+                            })
+                          : null,
+                        hasExpandCol.value
+                          ? h("td", {
+                              class: [
+                                "tbx-summary-cell",
+                                leftOffsets.has("__expand") ? "tbx-td--pinned-left" : undefined,
+                                lastLeftPinnedId === "__expand" ? "tbx-pinned-border-left" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
+                              style: {
+                                width: "40px",
+                                ...(leftOffsets.has("__expand") ? { left: `${leftOffsets.get("__expand")}px` } : {}),
+                              },
+                            })
+                          : null,
                         props.enableSelection
-                          ? h("td", { class: "tbx-summary-cell tbx-summary-cell--select" })
+                          ? h("td", {
+                              class: [
+                                "tbx-summary-cell tbx-summary-cell--select",
+                                leftOffsets.has("__select") ? "tbx-td--pinned-left" : undefined,
+                                lastLeftPinnedId === "__select" ? "tbx-pinned-border-left" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
+                              style: leftOffsets.has("__select")
+                                ? { left: `${leftOffsets.get("__select")}px` }
+                                : undefined,
+                            })
                           : null,
                         props.showSerialNumber
-                          ? h("td", { class: "tbx-summary-cell tbx-summary-cell--serial" })
+                          ? h("td", {
+                              class: [
+                                "tbx-summary-cell tbx-summary-cell--serial",
+                                leftOffsets.has("__serial") ? "tbx-td--pinned-left" : undefined,
+                                lastLeftPinnedId === "__serial" ? "tbx-pinned-border-left" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
+                              style: leftOffsets.has("__serial")
+                                ? { left: `${leftOffsets.get("__serial")}px` }
+                                : undefined,
+                            })
                           : null,
                         ...visible.value.map((col, idx) => {
+                          const cid = getColumnId(col);
                           const aggVal = computeAggregation(col, rows.value);
                           const lbl =
                             col.meta?.aggregationLabel ||
@@ -2574,9 +2904,21 @@ export const TableX = defineComponent({
                           return h(
                             "td",
                             {
-                              key: `sum-${getColumnId(col) || idx}`,
-                              class: "tbx-summary-cell",
-                              style: { textAlign: col.meta?.align ?? "left" },
+                              key: `sum-${cid || idx}`,
+                              class: [
+                                "tbx-summary-cell",
+                                leftOffsets.has(cid) ? "tbx-td--pinned-left" : undefined,
+                                rightOffsets.has(cid) ? "tbx-td--pinned-right" : undefined,
+                                lastLeftPinnedId === cid ? "tbx-pinned-border-left" : undefined,
+                                firstRightPinnedId === cid ? "tbx-pinned-border-right" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
+                              style: {
+                                textAlign: col.meta?.align ?? "left",
+                                ...(leftOffsets.has(cid) ? { left: `${leftOffsets.get(cid)}px` } : {}),
+                                ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
+                              },
                             },
                             aggVal !== null && aggVal !== undefined
                               ? [
@@ -2603,113 +2945,481 @@ export const TableX = defineComponent({
                 const cid = getColumnId(col);
                 const fField = getFilterField(col);
                 const sField = getSortField(col);
+                const title = getColumnTitle(col) || cid;
+                const colSortable = isSortable(col) && props.enableSorting !== false;
+                const colFilterable = isFilterable(col, props.enableColumnFilters);
+                const activeSort = q.sort.find(
+                  (s) =>
+                    s.field.toLowerCase() === sField.toLowerCase() ||
+                    s.field.toLowerCase() === cid.toLowerCase(),
+                );
+                const currentPin = isPinned(col, pinnedCols.value);
+                const isPinCapable = !isStructuralColumn(col) && cid !== "";
+                const canHide = isHideable(col) && visible.value.length > 1;
+                const isGrouped = activeGroupBy.value.some(
+                  (g) => g.toLowerCase() === cid.toLowerCase(),
+                );
+                const hasQuickActions =
+                  props.enableColumnMenu !== false && (colSortable || isPinCapable || canHide);
+
                 const applyVal = (v: string | undefined) => {
                   openFilterCol.value = null;
-                  pushQuery(withFilter(q, fField, v));
+                  let nextQ = withFilter(q, fField, v);
+                  if (fField !== cid && nextQ.filter?.[cid] !== undefined) {
+                    nextQ = withFilter(nextQ, cid, undefined);
+                  }
+                  pushQuery(nextQ);
                 };
-                const isGrouped = activeGroupBy.value.some((g) => g.toLowerCase() === cid.toLowerCase());
-                return h("div", { class: "tbx-filter-popover" }, [
-                  props.enableColumnMenu !== false
-                    ? h("div", { class: "tbx-col-menu-actions" }, [
-                        isSortable(col)
+
+                const quickActionsNode = hasQuickActions
+                  ? [
+                      h("div", { class: "tbx-col-menu-actions" }, [
+                        colSortable
                           ? h(
                               "button",
                               {
                                 type: "button",
-                                class: "tbx-col-menu-btn",
+                                "data-col-action": "sort-asc",
+                                class: `tbx-col-menu-btn ${activeSort?.dir === "asc" ? "tbx-col-menu-btn--active" : ""}`,
                                 onClick: () => {
                                   openFilterCol.value = null;
-                                  pushQuery(withSort(q, sField, "asc"));
+                                  pushQuery(
+                                    activeSort?.dir === "asc"
+                                      ? { ...q, sort: [], page: 1 }
+                                      : withSort(q, sField, "asc"),
+                                  );
                                 },
                               },
                               [arrowUpIcon(), h("span", loc.sortAscending)],
                             )
                           : null,
-                        isSortable(col)
+                        colSortable
                           ? h(
                               "button",
                               {
                                 type: "button",
-                                class: "tbx-col-menu-btn",
+                                "data-col-action": "sort-desc",
+                                class: `tbx-col-menu-btn ${activeSort?.dir === "desc" ? "tbx-col-menu-btn--active" : ""}`,
                                 onClick: () => {
                                   openFilterCol.value = null;
-                                  pushQuery(withSort(q, sField, "desc"));
+                                  pushQuery(
+                                    activeSort?.dir === "desc"
+                                      ? { ...q, sort: [], page: 1 }
+                                      : withSort(q, sField, "desc"),
+                                  );
                                 },
                               },
                               [arrowDownIcon(), h("span", loc.sortDescending)],
                             )
                           : null,
-                        isGrouped
+                        isPinCapable && currentPin !== "left"
                           ? h(
                               "button",
                               {
                                 type: "button",
-                                class: "tbx-col-menu-btn tbx-col-menu-btn--active",
+                                "data-col-action": "pin-left",
+                                class: "tbx-col-menu-btn",
                                 onClick: () => {
-                                  activeGroupBy.value = activeGroupBy.value.filter(
-                                    (g) => g.toLowerCase() !== cid.toLowerCase(),
-                                  );
+                                  pinnedCols.value = { ...pinnedCols.value, [cid]: "left" };
                                   openFilterCol.value = null;
-                                  props.onGroupByChange?.(activeGroupBy.value[0], [...activeGroupBy.value]);
-                                  emit("groupByChange", activeGroupBy.value[0]);
+                                  savePersisted();
                                 },
                               },
-                              [h("span", loc.ungroupColumn)],
+                              [h("span", loc.pinLeft)],
                             )
-                          : h(
+                          : null,
+                        isPinCapable && currentPin !== "right"
+                          ? h(
                               "button",
                               {
                                 type: "button",
+                                "data-col-action": "pin-right",
                                 class: "tbx-col-menu-btn",
                                 onClick: () => {
-                                  activeGroupBy.value = [cid];
+                                  pinnedCols.value = { ...pinnedCols.value, [cid]: "right" };
                                   openFilterCol.value = null;
-                                  props.onGroupByChange?.(cid, [cid]);
-                                  emit("groupByChange", cid);
+                                  savePersisted();
                                 },
                               },
-                              [h("span", loc.groupByColumn)],
-                            ),
-                      ])
-                    : null,
-                  isFilterable(col, props.enableColumnFilters)
-                    ? [
+                              [h("span", loc.pinRight)],
+                            )
+                          : null,
+                        isPinCapable && (currentPin === "left" || currentPin === "right")
+                          ? h(
+                              "button",
+                              {
+                                type: "button",
+                                "data-col-action": "unpin",
+                                class: "tbx-col-menu-btn tbx-col-menu-btn--active",
+                                onClick: () => {
+                                  pinnedCols.value = { ...pinnedCols.value, [cid]: "none" };
+                                  openFilterCol.value = null;
+                                  savePersisted();
+                                },
+                              },
+                              [h("span", loc.unpinColumn)],
+                            )
+                          : null,
+                        isPinCapable
+                          ? isGrouped
+                            ? h(
+                                "button",
+                                {
+                                  type: "button",
+                                  "data-col-action": "ungroup",
+                                  class: "tbx-col-menu-btn tbx-col-menu-btn--active",
+                                  onClick: () => {
+                                    const nextArr = activeGroupBy.value.filter(
+                                      (g) => g.toLowerCase() !== cid.toLowerCase(),
+                                    );
+                                    activeGroupBy.value = nextArr;
+                                    collapsedGroups.value = new Set();
+                                    openFilterCol.value = null;
+                                    emit("groupByChange", nextArr[0], [...nextArr]);
+                                    savePersisted();
+                                  },
+                                },
+                                [h("span", loc.ungroupColumn)],
+                              )
+                            : [
+                                h(
+                                  "button",
+                                  {
+                                    type: "button",
+                                    "data-col-action": "group-by",
+                                    class: "tbx-col-menu-btn",
+                                    onClick: () => {
+                                      activeGroupBy.value = [cid];
+                                      collapsedGroups.value = new Set();
+                                      openFilterCol.value = null;
+                                      emit("groupByChange", cid, [cid]);
+                                      savePersisted();
+                                    },
+                                  },
+                                  [h("span", loc.groupByColumn)],
+                                ),
+                                activeGroupBy.value.length > 0
+                                  ? h(
+                                      "button",
+                                      {
+                                        type: "button",
+                                        "data-col-action": "add-group-by",
+                                        class: "tbx-col-menu-btn",
+                                        onClick: () => {
+                                          const nextArr = [...activeGroupBy.value, cid];
+                                          activeGroupBy.value = nextArr;
+                                          collapsedGroups.value = new Set();
+                                          openFilterCol.value = null;
+                                          emit("groupByChange", nextArr[0], [...nextArr]);
+                                          savePersisted();
+                                        },
+                                      },
+                                      [h("span", loc.addGroupByColumn)],
+                                    )
+                                  : null,
+                              ]
+                          : null,
+                        canHide
+                          ? h(
+                              "button",
+                              {
+                                type: "button",
+                                "data-col-action": "hide",
+                                class: "tbx-col-menu-btn",
+                                onClick: () => {
+                                  hiddenCols.value = { ...hiddenCols.value, [cid]: true };
+                                  openFilterCol.value = null;
+                                  savePersisted();
+                                },
+                              },
+                              [h("span", loc.hideColumn)],
+                            )
+                          : null,
+                      ]),
+                      colFilterable ? h("div", { class: "tbx-col-menu-sep" }) : null,
+                    ]
+                  : [];
+
+                let filterBody: VNodeChild[] = [];
+                if (colFilterable) {
+                  const fType = col.meta?.filterType;
+                  if (fType === "date-range" || fType === "number-range") {
+                    const isDate = fType === "date-range";
+                    const submitRange = () => {
+                      const mi = filterRangeMin.value.trim();
+                      const ma = filterRangeMax.value.trim();
+                      applyVal(!mi && !ma ? undefined : `${mi}..${ma}`);
+                    };
+                    const onRangeKey = (ev: KeyboardEvent) => {
+                      if (ev.key === "Enter") {
+                        ev.preventDefault();
+                        submitRange();
+                      } else if (ev.key === "Escape") {
+                        ev.preventDefault();
+                        openFilterCol.value = null;
+                      }
+                    };
+                    filterBody = [
+                      h("div", { class: "tbx-range-inputs" }, [
                         h("input", {
-                          type: "text",
-                          class: "tbx-filter-popover-input",
-                          value: filterSearchText.value,
-                          placeholder: formatMessage(loc.filterColumnPlaceholder, {
-                            column: getColumnTitle(col) || cid,
-                          }),
+                          type: isDate ? "date" : "number",
+                          class: "tbx-range-input",
+                          placeholder: isDate ? undefined : "Min",
+                          "aria-label": isDate ? "From date" : "Minimum",
+                          value: filterRangeMin.value,
                           onInput: (ev: Event) => {
-                            filterSearchText.value = (ev.target as { value?: string })?.value ?? "";
+                            filterRangeMin.value = (ev.target as { value?: string })?.value ?? "";
                           },
-                          onKeydown: (ev: KeyboardEvent) => {
-                            if (ev.key === "Enter") {
-                              ev.preventDefault();
-                              applyVal(filterSearchText.value.trim() || undefined);
-                            }
-                          },
+                          onKeydown: onRangeKey,
                         }),
-                        h("div", { class: "tbx-filter-popover-actions" }, [
+                        h("span", { class: "tbx-range-sep" }, "to"),
+                        h("input", {
+                          type: isDate ? "date" : "number",
+                          class: "tbx-range-input",
+                          placeholder: isDate ? undefined : "Max",
+                          "aria-label": isDate ? "To date" : "Maximum",
+                          value: filterRangeMax.value,
+                          onInput: (ev: Event) => {
+                            filterRangeMax.value = (ev.target as { value?: string })?.value ?? "";
+                          },
+                          onKeydown: onRangeKey,
+                        }),
+                      ]),
+                      h("div", { class: "tbx-filter-popover-actions" }, [
+                        h(
+                          "button",
+                          { type: "button", class: "tbx-filter-popover-btn", onClick: () => applyVal(undefined) },
+                          [rotateCcwIcon(), h("span", loc.clearFilter)],
+                        ),
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
+                            onClick: submitRange,
+                          },
+                          [checkIcon("tbx-icon"), h("span", loc.applyFilter)],
+                        ),
+                      ]),
+                    ];
+                  } else if (isMultiSelectFilter(col) && col.meta?.filterOptions?.length) {
+                    const opts = col.meta.filterOptions;
+                    const term = filterSearchText.value.trim().toLowerCase();
+                    const filteredMulti = opts.filter(
+                      (o) => !term || o.toLowerCase().includes(term),
+                    );
+                    const toggleMulti = (opt: string) => {
+                      const next = new Set(filterMultiSet.value);
+                      if (next.has(opt)) next.delete(opt);
+                      else next.add(opt);
+                      filterMultiSet.value = next;
+                    };
+                    const submitMulti = () => {
+                      const ordered = opts.filter((o) => filterMultiSet.value.has(o));
+                      applyVal(serializeMultiFilterValues(ordered));
+                    };
+                    filterBody = [
+                      h("input", {
+                        type: "text",
+                        class: "tbx-filter-popover-input",
+                        value: filterSearchText.value,
+                        placeholder:
+                          col.meta.filterPlaceholder ||
+                          formatMessage(loc.filterColumnPlaceholder, { column: title }),
+                        "aria-label": `Filter ${title}`,
+                        onInput: (ev: Event) => {
+                          filterSearchText.value = (ev.target as { value?: string })?.value ?? "";
+                        },
+                        onKeydown: (ev: KeyboardEvent) => {
+                          if (ev.key === "Enter") {
+                            ev.preventDefault();
+                            submitMulti();
+                          } else if (ev.key === "Escape") {
+                            ev.preventDefault();
+                            openFilterCol.value = null;
+                          }
+                        },
+                      }),
+                      h(
+                        "div",
+                        {
+                          class: "tbx-filter-popover-options",
+                          role: "listbox",
+                          "aria-multiselectable": "true",
+                        },
+                        [
                           h(
-                            "button",
-                            { type: "button", class: "tbx-filter-popover-btn", onClick: () => applyVal(undefined) },
-                            [rotateCcwIcon(), h("span", loc.clearFilter)],
-                          ),
-                          h(
-                            "button",
+                            "div",
                             {
-                              type: "button",
-                              class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
-                              onClick: () => applyVal(filterSearchText.value.trim() || undefined),
+                              class: `tbx-filter-option ${filterMultiSet.value.size === 0 ? "tbx-filter-option--selected" : ""}`,
+                              onClick: () => {
+                                filterMultiSet.value = new Set();
+                              },
                             },
-                            [checkIcon("tbx-icon"), h("span", loc.applyFilter)],
+                            loc.filterAll,
                           ),
-                        ]),
-                      ]
-                    : null,
-                ]);
+                          ...(filteredMulti.length === 0
+                            ? [h("div", { class: "tbx-filter-empty" }, "No matching options")]
+                            : filteredMulti.map((opt) => {
+                                const checked = filterMultiSet.value.has(opt);
+                                return h(
+                                  "div",
+                                  {
+                                    key: opt,
+                                    role: "option",
+                                    "aria-selected": String(checked),
+                                    class: `tbx-filter-option ${checked ? "tbx-filter-option--selected" : ""}`,
+                                    onClick: () => toggleMulti(opt),
+                                  },
+                                  [
+                                    h("input", {
+                                      type: "checkbox",
+                                      class: "tbx-filter-option-check",
+                                      checked,
+                                      tabindex: -1,
+                                      "aria-hidden": "true",
+                                      onClick: (ev: MouseEvent) => ev.stopPropagation(),
+                                      onChange: () => toggleMulti(opt),
+                                    }),
+                                    h("span", opt),
+                                  ],
+                                );
+                              })),
+                        ],
+                      ),
+                      h("div", { class: "tbx-filter-popover-actions" }, [
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            class: "tbx-filter-popover-btn",
+                            onClick: () => {
+                              filterMultiSet.value = new Set();
+                              applyVal(undefined);
+                            },
+                          },
+                          [rotateCcwIcon(), h("span", loc.clearFilter)],
+                        ),
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
+                            onClick: submitMulti,
+                          },
+                          [checkIcon("tbx-icon"), h("span", loc.applyFilter)],
+                        ),
+                      ]),
+                    ];
+                  } else {
+                    const singleOpts = col.meta?.filterOptions;
+                    const filteredSingle = singleOpts
+                      ? filterHasTyped.value
+                        ? singleOpts.filter(
+                            (o) =>
+                              !filterSearchText.value.trim() ||
+                              o.toLowerCase().includes(filterSearchText.value.trim().toLowerCase()),
+                          )
+                        : singleOpts
+                      : [];
+                    filterBody = [
+                      h("input", {
+                        type: fType === "date" ? "date" : fType === "number" ? "number" : "text",
+                        class: "tbx-filter-popover-input",
+                        value: filterSearchText.value,
+                        placeholder:
+                          col.meta?.filterPlaceholder ||
+                          formatMessage(loc.filterColumnPlaceholder, { column: title }),
+                        "aria-label": `Filter ${title}`,
+                        onInput: (ev: Event) => {
+                          filterHasTyped.value = true;
+                          filterSearchText.value = (ev.target as { value?: string })?.value ?? "";
+                        },
+                        onKeydown: (ev: KeyboardEvent) => {
+                          if (ev.key === "Enter") {
+                            ev.preventDefault();
+                            applyVal(filterSearchText.value.trim() || undefined);
+                          } else if (ev.key === "Escape") {
+                            ev.preventDefault();
+                            openFilterCol.value = null;
+                          }
+                        },
+                      }),
+                      singleOpts && singleOpts.length > 0
+                        ? h("div", { class: "tbx-filter-popover-options" }, [
+                            h(
+                              "div",
+                              {
+                                class: `tbx-filter-option ${!filterSearchText.value.trim() ? "tbx-filter-option--selected" : ""}`,
+                                onClick: () => {
+                                  filterSearchText.value = "";
+                                  filterHasTyped.value = false;
+                                  applyVal(undefined);
+                                },
+                              },
+                              loc.filterAll,
+                            ),
+                            ...(filteredSingle.length === 0
+                              ? [h("div", { class: "tbx-filter-empty" }, "No matching options")]
+                              : filteredSingle.map((opt) => {
+                                  const selected =
+                                    filterSearchText.value.trim().toLowerCase() ===
+                                    opt.trim().toLowerCase();
+                                  return h(
+                                    "div",
+                                    {
+                                      key: opt,
+                                      class: `tbx-filter-option ${selected ? "tbx-filter-option--selected" : ""}`,
+                                      onClick: () => {
+                                        filterSearchText.value = opt;
+                                        filterHasTyped.value = false;
+                                        applyVal(opt);
+                                      },
+                                    },
+                                    opt,
+                                  );
+                                })),
+                          ])
+                        : null,
+                      h("div", { class: "tbx-filter-popover-actions" }, [
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            class: "tbx-filter-popover-btn",
+                            onClick: () => {
+                              filterSearchText.value = "";
+                              filterHasTyped.value = false;
+                              applyVal(undefined);
+                            },
+                          },
+                          [rotateCcwIcon(), h("span", loc.clearFilter)],
+                        ),
+                        h(
+                          "button",
+                          {
+                            type: "button",
+                            class: "tbx-filter-popover-btn tbx-filter-popover-btn--primary",
+                            onClick: () => applyVal(filterSearchText.value.trim() || undefined),
+                          },
+                          [checkIcon("tbx-icon"), h("span", loc.applyFilter)],
+                        ),
+                      ]),
+                    ];
+                  }
+                }
+
+                return h(
+                  "div",
+                  {
+                    class: "tbx-filter-popover",
+                    style: filterPopoverStyle.value,
+                    onPointerdown: (ev: PointerEvent) => ev.stopPropagation(),
+                    onMousedown: (ev: MouseEvent) => ev.stopPropagation(),
+                    onClick: (ev: MouseEvent) => ev.stopPropagation(),
+                  },
+                  [...quickActionsNode, ...filterBody],
+                );
               })()
             : null,
 
@@ -2724,7 +3434,6 @@ export const TableX = defineComponent({
                     disabled: props.isLoadingMore,
                     onClick: () => {
                       if (!props.isLoadingMore && props.hasMore) {
-                        props.onLoadMore?.(props.nextCursor);
                         emit("loadMore", props.nextCursor);
                       }
                     },
@@ -2743,12 +3452,19 @@ export const TableX = defineComponent({
                 const custom =
                   props.contextMenuItems?.({ row: ctx.row, columnId: ctx.colId, value: rawVal }) ??
                   [];
+                const currentPin = isPinned(ctx.col, pinnedCols.value);
+                const winW = typeof window !== "undefined" ? window.innerWidth || 1024 : 1024;
+                const winH = typeof window !== "undefined" ? window.innerHeight || 800 : 800;
+                const left = Math.min(Math.max(8, ctx.x), Math.max(8, winW - 210));
+                const top = Math.min(Math.max(8, ctx.y), Math.max(8, winH - 240));
+
                 return h(
                   "div",
                   {
                     class: "tbx-context-menu",
                     role: "menu",
-                    style: { position: "fixed", left: `${ctx.x}px`, top: `${ctx.y}px` },
+                    style: { position: "fixed", left: `${left}px`, top: `${top}px` },
+                    onClick: (ev: MouseEvent) => ev.stopPropagation(),
                   },
                   [
                     h(
@@ -2756,6 +3472,7 @@ export const TableX = defineComponent({
                       {
                         type: "button",
                         class: "tbx-context-menu-item",
+                        role: "menuitem",
                         onClick: () => {
                           void navigator.clipboard?.writeText?.(text);
                           contextMenu.value = null;
@@ -2763,36 +3480,108 @@ export const TableX = defineComponent({
                       },
                       loc.copyCell,
                     ),
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        class: "tbx-context-menu-item",
+                        role: "menuitem",
+                        onClick: () => {
+                          const line = visible.value
+                            .map((c) =>
+                              getCellText(getCellValue(c, ctx.row), boolLabels.value).replace(
+                                /\t|\r|\n/g,
+                                " ",
+                              ),
+                            )
+                            .join("\t");
+                          void navigator.clipboard?.writeText?.(line);
+                          contextMenu.value = null;
+                        },
+                      },
+                      loc.copyRow,
+                    ),
                     text !== "" && isFilterable(ctx.col, props.enableColumnFilters)
                       ? h(
                           "button",
                           {
                             type: "button",
                             class: "tbx-context-menu-item",
+                            role: "menuitem",
                             onClick: () => {
                               pushQuery(withFilter(q, getFilterField(ctx.col), text));
                               contextMenu.value = null;
                             },
                           },
-                          formatMessage(loc.filterByValue, { value: text }),
+                          formatMessage(loc.filterByValue, {
+                            value: text.length > 24 ? `${text.slice(0, 24)}…` : text,
+                          }),
                         )
                       : null,
-                    ...custom.map((ci) =>
-                      h(
-                        "button",
-                        {
-                          key: ci.id,
-                          type: "button",
-                          class: `tbx-context-menu-item ${ci.danger ? "tbx-context-menu-item--danger" : ""}`,
-                          disabled: ci.disabled,
-                          onClick: () => {
-                            contextMenu.value = null;
-                            ci.onSelect();
-                          },
-                        },
-                        ci.label,
-                      ),
-                    ),
+                    ...(!isStructuralColumn(ctx.col) && ctx.colId !== ""
+                      ? [
+                          h("div", { class: "tbx-context-menu-sep" }),
+                          h(
+                            "button",
+                            {
+                              type: "button",
+                              class: "tbx-context-menu-item",
+                              role: "menuitem",
+                              onClick: () => {
+                                const nextSide =
+                                  currentPin === "left" || currentPin === "right" ? "none" : "left";
+                                pinnedCols.value = { ...pinnedCols.value, [ctx.colId]: nextSide };
+                                contextMenu.value = null;
+                                savePersisted();
+                              },
+                            },
+                            currentPin === "left" || currentPin === "right"
+                              ? loc.unpinColumn
+                              : loc.pinLeft,
+                          ),
+                          isHideable(ctx.col) && visible.value.length > 1
+                            ? h(
+                                "button",
+                                {
+                                  type: "button",
+                                  class: "tbx-context-menu-item",
+                                  role: "menuitem",
+                                  onClick: () => {
+                                    hiddenCols.value = { ...hiddenCols.value, [ctx.colId]: true };
+                                    contextMenu.value = null;
+                                    savePersisted();
+                                  },
+                                },
+                                loc.hideColumn,
+                              )
+                            : null,
+                        ]
+                      : []),
+                    ...(custom.length > 0
+                      ? [
+                          h("div", { class: "tbx-context-menu-sep" }),
+                          ...custom.flatMap((ci) => [
+                            ci.separatorBefore
+                              ? h("div", { key: `${ci.id}-sep`, class: "tbx-context-menu-sep" })
+                              : null,
+                            h(
+                              "button",
+                              {
+                                key: ci.id,
+                                type: "button",
+                                role: "menuitem",
+                                class: `tbx-context-menu-item ${ci.danger ? "tbx-context-menu-item--danger" : ""}`,
+                                disabled: ci.disabled,
+                                onClick: () => {
+                                  contextMenu.value = null;
+                                  ci.onSelect();
+                                },
+                              },
+                              ci.label,
+                            ),
+                          ]),
+                        ]
+                      : []),
                   ],
                 );
               })()
@@ -2802,24 +3591,96 @@ export const TableX = defineComponent({
           h(
             "div",
             { class: "tbx-cards" },
-            rows.value.map((r, idx) =>
-              h(
-                "div",
-                { key: `${rowIdFn.value(r)}-${idx}`, class: "tbx-card" },
-                [
-                  h(
-                    "dl",
-                    { class: "tbx-card-rows" },
-                    visible.value.map((col, cIdx) =>
-                      h("div", { key: getColumnId(col) || cIdx, class: "tbx-card-row" }, [
-                        h("dt", getColumnTitle(col) || getColumnId(col)),
-                        h("dd", [renderCellDisplay(col, r, idx)]),
+            props.isLoading
+              ? [
+                  h("div", { class: "tbx-card" }, [
+                    h("div", { class: "tbx-state" }, [
+                      h("div", { class: "tbx-dotted-loader", "aria-hidden": "true" }, [
+                        h("span", { class: "tbx-dot" }),
+                        h("span", { class: "tbx-dot" }),
+                        h("span", { class: "tbx-dot" }),
+                        h("span", { class: "tbx-dot" }),
                       ]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                      h("div", { class: "tbx-loading-text", "aria-live": "polite" }, loc.loadingText),
+                    ]),
+                  ]),
+                ]
+              : rows.value.length === 0
+                ? [h("div", { class: "tbx-card" }, [h("div", { class: "tbx-state" }, loc.emptyText)])]
+                : rows.value.map((r, idx) => {
+                    const rid = pageRowIds.value[idx] ?? rowIdFn.value(r);
+                    const isCardSelected = allAcrossSelected.value || selectedIds.value.has(rid);
+                    const cardClickable = typeof props.onRowClick === "function";
+                    return h(
+                      "div",
+                      {
+                        key: `${rid}-${idx}`,
+                        tabindex: cardClickable ? 0 : undefined,
+                        class: [
+                          "tbx-card",
+                          isCardSelected ? "tbx-card--selected" : undefined,
+                          cardClickable ? "tbx-card--clickable" : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" "),
+                        onClick: cardClickable ? () => emit("rowClick", r) : undefined,
+                        onKeydown: cardClickable
+                          ? (ev: KeyboardEvent) => {
+                              if (ev.key === "Enter") {
+                                ev.preventDefault();
+                                emit("rowClick", r);
+                              }
+                            }
+                          : undefined,
+                      },
+                      [
+                        props.showSerialNumber || props.enableSelection
+                          ? h("div", { class: "tbx-card-head" }, [
+                              props.showSerialNumber
+                                ? h(
+                                    "span",
+                                    { class: "tbx-card-serial" },
+                                    `#${serialNumber(currentPage, pageSize, idx)}`,
+                                  )
+                                : null,
+                              props.enableSelection
+                                ? h(
+                                    "span",
+                                    {
+                                      class: "tbx-card-select",
+                                      onClick: (ev: MouseEvent) => ev.stopPropagation(),
+                                    },
+                                    [
+                                      h("input", {
+                                        type: props.selectionMode === "single" ? "radio" : "checkbox",
+                                        name:
+                                          props.selectionMode === "single"
+                                            ? `${uid}-card-sel`
+                                            : undefined,
+                                        class: "tbx-checkbox",
+                                        checked: isCardSelected,
+                                        "aria-label": formatMessage(loc.selectRowLabel, { id: rid }),
+                                        onClick: (ev: MouseEvent) => ev.stopPropagation(),
+                                        onChange: () => toggleSelectRow(rid, idx),
+                                      }),
+                                    ],
+                                  )
+                                : null,
+                            ])
+                          : null,
+                        h(
+                          "dl",
+                          { class: "tbx-card-rows" },
+                          visible.value.map((col, cIdx) =>
+                            h("div", { key: getColumnId(col) || cIdx, class: "tbx-card-row" }, [
+                              h("dt", getColumnTitle(col) || getColumnId(col)),
+                              h("dd", [renderCellDisplay(col, r, idx)]),
+                            ]),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
           ),
 
           // Bulk Actions Bar

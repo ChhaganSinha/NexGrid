@@ -2723,7 +2723,8 @@
   font-weight: 500;
 }
 
-.tbx-row--pinned-top .tbx-td {
+.tbx-row--pinned-top > .tbx-td {
+  background: color-mix(in srgb, var(--tbx-primary) 5%, var(--tbx-card));
   border-bottom: 2px solid var(--tbx-border);
 }
 
@@ -2732,8 +2733,19 @@
   font-weight: 500;
 }
 
-.tbx-row--pinned-bottom .tbx-td {
+.tbx-row--pinned-bottom > .tbx-td {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: color-mix(in srgb, var(--tbx-primary) 5%, var(--tbx-card));
   border-top: 2px solid var(--tbx-border);
+}
+
+.tbx-row--pinned-top > .tbx-td--pinned-left,
+.tbx-row--pinned-top > .tbx-td--pinned-right,
+.tbx-row--pinned-bottom > .tbx-td--pinned-left,
+.tbx-row--pinned-bottom > .tbx-td--pinned-right {
+  z-index: 5;
 }
 
 /* ---- Cell Validation, Dirty Marker & Full-Row Editing ---- */
