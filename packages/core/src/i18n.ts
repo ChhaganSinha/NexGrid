@@ -79,8 +79,42 @@ export interface TableXLocale {
   clearSelection?: string;
   /** Column menu quick action: Group by column. */
   groupByColumn?: string;
+  /** Column menu quick action: Add to grouping (nested). */
+  addGroupByColumn?: string;
   /** Column menu quick action: Ungroup. */
   ungroupColumn?: string;
+  /** Export menu: PDF title. */
+  exportPdfTitle?: string;
+  /** Export menu: PDF subtitle. */
+  exportPdfSubtitle?: string;
+  /** Export notice: PDF export succeeded (`{count}`). */
+  exportPdfSuccess?: string;
+  /** Direct PDF export button text. */
+  exportPdfButton?: string;
+  /** Saved views dropdown button label. */
+  viewsButton?: string;
+  /** Save current view action label. */
+  saveCurrentView?: string;
+  /** Saved view input placeholder. */
+  viewNamePlaceholder?: string;
+  /** Empty state inside Saved Views menu. */
+  noSavedViews?: string;
+  /** Context menu: Copy cell. */
+  copyCell?: string;
+  /** Context menu: Copy row. */
+  copyRow?: string;
+  /** Context menu: Filter by cell value (`{value}`). */
+  filterByValue?: string;
+  /** Infinite scroll: Load more button. */
+  loadMoreButton?: string;
+  /** Infinite scroll: Loading more indicator. */
+  loadingMoreText?: string;
+  /** Row editing: Edit row action. */
+  editRow?: string;
+  /** Row editing: Save row action. */
+  saveRow?: string;
+  /** Row editing: Cancel row edit action. */
+  cancelRowEdit?: string;
 }
 export type NexGridLocale = TableXLocale;
 
@@ -143,7 +177,24 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
   allAcrossPagesSelected: "All {total} matching records across all pages are selected.",
   clearSelection: "Clear selection",
   groupByColumn: "Group by column",
+  addGroupByColumn: "Add to grouping",
   ungroupColumn: "Ungroup",
+  exportPdfTitle: "PDF Report (.pdf)",
+  exportPdfSubtitle: "Printable multi-page landscape table",
+  exportPdfSuccess: "Exported {count} records to PDF (.pdf)",
+  exportPdfButton: "Export PDF",
+  viewsButton: "Views",
+  saveCurrentView: "Save view",
+  viewNamePlaceholder: "View name…",
+  noSavedViews: "No saved views yet",
+  copyCell: "Copy cell",
+  copyRow: "Copy row",
+  filterByValue: "Filter by \"{value}\"",
+  loadMoreButton: "Load more records",
+  loadingMoreText: "Loading more records…",
+  editRow: "Edit row",
+  saveRow: "Save row",
+  cancelRowEdit: "Cancel edit",
 };
 
 /**
@@ -169,7 +220,24 @@ export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXL
     allAcrossPagesSelected: partial.allAcrossPagesSelected ?? DEFAULT_LOCALE.allAcrossPagesSelected,
     clearSelection: partial.clearSelection ?? DEFAULT_LOCALE.clearSelection,
     groupByColumn: partial.groupByColumn ?? DEFAULT_LOCALE.groupByColumn,
+    addGroupByColumn: partial.addGroupByColumn ?? DEFAULT_LOCALE.addGroupByColumn,
     ungroupColumn: partial.ungroupColumn ?? DEFAULT_LOCALE.ungroupColumn,
+    exportPdfTitle: partial.exportPdfTitle ?? DEFAULT_LOCALE.exportPdfTitle,
+    exportPdfSubtitle: partial.exportPdfSubtitle ?? DEFAULT_LOCALE.exportPdfSubtitle,
+    exportPdfSuccess: partial.exportPdfSuccess ?? DEFAULT_LOCALE.exportPdfSuccess,
+    exportPdfButton: partial.exportPdfButton ?? DEFAULT_LOCALE.exportPdfButton,
+    viewsButton: partial.viewsButton ?? DEFAULT_LOCALE.viewsButton,
+    saveCurrentView: partial.saveCurrentView ?? DEFAULT_LOCALE.saveCurrentView,
+    viewNamePlaceholder: partial.viewNamePlaceholder ?? DEFAULT_LOCALE.viewNamePlaceholder,
+    noSavedViews: partial.noSavedViews ?? DEFAULT_LOCALE.noSavedViews,
+    copyCell: partial.copyCell ?? DEFAULT_LOCALE.copyCell,
+    copyRow: partial.copyRow ?? DEFAULT_LOCALE.copyRow,
+    filterByValue: partial.filterByValue ?? DEFAULT_LOCALE.filterByValue,
+    loadMoreButton: partial.loadMoreButton ?? DEFAULT_LOCALE.loadMoreButton,
+    loadingMoreText: partial.loadingMoreText ?? DEFAULT_LOCALE.loadingMoreText,
+    editRow: partial.editRow ?? DEFAULT_LOCALE.editRow,
+    saveRow: partial.saveRow ?? DEFAULT_LOCALE.saveRow,
+    cancelRowEdit: partial.cancelRowEdit ?? DEFAULT_LOCALE.cancelRowEdit,
   };
 }
 

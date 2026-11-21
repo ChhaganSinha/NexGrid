@@ -5,8 +5,8 @@
 // so the union lives in core rather than being re-typed inline per adapter.
 
 /** The destination the user chose from the export menu. */
-export type ExportFormat = "excel" | "csv" | "clipboard";
+export type ExportFormat = "excel" | "csv" | "pdf" | "clipboard";
 export type NexGridExportFormat = ExportFormat;
 
 /** All export formats, in menu order. */
-export const EXPORT_FORMATS: readonly ExportFormat[] = ["excel", "csv", "clipboard"];
+export const EXPORT_FORMATS: readonly ExportFormat[] = ["excel", "csv", "pdf", "clipboard"];

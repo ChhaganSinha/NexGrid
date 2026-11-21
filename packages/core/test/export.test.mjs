@@ -7,6 +7,7 @@ import {
   toCsv,
   toExcelHtml,
   toXlsxBytes,
+  toPdfBytes,
   excelColName,
   toExportColumns,
   getCellText,
@@ -160,7 +161,7 @@ test("file naming is slug-safe and dated", () => {
 test("every export menu destination is named by ExportFormat", () => {
   // A host that takes the export over is handed one of these; the menu and the
   // union must not drift apart.
-  assert.deepEqual([...EXPORT_FORMATS], ["excel", "csv", "clipboard"]);
+  assert.deepEqual([...EXPORT_FORMATS], ["excel", "csv", "pdf", "clipboard"]);
 });
 
 test("Excel export neutralizes formula prefixes and adds mso text format", () => {
@@ -283,5 +284,32 @@ test("toXlsxBytes generates a valid OpenXML .xlsx ZIP workbook with typed number
   assert.ok(sheetXml.includes("Ada &lt;script&gt;&amp;"), "Escapes XML entities");
   assert.ok(sheetXml.includes("&apos;=HYPERLINK"), "Neutralizes formula injection with leading quote");
   assert.ok(sheetXml.includes(">—</t>"), "Null/empty cells render em dash");
+});
+
+test("toPdfBytes generates a valid multi-page PDF 1.4 binary document with xref table and escaped text", () => {
+  const pdfCols = [
+    { header: "Name", value: (r) => r.name },
+    { header: "Status", value: (r) => r.status },
+  ];
+  const manyRows = Array.from({ length: 65 }, (_, i) => ({
+    name: `Student (${i + 1}) \\ Test`,
+    status: i % 2 === 0 ? "Active" : "Pending",
+  }));
+
+  const pdfBytes = toPdfBytes({
+    filename: "report",
+    caption: "Enrollment Report",
+    rows: manyRows,
+    columns: pdfCols,
+  });
+
+  const text = new TextDecoder().decode(pdfBytes);
+  assert.ok(text.startsWith("%PDF-1.4\n"), "Starts with %PDF-1.4 signature");
+  assert.ok(text.endsWith("%%EOF"), "Ends with %%EOF trailer");
+  assert.ok(text.includes("/Type /Catalog"), "Contains PDF Catalog");
+  assert.ok(text.includes("/Count 3"), "Paginates 65 rows across 3 landscape A4 pages");
+  assert.ok(text.includes("Enrollment Report"), "Renders report title");
+  assert.ok(text.includes("Student \\(1\\) \\\\ Test"), "Escapes PDF literal parentheses and backslashes");
+  assert.ok(text.includes("Page 1 of 3") && text.includes("Page 3 of 3"), "Renders page footers");
 });
 

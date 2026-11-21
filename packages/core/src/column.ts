@@ -66,10 +66,12 @@ export interface TableXColumnMeta {
   aggregationLabel?: string;
   /** Enable double-click / inline cell editing on this column. */
   editable?: boolean;
-  /** Editor type for inline cell editing. */
-  editType?: "text" | "number" | "select";
+  /** Editor type for inline cell or full-row editing. */
+  editType?: "text" | "number" | "select" | "date" | "boolean";
   /** Options list for select editor. */
   editOptions?: readonly string[];
+  /** Optional cell validator returning an error message string when invalid, or `null`/`undefined` when valid. */
+  validateCell?: (newValue: unknown, row: unknown) => string | null | undefined;
   /** Custom export value formatter returning plain text / value for CSV and Excel. */
   exportValue?: (row: unknown) => string | number | null | undefined;
 }
@@ -410,6 +412,36 @@ export function isEditable<TData, TRender>(
 ): boolean {
   if (isGroupColumn(col)) return false;
   return col.meta?.editable === true;
+}
+
+/** Coerce a raw string/boolean editor input according to `col.meta?.editType`. */
+export function coerceEditedValue(
+  rawVal: unknown,
+  editType?: "text" | "number" | "select" | "date" | "boolean",
+): unknown {
+  if (editType === "boolean") {
+    if (typeof rawVal === "boolean") return rawVal;
+    const s = String(rawVal ?? "").trim().toLowerCase();
+    return s === "true" || s === "1" || s === "yes";
+  }
+  if (editType === "number") {
+    if (typeof rawVal === "number") return rawVal;
+    const parsed = Number(rawVal);
+    return Number.isNaN(parsed) ? rawVal : parsed;
+  }
+  return rawVal === null || rawVal === undefined ? "" : String(rawVal);
+}
+
+/** Run `col.meta?.validateCell` if provided; returns the trimmed error message or `null` when valid. */
+export function validateEditedCell<TData, TRender>(
+  col: TableXColumn<TData, TRender>,
+  newValue: unknown,
+  row: TData,
+): string | null {
+  const fn = col.meta?.validateCell;
+  if (typeof fn !== "function") return null;
+  const res = fn(newValue, row);
+  return typeof res === "string" && res.trim() !== "" ? res.trim() : null;
 }
 
 /** Compute aggregation value for a column across a set of rows. */

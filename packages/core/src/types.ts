@@ -76,6 +76,33 @@ export const DENSITIES: readonly Density[] = ["compact", "default", "comfortable
 /** Selection mode: multiple rows or single row. */
 export type SelectionMode = "multi" | "single";
 
+/** Editing mode: single-cell (`"cell"`, default) or full-row (`"row"`). */
+export type EditMode = "cell" | "row";
+
+/** Custom or built-in item in the right-click context menu. */
+export interface ContextMenuItem {
+  id: string;
+  label: string;
+  disabled?: boolean;
+  danger?: boolean;
+  separatorBefore?: boolean;
+  onSelect: () => void;
+}
+
+/** Event emitted when a full-row edit (`editMode: "row"`) is committed. */
+export interface RowEditEvent<TData> {
+  row: TData;
+  updatedRow: TData;
+  changes: Record<string, { oldValue: unknown; newValue: unknown }>;
+}
+
+/** Event emitted when rows are reordered via drag-and-drop (`enableRowReorder`). */
+export interface RowOrderChangeEvent<TData> {
+  fromIndex: number;
+  toIndex: number;
+  rows: TData[];
+}
+
 /**
  * Persisted view state snapshot for a NexGrid instance.
  */
@@ -86,7 +113,7 @@ export interface GridStateSnapshot {
   columnOrder?: string[];
   columnWidths?: Record<string, number>;
   pinnedColumns?: Record<string, "left" | "right" | "none">;
-  groupBy?: string;
+  groupBy?: string | string[];
 }
 
 /**

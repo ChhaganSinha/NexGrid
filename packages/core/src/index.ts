@@ -19,6 +19,10 @@ export type {
   PagedResponse,
   Density,
   SelectionMode,
+  EditMode,
+  ContextMenuItem,
+  RowEditEvent,
+  RowOrderChangeEvent,
   GridStateSnapshot,
 } from "./types.js";
 
@@ -42,6 +46,8 @@ export {
   serializeMultiFilterValues,
   formatFilterPillValue,
   isEditable,
+  coerceEditedValue,
+  validateEditedCell,
   computeAggregation,
   isStructuralColumn,
   isGroupColumn,
@@ -92,8 +98,50 @@ export {
 export type { VirtualWindow, VirtualWindowInput } from "./virtual.js";
 
 // Client-side row grouping
-export { groupRows } from "./grouping.js";
-export type { RowGroup, RowGroupEntry, RowGroupSummary } from "./grouping.js";
+export {
+  groupRows,
+  normalizeGroupBy,
+  buildNestedGroupItems,
+} from "./grouping.js";
+export type {
+  RowGroup,
+  RowGroupEntry,
+  RowGroupSummary,
+  NestedGroupRenderItem,
+} from "./grouping.js";
+
+// Hierarchical tree data
+export {
+  flattenTreeRows,
+  collectInitialExpandedTreeIds,
+} from "./tree.js";
+export type { TreeRowNode, FlattenTreeOptions } from "./tree.js";
+
+// Saved views / filter presets
+export {
+  loadSavedViews,
+  writeSavedViews,
+  upsertSavedView,
+  removeSavedView,
+} from "./views.js";
+export type { SavedGridView } from "./views.js";
+
+// Keyboard navigation, range selection, clipboard paste, and row reordering
+export {
+  normalizeCellRange,
+  isCellInRange,
+  computeRangeStats,
+  formatRangeTsv,
+  parseClipboardTsv,
+  moveFocusCoord,
+  selectContiguousRowIds,
+  reorderArrayItem,
+} from "./range-selection.js";
+export type {
+  CellCoord,
+  NormalizedCellRange,
+  RangeAggregationStats,
+} from "./range-selection.js";
 
 // Wire format (REST & OData v4)
 export { toSearchParams, serializeQuery, parseQuery, buildQueryUrl } from "./serialize.js";
@@ -122,6 +170,10 @@ export {
   downloadXlsx,
   excelColName,
 } from "./export/xlsx.js";
+export {
+  toPdfBytes,
+  downloadPdf,
+} from "./export/pdf.js";
 export {
   downloadBlob,
   timestampedFilename,
