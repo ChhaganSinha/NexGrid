@@ -5,7 +5,11 @@
 // the locale, the export options — lives in `@nexgrid/core` and is re-exported
 // from this package's public API. Nothing here reimplements engine behavior.
 
-import type { TableXColumn } from "@nexgrid/core";
+import type {
+  RowEditEvent,
+  RowOrderChangeEvent,
+  TableXColumn,
+} from "@nexgrid/core";
 
 /**
  * A NexGrid column as the Angular adapter binds it.
@@ -89,11 +93,23 @@ export interface TableXBulkActionsTemplateContext {
   deselectAll: () => void;
 }
 
+/** Payload of the `rowEdit` output when a full-row edit (`editMode === 'row'`) is committed. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TableXRowEditEvent<TData = any> = RowEditEvent<TData>;
+
+/** Payload of the `rowOrderChange` output when rows are reordered via drag-and-drop. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TableXRowOrderChangeEvent<TData = any> = RowOrderChangeEvent<TData>;
+
 export type NexGridAngularColumn<TData> = TableXAngularColumn<TData>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type NexGridCellTemplateContext<TData = any> = TableXCellTemplateContext<TData>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type NexGridCellEditEvent<TData = any> = TableXCellEditEvent<TData>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NexGridRowEditEvent<TData = any> = TableXRowEditEvent<TData>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NexGridRowOrderChangeEvent<TData = any> = TableXRowOrderChangeEvent<TData>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type NexGridExpandedRowTemplateContext<TData = any> = TableXExpandedRowTemplateContext<TData>;
 export type NexGridBulkActionsTemplateContext = TableXBulkActionsTemplateContext;

@@ -118,3 +118,78 @@ test("React package exports sorting/filtering helpers and TableX / useClientTabl
   assert.equal(element.props.total, paged.total);
 });
 
+test("React TableX SSR renders tree data, pinned top/bottom rows, nested groupBy, saved views button, row reorder, and infinite footer", async () => {
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const {
+    toPdfBytes,
+    buildNestedGroupItems,
+    flattenTreeRows,
+    computeRangeStats,
+    parseClipboardTsv,
+    upsertSavedView,
+  } = await import("../dist/index.js");
+
+  assert.equal(typeof toPdfBytes, "function");
+  assert.equal(typeof buildNestedGroupItems, "function");
+  assert.equal(typeof flattenTreeRows, "function");
+  assert.equal(typeof computeRangeStats, "function");
+  assert.equal(typeof parseClipboardTsv, "function");
+  assert.equal(typeof upsertSavedView, "function");
+
+  const treeMarkup = renderToStaticMarkup(
+    React.createElement(TableX, {
+      caption: "Org Tree",
+      columns: [
+        { accessorKey: "name", header: "Department" },
+        { accessorKey: "headcount", header: "Headcount" },
+      ],
+      data: [
+        {
+          id: "eng",
+          name: "Engineering",
+          headcount: 42,
+          children: [{ id: "fe", name: "Frontend", headcount: 18 }],
+        },
+      ],
+      clientSidePagination: true,
+      enableTreeData: true,
+      defaultExpandedDepth: 1,
+      pinnedTopRows: [{ id: "pin-t", name: "Company Target", headcount: 100 }],
+      pinnedBottomRows: [{ id: "pin-b", name: "Unallocated", headcount: 5 }],
+      enableSavedViews: true,
+      enableRowReorder: true,
+      enableInfiniteScroll: true,
+      hasMore: true,
+      exportMode: "pdf",
+    }),
+  );
+
+  assert.ok(treeMarkup.includes("tbx-tree-toggle--open"), "Expanded root tree chevron renders");
+  assert.ok(treeMarkup.includes("Frontend"), "Expanded child tree row renders");
+  assert.ok(treeMarkup.includes("tbx-row--pinned-top"), "Pinned top row renders");
+  assert.ok(treeMarkup.includes("tbx-row--pinned-bottom"), "Pinned bottom row renders");
+  assert.ok(treeMarkup.includes("Views"), "Saved Views toolbar button renders");
+  assert.ok(treeMarkup.includes("Export PDF"), "Direct PDF export button renders");
+  assert.ok(treeMarkup.includes("tbx-row-drag-handle"), "Row drag handle column renders");
+  assert.ok(treeMarkup.includes("tbx-load-more-btn"), "Infinite scroll Load More button renders");
+
+  const groupedMarkup = renderToStaticMarkup(
+    React.createElement(TableX, {
+      caption: "Nested Grouping",
+      columns: [
+        { accessorKey: "region", header: "Region" },
+        { accessorKey: "dept", header: "Dept" },
+      ],
+      data: [
+        { id: "1", region: "APAC", dept: "Sales" },
+        { id: "2", region: "EMEA", dept: "Eng" },
+      ],
+      clientSidePagination: true,
+      groupBy: ["region", "dept"],
+    }),
+  );
+
+  assert.ok(groupedMarkup.includes('data-group-depth="0"'), "Outer group depth 0 renders");
+  assert.ok(groupedMarkup.includes('data-group-depth="1"'), "Inner nested group depth 1 renders");
+});
+

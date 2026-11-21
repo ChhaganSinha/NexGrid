@@ -52,16 +52,23 @@ import {
   DENSITIES,
   DEFAULT_ROW_CAP,
   PAGE_SIZES,
+  buildNestedGroupItems,
   buildQueryUrl,
+  coerceEditedValue,
+  collectInitialExpandedTreeIds,
   computeAggregation,
+  computeRangeStats,
   computeVirtualWindow,
   defaultQuery,
   downloadCsv,
   downloadExcel,
+  downloadPdf,
   fetchAllPages,
   filePrefixFromCaption,
+  flattenTreeRows,
   formatFilterPillValue,
   formatMessage,
+  formatRangeTsv,
   getCellValue,
   getColumnId,
   getColumnTitle,
@@ -71,6 +78,7 @@ import {
   getRecordRange,
   groupRows,
   initialHiddenColumns,
+  isCellInRange,
   isEditable,
   isHideable,
   isMultiSelectFilter,
@@ -79,15 +87,25 @@ import {
   isSortable,
   isStructuralColumn,
   isFilterable,
+  loadSavedViews,
+  moveFocusCoord,
+  normalizeCellRange,
+  normalizeGroupBy,
+  parseClipboardTsv,
   parseMultiFilterValues,
   primarySort,
+  removeSavedView,
+  reorderArrayItem,
   resolveLocale,
   searchableColumnIds,
+  selectContiguousRowIds,
   serialNumber,
   serializeMultiFilterValues,
   timestampedFilename,
   toExportColumns,
   totalPagesFor,
+  upsertSavedView,
+  validateEditedCell,
   visibleColumns,
   withFilter,
   withPage,
@@ -105,9 +123,16 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  type CellCoord,
+  type ContextMenuItem,
   type Density,
+  type EditMode,
   type ExcelBadgeRule,
+  type ExportFormat,
+  type NormalizedCellRange,
+  type SavedGridView,
   type TableXLocale,
+  type TreeRowNode,
   type PagedResponse,
   type QueryState,
   type RecordRange,
@@ -123,6 +148,8 @@ import type {
   TableXCellEditEvent,
   NexGridCellTemplateContext,
   TableXNotice,
+  TableXRowEditEvent,
+  TableXRowOrderChangeEvent,
   TableXSelectionChange,
   TableXTheme,
 } from "./types";
@@ -135,6 +162,7 @@ import {
   trackKeys,
   uniqueKey,
   type NexGridCellView,
+  type TableXBodyGroupEntry,
   type TableXColumnToggle,
   type NexGridDensityOption,
   type NexGridGroupView,
@@ -146,7 +174,7 @@ import {
 } from "./view-model";
 
 /** Which toolbar dropdown is open, if any. */
-type MenuName = "columns" | "density" | "export";
+type MenuName = "columns" | "density" | "export" | "views";
 
 /** Search input debounce, in milliseconds. Identical in every adapter. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -161,6 +189,8 @@ const SEARCH_DEBOUNCE_MS = 350;
     "[attr.data-density]": "currentDensity",
     "[class.tbx-dark]": "theme === 'dark'",
     "[class.tbx-auto]": "theme === 'auto'",
+    "(keydown)": "onHostKeydown($event)",
+    "(paste)": "onHostPaste($event)",
   },
   template: `
     @if (error) {
@@ -241,6 +271,98 @@ const SEARCH_DEBOUNCE_MS = 350;
         </div>
 
         <div class="tbx-toolbar-group tbx-toolbar-group--end">
+          @if (enableSavedViews) {
+            <div class="tbx-menu-wrap">
+              <button
+                type="button"
+                class="tbx-btn"
+                aria-haspopup="menu"
+                [attr.aria-expanded]="openMenu === 'views'"
+                (click)="toggleMenu('views', $event)"
+              >
+                <svg
+                  class="tbx-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="4" x2="4" y1="21" y2="14" />
+                  <line x1="4" x2="4" y1="10" y2="3" />
+                  <line x1="12" x2="12" y1="21" y2="12" />
+                  <line x1="12" x2="12" y1="8" y2="3" />
+                  <line x1="20" x2="20" y1="21" y2="16" />
+                  <line x1="20" x2="20" y1="12" y2="3" />
+                  <line x1="2" x2="6" y1="14" y2="14" />
+                  <line x1="10" x2="14" y1="8" y2="8" />
+                  <line x1="18" x2="22" y1="16" y2="16" />
+                </svg>
+                <span>{{ strings.viewsButton ?? 'Views' }}</span>
+                <svg
+                  class="tbx-icon tbx-chevron"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              @if (openMenu === 'views') {
+                <div class="tbx-menu tbx-views-menu" role="menu" (click)="$event.stopPropagation()">
+                  <div class="tbx-views-save-row">
+                    <input
+                      type="text"
+                      class="tbx-views-input"
+                      [value]="newViewName"
+                      [placeholder]="strings.viewNamePlaceholder ?? 'View name…'"
+                      [attr.aria-label]="strings.viewNamePlaceholder ?? 'View name…'"
+                      (input)="onViewNameInput($event)"
+                      (keydown.enter)="$event.preventDefault(); savePresetView()"
+                    />
+                    <button
+                      type="button"
+                      class="tbx-views-save-btn"
+                      (click)="savePresetView()"
+                    >
+                      {{ strings.saveCurrentView ?? 'Save view' }}
+                    </button>
+                  </div>
+                  <div class="tbx-menu-separator"></div>
+                  @if (savedViewsList.length === 0) {
+                    <div class="tbx-views-empty">{{ strings.noSavedViews ?? 'No saved views yet' }}</div>
+                  } @else {
+                    @for (view of savedViewsList; track view.id) {
+                      <div class="tbx-views-item-row">
+                        <button
+                          type="button"
+                          class="tbx-menu-item"
+                          role="menuitem"
+                          (click)="applyPresetView(view)"
+                        >
+                          <span>{{ view.name }}</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="tbx-views-delete-btn"
+                          [attr.aria-label]="'Delete view ' + view.name"
+                          (click)="deletePresetView(view.id, $event)"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          }
           @if (isColumnsVisible) {
             <div class="tbx-menu-wrap">
               <button
@@ -377,12 +499,12 @@ const SEARCH_DEBOUNCE_MS = 350;
         }
 
         @if (isExportVisible) {
-          @if (resolvedExportMode === 'excel' || resolvedExportMode === 'csv') {
+          @if (resolvedExportMode === 'excel' || resolvedExportMode === 'csv' || resolvedExportMode === 'pdf') {
             <button
               type="button"
               class="tbx-btn tbx-btn--export"
               [disabled]="isExporting"
-              [attr.aria-label]="isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : (strings.exportCsvButton ?? 'Export CSV'))"
+              [attr.aria-label]="isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : resolvedExportMode === 'pdf' ? (strings.exportPdfButton ?? 'Export PDF') : (strings.exportCsvButton ?? 'Export CSV'))"
               (click)="runExport(resolvedExportMode)"
             >
               <svg
@@ -399,7 +521,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" x2="12" y1="15" y2="3" />
               </svg>
-              <span>{{ isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : (strings.exportCsvButton ?? 'Export CSV')) }}</span>
+              <span>{{ isExporting ? strings.exportingButton : (resolvedExportMode === 'excel' ? (strings.exportExcelButton ?? 'Export Excel') : resolvedExportMode === 'pdf' ? (strings.exportPdfButton ?? 'Export PDF') : (strings.exportCsvButton ?? 'Export CSV')) }}</span>
             </button>
           } @else if (resolvedExportMode === 'split') {
             <div class="tbx-menu-wrap">
@@ -509,6 +631,33 @@ const SEARCH_DEBOUNCE_MS = 350;
                     <div class="tbx-menu-item-title">
                       <strong>{{ strings.exportCsvTitle }}</strong>
                       <small>{{ strings.exportCsvSubtitle }}</small>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    class="tbx-menu-item"
+                    role="menuitem"
+                    (click)="runExport('pdf')"
+                  >
+                    <svg
+                      class="tbx-icon--pdf"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div class="tbx-menu-item-title">
+                      <strong>{{ strings.exportPdfTitle ?? 'PDF Report (.pdf)' }}</strong>
+                      <small>{{ strings.exportPdfSubtitle ?? 'Printable multi-page landscape table' }}</small>
                     </div>
                   </button>
                   <button
@@ -638,6 +787,33 @@ const SEARCH_DEBOUNCE_MS = 350;
                     <div class="tbx-menu-item-title">
                       <strong>{{ strings.exportCsvTitle }}</strong>
                       <small>{{ strings.exportCsvSubtitle }}</small>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    class="tbx-menu-item"
+                    role="menuitem"
+                    (click)="runExport('pdf')"
+                  >
+                    <svg
+                      class="tbx-icon--pdf"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div class="tbx-menu-item-title">
+                      <strong>{{ strings.exportPdfTitle ?? 'PDF Report (.pdf)' }}</strong>
+                      <small>{{ strings.exportPdfSubtitle ?? 'Printable multi-page landscape table' }}</small>
                     </div>
                   </button>
                   <button
@@ -868,6 +1044,18 @@ const SEARCH_DEBOUNCE_MS = 350;
             </ng-template>
 
             <tr>
+              @if (enableRowReorder) {
+                <th
+                  class="tbx-th tbx-th--row-drag"
+                  scope="col"
+                  aria-label="Row reorder"
+                  [attr.rowspan]="hasHeaderGroups ? 2 : null"
+                  [class.tbx-th--pinned-left]="rowDragPinnedLeft !== null"
+                  [class.tbx-pinned-border-left]="rowDragIsLastLeftPinned"
+                  [style.width.px]="36"
+                  [style.left.px]="rowDragPinnedLeft"
+                ></th>
+              }
               @if (hasExpandColumn) {
                 <th
                   class="tbx-th tbx-th--expand"
@@ -996,7 +1184,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                   <div class="tbx-loading-text" aria-live="polite">{{ strings.loadingText }}</div>
                 </td>
               </tr>
-            } @else if (rows.length === 0) {
+            } @else if (rows.length === 0 && pinnedTopRowViews.length === 0 && pinnedBottomRowViews.length === 0) {
               <tr>
                 <td class="tbx-state" [attr.colspan]="columnSpan">{{ strings.emptyText }}</td>
               </tr>
@@ -1004,11 +1192,32 @@ const SEARCH_DEBOUNCE_MS = 350;
               <ng-template #bodyRowTpl let-row>
                 <tr
                   class="tbx-row"
+                  [attr.draggable]="enableRowReorder && !row.pinnedVariant ? 'true' : null"
                   [class.tbx-row--selected]="row.selected"
                   [class.tbx-row--expanded]="row.expanded"
+                  [class.tbx-row--editing]="row.isRowEditing"
+                  [class.tbx-row--pinned-top]="row.pinnedVariant === 'top'"
+                  [class.tbx-row--pinned-bottom]="row.pinnedVariant === 'bottom'"
                   [class.tbx-row--clickable]="isRowClickable"
+                  (dragstart)="onRowDragStart(row, $event)"
+                  (dragover)="onRowDragOver(row, $event)"
+                  (drop)="onRowDrop(row, $event)"
                   (click)="onRowActivate(row)"
                 >
+                  @if (enableRowReorder) {
+                    <td
+                      class="tbx-td tbx-td--row-drag"
+                      [class.tbx-td--pinned-left]="rowDragPinnedLeft !== null"
+                      [class.tbx-pinned-border-left]="rowDragIsLastLeftPinned"
+                      [style.width.px]="36"
+                      [style.left.px]="rowDragPinnedLeft"
+                      (click)="$event.stopPropagation()"
+                    >
+                      @if (!row.pinnedVariant) {
+                        <span class="tbx-row-drag-handle" aria-label="Drag to reorder row">⋮⋮</span>
+                      }
+                    </td>
+                  }
                   @if (hasExpandColumn) {
                     <td
                       class="tbx-td tbx-td--expand"
@@ -1018,27 +1227,29 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [style.left.px]="expandPinnedLeft"
                       (click)="$event.stopPropagation()"
                     >
-                      <button
-                        type="button"
-                        class="tbx-expand-btn"
-                        [class.tbx-expand-btn--open]="row.expanded"
-                        [attr.aria-expanded]="row.expanded"
-                        [attr.aria-label]="row.expanded ? 'Collapse row' : 'Expand row'"
-                        (click)="toggleExpandRow(row.id, $event)"
-                      >
-                        <svg
-                          class="tbx-icon"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          aria-hidden="true"
+                      @if (!row.pinnedVariant) {
+                        <button
+                          type="button"
+                          class="tbx-expand-btn"
+                          [class.tbx-expand-btn--open]="row.expanded"
+                          [attr.aria-expanded]="row.expanded"
+                          [attr.aria-label]="row.expanded ? 'Collapse row' : 'Expand row'"
+                          (click)="toggleExpandRow(row.id, $event)"
                         >
-                          <path d="m9 18 6-6-6-6" />
-                        </svg>
-                      </button>
+                          <svg
+                            class="tbx-icon"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                        </button>
+                      }
                     </td>
                   }
                   @if (enableSelection) {
@@ -1049,14 +1260,17 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [style.left.px]="selectPinnedLeft"
                       (click)="$event.stopPropagation()"
                     >
-                      <input
-                        [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
-                        [attr.name]="selectionMode === 'single' ? selectRadioGroupName : null"
-                        class="tbx-checkbox"
-                        [checked]="row.selected"
-                        [attr.aria-label]="row.selectLabel"
-                        (change)="toggleRow(row)"
-                      />
+                      @if (!row.pinnedVariant) {
+                        <input
+                          [type]="selectionMode === 'single' ? 'radio' : 'checkbox'"
+                          [attr.name]="selectionMode === 'single' ? selectRadioGroupName : null"
+                          class="tbx-checkbox"
+                          [checked]="row.selected"
+                          [attr.aria-label]="row.selectLabel"
+                          (click)="onRowCheckboxClick($event)"
+                          (change)="toggleRow(row, $event)"
+                        />
+                      }
                     </td>
                   }
                   @if (showSerialNumber) {
@@ -1066,13 +1280,18 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [class.tbx-pinned-border-left]="serialIsLastLeftPinned"
                       [style.left.px]="serialPinnedLeft"
                     >
-                      {{ row.serial }}
+                      {{ row.pinnedVariant ? '★' : row.serial }}
                     </td>
                   }
                   @for (cell of row.cells; track cell.key) {
                     <td
                       class="tbx-td"
-                      [class.tbx-cell--editable]="cell.editable"
+                      [attr.tabindex]="!row.pinnedVariant && enableKeyboardNavigation ? (cell.focused ? 0 : -1) : null"
+                      [attr.data-tbx-focus]="!row.pinnedVariant && enableKeyboardNavigation ? ('cell:' + row.rowIndex + ':' + cell.columnIndex) : null"
+                      [class.tbx-cell--editable]="cell.editable && !row.pinnedVariant"
+                      [class.tbx-td--dirty]="cell.dirty"
+                      [class.tbx-td--focused]="cell.focused"
+                      [class.tbx-td--in-range]="cell.inRange"
                       [class.tbx-td--pinned-left]="cell.pinnedLeft !== null && cell.pinnedLeft !== undefined"
                       [class.tbx-td--pinned-right]="cell.pinnedRight !== null && cell.pinnedRight !== undefined"
                       [class.tbx-pinned-border-left]="cell.isLastLeftPinned"
@@ -1080,9 +1299,12 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [style.textAlign]="cell.align"
                       [style.left.px]="cell.pinnedLeft"
                       [style.right.px]="cell.pinnedRight"
+                      (pointerdown)="onCellPointerDown(row, cell, $event)"
+                      (pointerenter)="onCellPointerEnter(row, cell)"
+                      (contextmenu)="onCellContextMenu(row, cell, $event)"
                       (dblclick)="onCellDblClick(row, cell, $event)"
                     >
-                      @if (editingCell?.rowId === row.id && editingCell?.columnId === cell.columnId) {
+                      @if (row.isRowEditing && cell.editable) {
                         <div
                           class="tbx-cell-edit-wrap"
                           (click)="$event.stopPropagation()"
@@ -1091,6 +1313,92 @@ const SEARCH_DEBOUNCE_MS = 350;
                           @if (cell.editType === 'select' && cell.editOptions && cell.editOptions.length > 0) {
                             <select
                               class="tbx-cell-edit-select tbx-cell-edit-input"
+                              [class.tbx-cell-edit-input--invalid]="cellValidationError !== null"
+                              (change)="onRowDraftInput(cell.columnId, $event, false)"
+                              (keydown.enter)="$event.preventDefault(); commitRowEdit(row)"
+                              (keydown.escape)="$event.preventDefault(); cancelRowEdit($event)"
+                            >
+                              @for (opt of cell.editOptions; track opt) {
+                                <option [value]="opt" [selected]="opt === getRowDraftString(cell)">{{ opt }}</option>
+                              }
+                            </select>
+                          } @else if (cell.editType === 'boolean') {
+                            <input
+                              type="checkbox"
+                              class="tbx-checkbox tbx-cell-edit-checkbox"
+                              [checked]="getRowDraftBoolean(cell)"
+                              (change)="onRowDraftInput(cell.columnId, $event, true)"
+                              (keydown.enter)="$event.preventDefault(); commitRowEdit(row)"
+                              (keydown.escape)="$event.preventDefault(); cancelRowEdit($event)"
+                            />
+                          } @else {
+                            <input
+                              [type]="cell.editType === 'number' ? 'number' : cell.editType === 'date' ? 'date' : 'text'"
+                              class="tbx-cell-edit-input"
+                              [class.tbx-cell-edit-input--invalid]="cellValidationError !== null"
+                              [value]="getRowDraftString(cell)"
+                              (input)="onRowDraftInput(cell.columnId, $event, false)"
+                              (keydown.enter)="$event.preventDefault(); commitRowEdit(row)"
+                              (keydown.escape)="$event.preventDefault(); cancelRowEdit($event)"
+                            />
+                          }
+                          @if (firstEditableColumnId === cell.columnId) {
+                            <div class="tbx-cell-edit-actions">
+                              <button
+                                type="button"
+                                class="tbx-cell-edit-btn tbx-cell-edit-btn--save"
+                                [attr.aria-label]="strings.saveRow ?? 'Save row'"
+                                (click)="commitRowEdit(row, $event)"
+                              >
+                                <svg
+                                  class="tbx-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                class="tbx-cell-edit-btn tbx-cell-edit-btn--cancel"
+                                [attr.aria-label]="strings.cancelRowEdit ?? 'Cancel'"
+                                (click)="cancelRowEdit($event)"
+                              >
+                                <svg
+                                  class="tbx-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M18 6 6 18" />
+                                  <path d="m6 6 12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            @if (cellValidationError) {
+                              <span class="tbx-cell-edit-error">{{ cellValidationError }}</span>
+                            }
+                          }
+                        </div>
+                      } @else if (editingCell?.rowId === row.id && editingCell?.columnId === cell.columnId) {
+                        <div
+                          class="tbx-cell-edit-wrap"
+                          (click)="$event.stopPropagation()"
+                          (dblclick)="$event.stopPropagation()"
+                        >
+                          @if (cell.editType === 'select' && cell.editOptions && cell.editOptions.length > 0) {
+                            <select
+                              class="tbx-cell-edit-select tbx-cell-edit-input"
+                              [class.tbx-cell-edit-input--invalid]="cellValidationError !== null"
                               (change)="onEditValueChange($event)"
                               (keydown.enter)="$event.preventDefault(); commitCellEdit(row, cell)"
                               (keydown.escape)="$event.preventDefault(); cancelCellEdit($event)"
@@ -1099,10 +1407,20 @@ const SEARCH_DEBOUNCE_MS = 350;
                                 <option [value]="opt" [selected]="opt === editingValue">{{ opt }}</option>
                               }
                             </select>
+                          } @else if (cell.editType === 'boolean') {
+                            <input
+                              type="checkbox"
+                              class="tbx-checkbox tbx-cell-edit-checkbox"
+                              [checked]="editingBooleanValue"
+                              (change)="onEditBooleanChange($event)"
+                              (keydown.enter)="$event.preventDefault(); commitCellEdit(row, cell)"
+                              (keydown.escape)="$event.preventDefault(); cancelCellEdit($event)"
+                            />
                           } @else {
                             <input
-                              [type]="cell.editType === 'number' ? 'number' : 'text'"
+                              [type]="cell.editType === 'number' ? 'number' : cell.editType === 'date' ? 'date' : 'text'"
                               class="tbx-cell-edit-input"
+                              [class.tbx-cell-edit-input--invalid]="cellValidationError !== null"
                               [value]="editingValue"
                               (input)="onEditValueChange($event)"
                               (keydown.enter)="$event.preventDefault(); commitCellEdit(row, cell)"
@@ -1150,6 +1468,50 @@ const SEARCH_DEBOUNCE_MS = 350;
                               </svg>
                             </button>
                           </div>
+                          @if (cellValidationError) {
+                            <span class="tbx-cell-edit-error">{{ cellValidationError }}</span>
+                          }
+                        </div>
+                      } @else if (cell.isTreeColumn && !row.pinnedVariant) {
+                        <div
+                          class="tbx-tree-cell-wrap"
+                          [style.paddingInlineStart.px]="cell.treeDepth ? cell.treeDepth * 18 : null"
+                        >
+                          @if (cell.treeHasChildren) {
+                            <button
+                              type="button"
+                              class="tbx-tree-toggle"
+                              [class.tbx-tree-toggle--open]="cell.treeExpanded"
+                              [attr.aria-expanded]="cell.treeExpanded"
+                              [attr.aria-label]="cell.treeExpanded ? 'Collapse children' : 'Expand children'"
+                              (click)="toggleTreeNode(row.id, $event)"
+                            >
+                              <svg
+                                class="tbx-icon"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="m9 18 6-6-6-6" />
+                              </svg>
+                            </button>
+                          } @else {
+                            <span class="tbx-tree-spacer" aria-hidden="true"></span>
+                          }
+                          <span class="tbx-tree-label">
+                            @if (cell.template) {
+                              <ng-container
+                                [ngTemplateOutlet]="cell.template"
+                                [ngTemplateOutletContext]="cell.context"
+                              />
+                            } @else {
+                              {{ cell.text }}
+                            }
+                          </span>
                         </div>
                       } @else if (cell.template) {
                         <ng-container
@@ -1158,6 +1520,13 @@ const SEARCH_DEBOUNCE_MS = 350;
                         />
                       } @else {
                         {{ cell.text }}
+                      }
+                      @if (cell.isFillHandleCorner) {
+                        <span
+                          class="tbx-fill-handle"
+                          aria-hidden="true"
+                          (pointerdown)="onFillHandlePointerDown($event)"
+                        ></span>
                       }
                     </td>
                   }
@@ -1180,55 +1549,63 @@ const SEARCH_DEBOUNCE_MS = 350;
                 }
               </ng-template>
 
-              @if (rowGroups.length > 0) {
-                @for (grp of rowGroups; track grp.key) {
-                  <tr
-                    class="tbx-group-row"
-                    [attr.data-group-key]="grp.key"
-                    (click)="toggleGroupCollapse(grp.key, $event)"
-                  >
-                    <td class="tbx-group-cell" [attr.colspan]="columnSpan">
-                      <div class="tbx-group-inner">
-                        <button
-                          type="button"
-                          class="tbx-group-toggle"
-                          [class.tbx-group-toggle--open]="!grp.collapsed"
-                          [attr.aria-expanded]="!grp.collapsed"
-                          [attr.aria-label]="(grp.collapsed ? 'Expand ' : 'Collapse ') + grp.displayValue"
-                        >
-                          <svg
-                            class="tbx-icon"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
+              @for (topRow of pinnedTopRowViews; track topRow.key) {
+                <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: topRow }"></ng-container>
+              }
+
+              @if (bodyGroupEntries.length > 0) {
+                @for (entry of bodyGroupEntries; track entry.key) {
+                  @if (entry.kind === 'group') {
+                    <tr
+                      class="tbx-group-row"
+                      [attr.data-group-key]="entry.key"
+                      [attr.data-group-depth]="entry.depth"
+                      (click)="toggleGroupCollapse(entry.key, $event)"
+                    >
+                      <td
+                        class="tbx-group-cell"
+                        [attr.colspan]="columnSpan"
+                        [style.paddingInlineStart.px]="entry.depth > 0 ? (14 + entry.depth * 18) : null"
+                      >
+                        <div class="tbx-group-inner">
+                          <button
+                            type="button"
+                            class="tbx-group-toggle"
+                            [class.tbx-group-toggle--open]="!entry.collapsed"
+                            [attr.aria-expanded]="!entry.collapsed"
+                            [attr.aria-label]="(entry.collapsed ? 'Expand ' : 'Collapse ') + entry.displayValue"
                           >
-                            <path d="m9 18 6-6-6-6" />
-                          </svg>
-                        </button>
-                        <span class="tbx-group-label">{{ grp.columnTitle }}:</span>
-                        <strong class="tbx-group-value">{{ grp.displayValue }}</strong>
-                        <span class="tbx-group-count">{{ grp.count }}</span>
-                        @if (grp.summaries.length > 0) {
-                          <span class="tbx-group-summaries">
-                            @for (sum of grp.summaries; track sum.columnId) {
-                              <span class="tbx-group-summary-chip">
-                                <span>{{ sum.label }}</span>
-                                <strong>{{ sum.value }}</strong>
-                              </span>
-                            }
-                          </span>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                  @if (!grp.collapsed) {
-                    @for (row of grp.rows; track row.key) {
-                      <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: row }"></ng-container>
-                    }
+                            <svg
+                              class="tbx-icon"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="m9 18 6-6-6-6" />
+                            </svg>
+                          </button>
+                          <span class="tbx-group-label">{{ entry.columnTitle }}:</span>
+                          <strong class="tbx-group-value">{{ entry.displayValue }}</strong>
+                          <span class="tbx-group-count">{{ entry.count }}</span>
+                          @if (entry.summaries.length > 0) {
+                            <span class="tbx-group-summaries">
+                              @for (sum of entry.summaries; track sum.columnId) {
+                                <span class="tbx-group-summary-chip">
+                                  <span>{{ sum.label }}</span>
+                                  <strong>{{ sum.value }}</strong>
+                                </span>
+                              }
+                            </span>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  } @else {
+                    <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: entry.row }"></ng-container>
                   }
                 }
               } @else {
@@ -1246,11 +1623,24 @@ const SEARCH_DEBOUNCE_MS = 350;
                   </tr>
                 }
               }
+
+              @for (botRow of pinnedBottomRowViews; track botRow.key) {
+                <ng-container *ngTemplateOutlet="bodyRowTpl; context: { $implicit: botRow }"></ng-container>
+              }
             }
           </tbody>
           @if (!isLoading && hasSummary && rows.length > 0) {
             <tfoot>
               <tr class="tbx-summary-row">
+                @if (enableRowReorder) {
+                  <td
+                    class="tbx-summary-cell"
+                    [class.tbx-td--pinned-left]="rowDragPinnedLeft !== null"
+                    [class.tbx-pinned-border-left]="rowDragIsLastLeftPinned"
+                    [style.width.px]="36"
+                    [style.left.px]="rowDragPinnedLeft"
+                  ></td>
+                }
                 @if (hasExpandColumn) {
                   <td
                     class="tbx-summary-cell"
@@ -1397,7 +1787,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                     type="button"
                     data-col-action="ungroup"
                     class="tbx-col-menu-btn tbx-col-menu-btn--active"
-                    (click)="setGroupByColumn(undefined)"
+                    (click)="removeGroupByColumn(activeFilterHeader.id)"
                   >
                     <span>{{ strings.ungroupColumn ?? 'Ungroup' }}</span>
                   </button>
@@ -1410,6 +1800,16 @@ const SEARCH_DEBOUNCE_MS = 350;
                   >
                     <span>{{ strings.groupByColumn ?? 'Group by column' }}</span>
                   </button>
+                  @if (hasActiveGrouping) {
+                    <button
+                      type="button"
+                      data-col-action="add-group-by"
+                      class="tbx-col-menu-btn"
+                      (click)="addGroupByColumn(activeFilterHeader.id)"
+                    >
+                      <span>{{ strings.addGroupByColumn ?? 'Add to grouping' }}</span>
+                    </button>
+                  }
                 }
               }
               @if (activeFilterHeader.canHide) {
@@ -1574,6 +1974,46 @@ const SEARCH_DEBOUNCE_MS = 350;
         </div>
       }
 
+      @if (isInfiniteMode && (hasMore || isLoadingMore)) {
+        <div class="tbx-infinite-footer">
+          <button
+            type="button"
+            class="tbx-load-more-btn"
+            [disabled]="isLoadingMore"
+            (click)="triggerLoadMore()"
+          >
+            {{ isLoadingMore ? (strings.loadingMoreText ?? 'Loading more…') : (strings.loadMoreButton ?? 'Load more') }}
+          </button>
+        </div>
+      }
+
+      @if (activeContextMenu) {
+        <div
+          class="tbx-context-menu"
+          role="menu"
+          [style.position]="'fixed'"
+          [style.left.px]="activeContextMenu.x"
+          [style.top.px]="activeContextMenu.y"
+          (click)="$event.stopPropagation()"
+        >
+          @for (item of activeContextMenu.items; track item.id) {
+            @if (item.separatorBefore) {
+              <div class="tbx-context-menu-sep"></div>
+            }
+            <button
+              type="button"
+              class="tbx-context-menu-item"
+              [class.tbx-context-menu-item--danger]="item.danger"
+              role="menuitem"
+              [disabled]="item.disabled"
+              (click)="invokeContextMenuItem(item)"
+            >
+              {{ item.label }}
+            </button>
+          }
+        </div>
+      }
+
       <div class="tbx-cards">
         @if (isLoading) {
           <div class="tbx-card">
@@ -1694,6 +2134,30 @@ const SEARCH_DEBOUNCE_MS = 350;
                 </svg>
                 <span>{{ strings.exportCsvButton ?? 'Export CSV' }}</span>
               </button>
+              <button
+                type="button"
+                class="tbx-bulk-btn"
+                [disabled]="isExporting"
+                (click)="runBulkExport('pdf')"
+              >
+                <svg
+                  class="tbx-icon--pdf"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                  <path d="M10 9H8" />
+                  <path d="M16 13H8" />
+                  <path d="M16 17H8" />
+                </svg>
+                <span>{{ strings.exportPdfButton ?? 'Export PDF' }}</span>
+              </button>
             }
             @if (bulkActionsSlot) {
               <ng-container
@@ -1736,6 +2200,9 @@ const SEARCH_DEBOUNCE_MS = 350;
             >
             @if (selectedCount > 0) {
               <span class="tbx-selected-badge">{{ selectedBadge }}</span>
+            }
+            @if (rangeStatsText) {
+              <span class="tbx-range-stats-badge">{{ rangeStatsText }}</span>
             }
           </div>
 
@@ -1955,8 +2422,8 @@ export class TableXComponent<TData>
   /** Enable client-side pagination, sorting, search, and filtering over in-memory `data`. */
   @Input({ transform: booleanAttribute }) clientSidePagination = false;
 
-  /** Explicit pagination mode: `"server"` (default) or `"client"`. */
-  @Input() paginationMode: "client" | "server" = "server";
+  /** Explicit pagination mode: `"server"` (default), `"client"`, or `"infinite"`. */
+  @Input() paginationMode: "client" | "server" | "infinite" = "server";
 
   /** Enable DOM row virtualization for 10,000+ rows. */
   @Input({ transform: booleanAttribute }) enableVirtualization = false;
@@ -1967,8 +2434,62 @@ export class TableXComponent<TData>
   /** Extra buffer rows rendered above and below the virtual viewport. */
   @Input() virtualOverscan = 6;
 
-  /** Group displayed rows by a column id or property name, rendering collapsible group header rows. */
-  @Input() groupBy?: string;
+  /** Group displayed rows by one or more column ids or property names (`"dept"` or `["region", "dept"]`). */
+  @Input() groupBy?: string | readonly string[];
+
+  /** Enable spreadsheet arrow-key cell navigation and Enter/F2/Space shortcuts. */
+  @Input({ transform: booleanAttribute }) enableKeyboardNavigation = true;
+
+  /** Enable right-click cell/row context menu. */
+  @Input({ transform: booleanAttribute }) enableContextMenu = true;
+
+  /** Custom context menu items appended when right-clicking a cell. */
+  @Input() contextMenuItems?: (ctx: { row: TData; columnId: string; value: unknown }) => readonly ContextMenuItem[];
+
+  /** Enable hierarchical tree data (`children` or `getSubRows`). */
+  @Input({ transform: booleanAttribute }) enableTreeData = false;
+
+  /** Property name holding child rows when `enableTreeData` is `true`. */
+  @Input() childrenKey?: string;
+
+  /** Custom child-row extractor enabling hierarchical tree rows. */
+  @Input() getSubRows?: (row: TData) => readonly TData[] | undefined;
+
+  /** Initial expanded tree depth (`0` = collapsed, `1` = root expanded, `-1` = expand all). */
+  @Input() defaultExpandedDepth = 0;
+
+  /** Rows frozen at the top of `<tbody>`. */
+  @Input() pinnedTopRows?: readonly TData[];
+
+  /** Rows frozen at the bottom of `<tbody>`. */
+  @Input() pinnedBottomRows?: readonly TData[];
+
+  /** Editing mode: `"cell"` (default) or `"row"` (full-row editing). */
+  @Input() editMode: EditMode = "cell";
+
+  /** Show the Saved Views / Filter Presets menu in the toolbar. */
+  @Input({ transform: booleanAttribute }) enableSavedViews = false;
+
+  /** Initial or controlled saved view presets. */
+  @Input() savedViews?: readonly SavedGridView[];
+
+  /** Enable drag-and-drop row reordering handle column. */
+  @Input({ transform: booleanAttribute }) enableRowReorder = false;
+
+  /** Enable infinite-scroll / Load More pagination mode. */
+  @Input({ transform: booleanAttribute }) enableInfiniteScroll = false;
+
+  /** Whether additional server records exist in infinite-scroll mode. */
+  @Input({ transform: booleanAttribute }) hasMore = false;
+
+  /** Whether a next-page / cursor request is currently in flight. */
+  @Input({ transform: booleanAttribute }) isLoadingMore = false;
+
+  /** Optional opaque cursor passed back to `loadMore`. */
+  @Input() nextCursor: string | null = null;
+
+  /** Enable rectangular cell range selection, status-bar stats, fill handle, and TSV copy/paste. */
+  @Input({ transform: booleanAttribute }) enableRangeSelection = false;
 
   /** Export file name without extension. Defaults to a slug of `caption`. */
   @Input() exportFileName?: string;
@@ -1985,15 +2506,16 @@ export class TableXComponent<TData>
   /** Maximum rows collected during a full dataset export walk. Defaults to DEFAULT_ROW_CAP (2000). Pass 0 for uncapped. */
   @Input() maxExportRows?: number;
 
-  /** Export button presentation: "menu" (default), "excel" (1-click direct), "csv" (1-click direct), or "split". */
-  @Input() exportMode?: "menu" | "split" | "excel" | "csv";
+  /** Export button presentation: "menu" (default), "excel", "csv", "pdf", or "split". */
+  @Input() exportMode?: "menu" | "split" | "excel" | "csv" | "pdf";
 
   /** Shortcut for direct 1-click export (defaults to "excel" when true). */
-  @Input() quickExport?: boolean | "excel" | "csv" | "clipboard";
+  @Input() quickExport?: boolean | ExportFormat;
 
-  protected get resolvedExportMode(): "menu" | "split" | "excel" | "csv" {
+  protected get resolvedExportMode(): "menu" | "split" | "excel" | "csv" | "pdf" {
     if (this.quickExport) {
-      return typeof this.quickExport === "string" && (this.quickExport === "excel" || this.quickExport === "csv")
+      return typeof this.quickExport === "string" &&
+        (this.quickExport === "excel" || this.quickExport === "csv" || this.quickExport === "pdf")
         ? this.quickExport
         : "excel";
     }
@@ -2047,14 +2569,26 @@ export class TableXComponent<TData>
   /** Observed => replaces the built-in export entirely. */
   @Output() readonly exportAll = new EventEmitter<void>();
 
-  /** Emitted when the active `groupBy` column changes via the column quick-action menu. */
-  @Output() readonly groupByChange = new EventEmitter<string | undefined>();
+  /** Emitted when the active `groupBy` column(s) change via the column quick-action menu. */
+  @Output() readonly groupByChange = new EventEmitter<string | readonly string[] | undefined>();
 
   /** Emitted with the ordered array of column IDs whenever columns are reordered via drag-and-drop. */
   @Output() readonly columnOrderChange = new EventEmitter<string[]>();
 
   /** Emitted whenever an inline cell edit is committed. */
   @Output() readonly cellEdit = new EventEmitter<TableXCellEditEvent<TData>>();
+
+  /** Emitted whenever a full-row edit (`editMode === 'row'`) is committed. */
+  @Output() readonly rowEdit = new EventEmitter<TableXRowEditEvent<TData>>();
+
+  /** Emitted whenever saved views are created or removed. */
+  @Output() readonly savedViewsChange = new EventEmitter<SavedGridView[]>();
+
+  /** Emitted whenever rows are reordered via drag-and-drop. */
+  @Output() readonly rowOrderChange = new EventEmitter<TableXRowOrderChangeEvent<TData>>();
+
+  /** Emitted when scrolling near the bottom or clicking Load More in infinite mode. */
+  @Output() readonly loadMore = new EventEmitter<string | null>();
 
   // ---------------------------------------------------------------------
   // Content
@@ -2083,7 +2617,7 @@ export class TableXComponent<TData>
 
   protected strings: TableXLocale = resolveLocale();
   protected currentDensity: Density = "default";
-  protected openMenu: "columns" | "density" | "export" | null = null;
+  protected openMenu: MenuName | null = null;
   protected openFilterColumn: string | null = null;
   protected activeFilterHeader: NexGridHeaderView | null = null;
   protected filterPopoverStyles: Record<string, string> | null = null;
@@ -2097,6 +2631,19 @@ export class TableXComponent<TData>
   protected draggedColumnId: string | null = null;
   protected editingCell: { rowId: string; columnId: string } | null = null;
   protected editingValue = "";
+  protected editingBooleanValue = false;
+  protected editingRowId: string | null = null;
+  protected rowEditDraft: Record<string, unknown> = {};
+  protected cellValidationError: string | null = null;
+  protected firstEditableColumnId = "";
+  protected savedViewsList: SavedGridView[] = [];
+  protected newViewName = "";
+  protected activeContextMenu: {
+    x: number;
+    y: number;
+    items: readonly ContextMenuItem[];
+  } | null = null;
+  protected rangeStatsText = "";
   protected isExporting = false;
   protected searchText = "";
   protected searchLabel = "";
@@ -2104,6 +2651,8 @@ export class TableXComponent<TData>
   protected jumpInputId = "tbx-jump-page";
 
   protected hasExpandColumn = false;
+  protected rowDragPinnedLeft: number | null = null;
+  protected rowDragIsLastLeftPinned = false;
   protected expandPinnedLeft: number | null = null;
   protected expandIsLastLeftPinned = false;
   protected selectPinnedLeft: number | null = null;
@@ -2116,7 +2665,10 @@ export class TableXComponent<TData>
   protected topHeaderCells: NexGridHeaderView[] = [];
   protected bottomHeaderCells: NexGridHeaderView[] = [];
   protected rows: NexGridRowView<TData>[] = [];
+  protected pinnedTopRowViews: NexGridRowView<TData>[] = [];
+  protected pinnedBottomRowViews: NexGridRowView<TData>[] = [];
   protected rowGroups: NexGridGroupView<TData>[] = [];
+  protected bodyGroupEntries: TableXBodyGroupEntry<TData>[] = [];
   protected hasSummary = false;
   protected summaryCells: TableXSummaryCellView[] = [];
   protected columnToggles: TableXColumnToggle[] = [];
@@ -2175,6 +2727,18 @@ export class TableXComponent<TData>
     return this.enableJumpToPage && this.showJumpToPage !== false;
   }
 
+  get isInfiniteMode(): boolean {
+    return this.enableInfiniteScroll || this.paginationMode === "infinite";
+  }
+
+  get hasActiveGrouping(): boolean {
+    return this.activeGroupBy.length > 0;
+  }
+
+  private get isTreeEnabled(): boolean {
+    return this.enableTreeData || typeof this.getSubRows === "function";
+  }
+
   // ---------------------------------------------------------------------
   // Internal state
   // ---------------------------------------------------------------------
@@ -2189,8 +2753,22 @@ export class TableXComponent<TData>
 
   private hiddenColumns: Readonly<Record<string, boolean>> = {};
   private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
-  private activeGroupBy: string | undefined;
+  private activeGroupBy: string[] = [];
   private collapsedGroupKeys = new Set<string>();
+  private treeExpandedIds = new Set<string>();
+  private treeSeeded = false;
+  private viewsSeeded = false;
+  private reorderedData: TData[] | null = null;
+  private draggedRowIndex: number | null = null;
+  private dirtyCells = new Set<string>();
+  private focusedCell: CellCoord | null = null;
+  private rangeAnchor: CellCoord | null = null;
+  private cellRange: NormalizedCellRange | null = null;
+  private isDraggingRange = false;
+  private isFillingRange = false;
+  private lastSelectedRowIndex: number | null = null;
+  private shiftOnCheckboxClick = false;
+  private currentDisplayData: TData[] = [];
   private orderedColumns: TableXAngularColumn<TData>[] = [];
   private columnsSeeded = false;
   private hasBoundQuery = false;
@@ -2209,6 +2787,8 @@ export class TableXComponent<TData>
   private detachMenuListeners: (() => void) | null = null;
   private detachFilterListeners: (() => void) | null = null;
   private detachResizeListeners: (() => void) | null = null;
+  private detachContextListeners: (() => void) | null = null;
+  private detachPointerUpListener: (() => void) | null = null;
 
   private get isClientMode(): boolean {
     return (
@@ -2240,11 +2820,40 @@ export class TableXComponent<TData>
           this.emitQuery(withSearch(this.query, text));
         }),
     );
+
+    const onPointerUp = (): void => {
+      this.isDraggingRange = false;
+      this.isFillingRange = false;
+    };
+    this.zone.runOutsideAngular(() => {
+      this.document.addEventListener("pointerup", onPointerUp);
+    });
+    this.detachPointerUpListener = () => {
+      this.document.removeEventListener("pointerup", onPointerUp);
+    };
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["locale"]) this.strings = resolveLocale(this.locale);
     if (changes["density"]) this.currentDensity = this.density;
+    if (changes["data"]) {
+      this.reorderedData = null;
+      if (this.isTreeEnabled && !this.treeSeeded && this.data.length > 0 && this.defaultExpandedDepth !== 0) {
+        this.treeExpandedIds = collectInitialExpandedTreeIds(this.data, this.defaultExpandedDepth, {
+          childrenKey: this.childrenKey,
+          getSubRows: this.getSubRows,
+          getRowId: this.getRowId,
+        });
+        this.treeSeeded = true;
+      }
+    }
+    if (changes["savedViews"] && this.savedViews !== undefined) {
+      this.savedViewsList = [...this.savedViews];
+      this.viewsSeeded = true;
+    } else if (!this.viewsSeeded) {
+      this.savedViewsList = this.savedViews ? [...this.savedViews] : loadSavedViews(this.storageKey);
+      this.viewsSeeded = true;
+    }
     if (changes["columns"] && this.columnsSeeded && this.columns.length > 0) {
       const colMap = new Map(this.columns.map((c) => [getColumnId(c), c]));
       const updatedOrder: TableXAngularColumn<TData>[] = [];
@@ -2275,7 +2884,7 @@ export class TableXComponent<TData>
             this.pinnedColumns = { ...persisted.pinnedColumns };
           }
           if (persisted.groupBy !== undefined) {
-            this.activeGroupBy = persisted.groupBy || undefined;
+            this.activeGroupBy = normalizeGroupBy(persisted.groupBy);
           }
           if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
             const hiddenMap: Record<string, boolean> = {};
@@ -2307,11 +2916,12 @@ export class TableXComponent<TData>
       this.columnsSeeded = true;
     }
     if (changes["groupBy"]) {
-      this.activeGroupBy = this.groupBy?.trim() || undefined;
+      this.activeGroupBy = normalizeGroupBy(this.groupBy);
       this.collapsedGroupKeys.clear();
     }
     if (changes["query"]) {
       this.hasBoundQuery = true;
+      this.reorderedData = null;
       this.syncFromQuery();
     }
 
@@ -2337,6 +2947,10 @@ export class TableXComponent<TData>
     this.detachFilterListeners = null;
     this.detachResizeListeners?.();
     this.detachResizeListeners = null;
+    this.detachContextListeners?.();
+    this.detachContextListeners = null;
+    this.detachPointerUpListener?.();
+    this.detachPointerUpListener = null;
   }
 
   // ---------------------------------------------------------------------
@@ -2747,23 +3361,69 @@ export class TableXComponent<TData>
   }
 
   protected isColumnGrouped(id: string): boolean {
-    if (!this.activeGroupBy) return false;
+    if (this.activeGroupBy.length === 0) return false;
     const cols = flattenColumns(
       this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
     );
     const col = cols.find((c) => getColumnId(c) === id);
     const accessKey = col?.accessorKey !== undefined ? String(col.accessorKey) : "";
-    const activeLower = this.activeGroupBy.toLowerCase();
-    return activeLower === id.toLowerCase() || (accessKey !== "" && activeLower === accessKey.toLowerCase());
+    return this.activeGroupBy.some(
+      (g) =>
+        g.toLowerCase() === id.toLowerCase() ||
+        (accessKey !== "" && g.toLowerCase() === accessKey.toLowerCase()),
+    );
   }
 
   protected setGroupByColumn(columnId: string | undefined): void {
-    this.activeGroupBy = columnId;
+    this.activeGroupBy = columnId ? [columnId] : [];
     this.collapsedGroupKeys.clear();
     this.closeFilterPopover();
     this.saveState();
     this.recompute();
-    this.groupByChange.emit(columnId);
+    this.groupByChange.emit(
+      this.activeGroupBy.length === 0
+        ? undefined
+        : this.activeGroupBy.length === 1
+          ? this.activeGroupBy[0]
+          : [...this.activeGroupBy],
+    );
+    this.cdr.markForCheck();
+  }
+
+  protected addGroupByColumn(columnId: string): void {
+    if (!this.isColumnGrouped(columnId)) {
+      this.activeGroupBy = [...this.activeGroupBy, columnId];
+    }
+    this.collapsedGroupKeys.clear();
+    this.closeFilterPopover();
+    this.saveState();
+    this.recompute();
+    this.groupByChange.emit([...this.activeGroupBy]);
+    this.cdr.markForCheck();
+  }
+
+  protected removeGroupByColumn(columnId: string): void {
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const col = cols.find((c) => getColumnId(c) === columnId);
+    const accessKey = col?.accessorKey !== undefined ? String(col.accessorKey) : "";
+    this.activeGroupBy = this.activeGroupBy.filter(
+      (g) =>
+        g.toLowerCase() !== columnId.toLowerCase() &&
+        (accessKey === "" || g.toLowerCase() !== accessKey.toLowerCase()),
+    );
+    this.collapsedGroupKeys.clear();
+    this.closeFilterPopover();
+    this.saveState();
+    this.recompute();
+    this.groupByChange.emit(
+      this.activeGroupBy.length === 0
+        ? undefined
+        : this.activeGroupBy.length === 1
+          ? this.activeGroupBy[0]
+          : [...this.activeGroupBy],
+    );
     this.cdr.markForCheck();
   }
 
@@ -2892,7 +3552,7 @@ export class TableXComponent<TData>
       columnOrder: cols.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
       pinnedColumns: { ...this.pinnedColumns },
-      groupBy: this.activeGroupBy ?? "",
+      groupBy: [...this.activeGroupBy],
     });
   }
 
@@ -2904,7 +3564,7 @@ export class TableXComponent<TData>
     this.currentDensity = "default";
     this.columnWidths = {};
     this.pinnedColumns = {};
-    this.activeGroupBy = this.groupBy?.trim() || undefined;
+    this.activeGroupBy = normalizeGroupBy(this.groupBy);
     this.collapsedGroupKeys.clear();
     this.hiddenColumns = initialHiddenColumns(flattenColumns(this.columns));
     this.orderedColumns = [...this.columns];
@@ -3002,13 +3662,39 @@ export class TableXComponent<TData>
     this.applySelection(next);
   }
 
-  protected toggleRow(row: NexGridRowView<TData>): void {
+  protected onRowCheckboxClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.shiftOnCheckboxClick = Boolean(event.shiftKey);
+  }
+
+  protected toggleRow(row: NexGridRowView<TData>, event?: Event): void {
+    const shiftHeld = this.shiftOnCheckboxClick;
+    this.shiftOnCheckboxClick = false;
+
     if (this.selectionMode === "single") {
       this.allAcrossSelected = false;
       if (this.selectedIds.has(row.id)) this.applySelection(new Set());
       else this.applySelection(new Set([row.id]));
       return;
     }
+
+    if (shiftHeld && this.lastSelectedRowIndex !== null) {
+      const targetChecked = (event?.target as { checked?: boolean } | null)?.checked ?? !this.selectedIds.has(row.id);
+      const pageIds = this.rows.map((r) => r.id);
+      const nextSet = selectContiguousRowIds(
+        pageIds,
+        this.lastSelectedRowIndex,
+        row.rowIndex,
+        this.selectedIds,
+        targetChecked,
+      );
+      this.lastSelectedRowIndex = row.rowIndex;
+      this.allAcrossSelected = false;
+      this.applySelection(nextSet);
+      return;
+    }
+
+    this.lastSelectedRowIndex = row.rowIndex;
     const next = new Set(this.selectedIds);
     if (this.allAcrossSelected) {
       for (const pageRow of this.rows) next.add(pageRow.id);
@@ -3058,20 +3744,30 @@ export class TableXComponent<TData>
     cell: NexGridCellView<TData>,
     event: MouseEvent,
   ): void {
-    if (!cell.editable) return;
+    if (!cell.editable || row.pinnedVariant) return;
     event.stopPropagation();
+    this.cellValidationError = null;
+    if (this.editMode === "row") {
+      this.startRowEdit(row);
+      return;
+    }
     this.editingCell = { rowId: row.id, columnId: cell.columnId };
+    this.editingBooleanValue = Boolean(cell.rawValue);
     this.editingValue =
-      cell.rawValue !== null && cell.rawValue !== undefined ? String(cell.rawValue) : "";
+      cell.rawValue instanceof Date
+        ? cell.rawValue.toISOString().slice(0, 10)
+        : cell.rawValue !== null && cell.rawValue !== undefined
+          ? String(cell.rawValue)
+          : "";
     this.cdr.markForCheck();
 
     if (typeof requestAnimationFrame === "function") {
       requestAnimationFrame(() => {
         const input = this.hostRef.nativeElement?.querySelector?.(
-          ".tbx-cell-edit-input",
+          ".tbx-cell-edit-input, .tbx-cell-edit-checkbox",
         ) as (HTMLElement & { value?: string }) | null;
         if (input) {
-          if ("value" in input && input.value !== this.editingValue) {
+          if ("value" in input && cell.editType !== "boolean" && input.value !== this.editingValue) {
             input.value = this.editingValue;
           }
           input.focus?.();
@@ -3084,29 +3780,27 @@ export class TableXComponent<TData>
     this.editingValue = eventValue(event);
   }
 
+  protected onEditBooleanChange(event: Event): void {
+    this.editingBooleanValue = Boolean((event.target as { checked?: boolean } | null)?.checked);
+  }
+
   protected cancelCellEdit(event?: Event): void {
     event?.stopPropagation();
     this.editingCell = null;
+    this.cellValidationError = null;
     this.cdr.markForCheck();
   }
 
-  protected commitCellEdit(
-    row: NexGridRowView<TData>,
-    cell: NexGridCellView<TData>,
-    event?: Event,
+  private writeMutatedRowProperty(
+    targetRow: TData,
+    col: TableXAngularColumn<TData> | undefined,
+    columnId: string,
+    nextVal: unknown,
   ): void {
-    event?.stopPropagation();
-    const rawVal = this.editingValue;
-    const nextVal = cell.editType === "number" ? Number(rawVal) : rawVal;
-    const cols = flattenColumns(
-      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
-    );
-    const col = cols.find((c) => getColumnId(c) === cell.columnId);
     const propKey =
       col?.accessorKey !== undefined && String(col.accessorKey) !== ""
         ? String(col.accessorKey)
-        : cell.columnId;
-    const targetRow = row.data;
+        : columnId;
     if (
       targetRow !== null &&
       typeof targetRow === "object" &&
@@ -3119,8 +3813,36 @@ export class TableXComponent<TData>
       try {
         (targetRow as Record<string, unknown>)[propKey] = nextVal;
       } catch {
-        // Host owns immutable/read-only state via (cellEdit)
+        // Host owns immutable/read-only state via (cellEdit) / (rowEdit)
       }
+    }
+  }
+
+  protected commitCellEdit(
+    row: NexGridRowView<TData>,
+    cell: NexGridCellView<TData>,
+    event?: Event,
+  ): void {
+    event?.stopPropagation();
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const col = cols.find((c) => getColumnId(c) === cell.columnId);
+    const rawVal = cell.editType === "boolean" ? this.editingBooleanValue : this.editingValue;
+    const nextVal = coerceEditedValue(rawVal, cell.editType);
+    if (col) {
+      const validationErr = validateEditedCell(col, nextVal, row.data);
+      if (validationErr) {
+        this.cellValidationError = validationErr;
+        this.cdr.markForCheck();
+        return;
+      }
+    }
+    this.cellValidationError = null;
+    const targetRow = row.data;
+    this.writeMutatedRowProperty(targetRow, col, cell.columnId, nextVal);
+    if (cell.rawValue !== nextVal) {
+      this.dirtyCells.add(`${row.id}::${cell.columnId}`);
     }
     this.editingCell = null;
     this.recompute();
@@ -3130,6 +3852,559 @@ export class TableXComponent<TData>
       oldValue: cell.rawValue,
       newValue: nextVal,
     });
+    this.cdr.markForCheck();
+  }
+
+  protected startRowEdit(row: NexGridRowView<TData>): void {
+    this.editingCell = null;
+    this.editingRowId = row.id;
+    this.cellValidationError = null;
+    const draft: Record<string, unknown> = {};
+    for (const c of row.cells) {
+      if (c.editable) {
+        draft[c.columnId] = c.rawValue;
+      }
+    }
+    this.rowEditDraft = draft;
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected getRowDraftString(cell: NexGridCellView<TData>): string {
+    const val = cell.columnId in this.rowEditDraft ? this.rowEditDraft[cell.columnId] : cell.rawValue;
+    if (val instanceof Date) return val.toISOString().slice(0, 10);
+    return val !== null && val !== undefined ? String(val) : "";
+  }
+
+  protected getRowDraftBoolean(cell: NexGridCellView<TData>): boolean {
+    const val = cell.columnId in this.rowEditDraft ? this.rowEditDraft[cell.columnId] : cell.rawValue;
+    return Boolean(val);
+  }
+
+  protected onRowDraftInput(columnId: string, event: Event, isCheckbox: boolean): void {
+    const nextVal = isCheckbox
+      ? Boolean((event.target as { checked?: boolean } | null)?.checked)
+      : eventValue(event);
+    this.rowEditDraft = { ...this.rowEditDraft, [columnId]: nextVal };
+  }
+
+  protected cancelRowEdit(event?: Event): void {
+    event?.stopPropagation();
+    this.editingRowId = null;
+    this.rowEditDraft = {};
+    this.cellValidationError = null;
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected commitRowEdit(row: NexGridRowView<TData>, event?: Event): void {
+    event?.stopPropagation();
+    const cols = flattenColumns(
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns,
+    );
+    const changes: Record<string, { oldValue: unknown; newValue: unknown }> = {};
+    for (const cell of row.cells) {
+      if (!cell.editable) continue;
+      const col = cols.find((c) => getColumnId(c) === cell.columnId);
+      const rawDraft =
+        cell.columnId in this.rowEditDraft ? this.rowEditDraft[cell.columnId] : cell.rawValue;
+      const coerced = coerceEditedValue(rawDraft, cell.editType);
+      if (col) {
+        const err = validateEditedCell(col, coerced, row.data);
+        if (err) {
+          this.cellValidationError = err;
+          this.cdr.markForCheck();
+          return;
+        }
+      }
+      changes[cell.columnId] = { oldValue: cell.rawValue, newValue: coerced };
+    }
+
+    const targetRow = row.data;
+    const updatedRow =
+      targetRow !== null && typeof targetRow === "object"
+        ? ({ ...(targetRow as Record<string, unknown>) } as TData)
+        : targetRow;
+
+    for (const cell of row.cells) {
+      if (!cell.editable) continue;
+      const change = changes[cell.columnId];
+      if (!change) continue;
+      const col = cols.find((c) => getColumnId(c) === cell.columnId);
+      this.writeMutatedRowProperty(targetRow, col, cell.columnId, change.newValue);
+      this.writeMutatedRowProperty(updatedRow, col, cell.columnId, change.newValue);
+      if (change.oldValue !== change.newValue) {
+        this.dirtyCells.add(`${row.id}::${cell.columnId}`);
+        this.cellEdit.emit({
+          row: targetRow,
+          columnId: cell.columnId,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+        });
+      }
+    }
+
+    this.editingRowId = null;
+    this.rowEditDraft = {};
+    this.cellValidationError = null;
+    this.recompute();
+    this.rowEdit.emit({ row: targetRow, updatedRow, changes });
+    this.cdr.markForCheck();
+  }
+
+  // ---------------------------------------------------------------------
+  // Saved Views, Tree Data, Row Reorder, Infinite Scroll & Cell Range/Nav
+  // ---------------------------------------------------------------------
+
+  protected onViewNameInput(event: Event): void {
+    this.newViewName = eventValue(event);
+  }
+
+  protected savePresetView(): void {
+    const trimmed = this.newViewName.trim();
+    if (!trimmed) return;
+    const cols = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    this.savedViewsList = upsertSavedView(
+      this.savedViewsList,
+      {
+        name: trimmed,
+        query: this.query,
+        hiddenColumns: { ...(this.hiddenColumns as Record<string, boolean>) },
+        pinnedColumns: { ...this.pinnedColumns },
+        columnOrder: cols.map(getColumnId).filter(Boolean) as string[],
+        groupBy: [...this.activeGroupBy],
+        density: this.currentDensity,
+      },
+      this.storageKey,
+    );
+    this.newViewName = "";
+    this.savedViewsChange.emit([...this.savedViewsList]);
+    this.cdr.markForCheck();
+  }
+
+  protected applyPresetView(view: SavedGridView): void {
+    if (view.density) this.currentDensity = view.density;
+    if (view.hiddenColumns) this.hiddenColumns = { ...view.hiddenColumns };
+    if (view.pinnedColumns) this.pinnedColumns = { ...view.pinnedColumns };
+    if (view.groupBy) this.activeGroupBy = [...view.groupBy];
+    this.collapsedGroupKeys.clear();
+    this.closeMenus();
+    this.emitQuery(view.query);
+  }
+
+  protected deletePresetView(viewId: string, event: Event): void {
+    event.stopPropagation();
+    this.savedViewsList = removeSavedView(this.savedViewsList, viewId, this.storageKey);
+    this.savedViewsChange.emit([...this.savedViewsList]);
+    this.cdr.markForCheck();
+  }
+
+  protected toggleTreeNode(nodeId: string, event: Event): void {
+    event.stopPropagation();
+    if (this.treeExpandedIds.has(nodeId)) {
+      this.treeExpandedIds.delete(nodeId);
+    } else {
+      this.treeExpandedIds.add(nodeId);
+    }
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected onRowDragStart(row: NexGridRowView<TData>, event: DragEvent): void {
+    if (!this.enableRowReorder || row.pinnedVariant) return;
+    this.draggedRowIndex = row.rowIndex;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(row.rowIndex));
+    }
+  }
+
+  protected onRowDragOver(row: NexGridRowView<TData>, event: DragEvent): void {
+    if (!this.enableRowReorder || row.pinnedVariant || this.draggedRowIndex === null) return;
+    event.preventDefault();
+  }
+
+  protected onRowDrop(row: NexGridRowView<TData>, event: DragEvent): void {
+    if (!this.enableRowReorder || row.pinnedVariant) return;
+    event.preventDefault();
+    const fromIdx = this.draggedRowIndex;
+    this.draggedRowIndex = null;
+    if (fromIdx === null || fromIdx === row.rowIndex) return;
+    const nextRows = reorderArrayItem(this.currentDisplayData, fromIdx, row.rowIndex);
+    this.reorderedData = nextRows;
+    this.recompute();
+    this.rowOrderChange.emit({
+      fromIndex: fromIdx,
+      toIndex: row.rowIndex,
+      rows: [...nextRows],
+    });
+    this.cdr.markForCheck();
+  }
+
+  protected triggerLoadMore(): void {
+    if (this.isLoadingMore || !this.hasMore) return;
+    this.loadMore.emit(this.nextCursor);
+  }
+
+  protected onCellPointerDown(
+    row: NexGridRowView<TData>,
+    cell: NexGridCellView<TData>,
+    event: PointerEvent,
+  ): void {
+    if (row.pinnedVariant || event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.("input, select, button, .tbx-fill-handle")) return;
+    const coord: CellCoord = { rowIndex: row.rowIndex, colIndex: cell.columnIndex };
+    this.focusedCell = coord;
+    if (this.enableRangeSelection) {
+      if (event.shiftKey && this.rangeAnchor) {
+        this.cellRange = normalizeCellRange(this.rangeAnchor, coord);
+      } else {
+        this.rangeAnchor = coord;
+        this.cellRange = normalizeCellRange(coord, coord);
+        this.isDraggingRange = true;
+      }
+    }
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected onCellPointerEnter(row: NexGridRowView<TData>, cell: NexGridCellView<TData>): void {
+    if (row.pinnedVariant || !this.enableRangeSelection) return;
+    if (this.isDraggingRange && this.rangeAnchor) {
+      this.cellRange = normalizeCellRange(this.rangeAnchor, {
+        rowIndex: row.rowIndex,
+        colIndex: cell.columnIndex,
+      });
+      this.recompute();
+      this.cdr.markForCheck();
+    } else if (this.isFillingRange) {
+      this.applyFillHandleToRow(row.rowIndex);
+    }
+  }
+
+  protected onFillHandlePointerDown(event: PointerEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isFillingRange = true;
+  }
+
+  private applyFillHandleToRow(targetRowIdx: number): void {
+    if (!this.cellRange) return;
+    const rowsData = this.currentDisplayData;
+    const rawColumns =
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+    const startRow = this.cellRange.minRow;
+    const endRow = Math.max(startRow, Math.min(rowsData.length - 1, targetRowIdx));
+    const sourceRow = rowsData[startRow];
+    if (!sourceRow) return;
+
+    for (let c = this.cellRange.minCol; c <= this.cellRange.maxCol; c++) {
+      const col = visible[c];
+      if (!col || !isEditable(col)) continue;
+      const cid = getColumnId(col);
+      const sourceVal = getCellValue(col, sourceRow);
+      for (let r = startRow + 1; r <= endRow; r++) {
+        const targetRow = rowsData[r];
+        if (!targetRow) continue;
+        const oldVal = getCellValue(col, targetRow);
+        const coerced = coerceEditedValue(sourceVal, col.meta?.editType);
+        if (validateEditedCell(col, coerced, targetRow) !== null) continue;
+        this.writeMutatedRowProperty(targetRow, col, cid, coerced);
+        if (oldVal !== coerced) {
+          this.dirtyCells.add(`${this.getRowId(targetRow)}::${cid}`);
+          this.cellEdit.emit({
+            row: targetRow,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
+        }
+      }
+    }
+    this.cellRange = { ...this.cellRange, maxRow: endRow };
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  protected onCellContextMenu(
+    row: NexGridRowView<TData>,
+    cell: NexGridCellView<TData>,
+    event: MouseEvent,
+  ): void {
+    if (row.pinnedVariant || !this.enableContextMenu) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rawColumns =
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+    const col = visible[cell.columnIndex];
+    if (!col) return;
+    const labels = { yes: this.strings.booleanYes, no: this.strings.booleanNo };
+    const text = getCellText(cell.rawValue, labels);
+    const items: ContextMenuItem[] = [
+      {
+        id: "copy-cell",
+        label: this.strings.copyCell ?? "Copy cell",
+        onSelect: () => {
+          void navigator.clipboard?.writeText?.(text);
+        },
+      },
+      {
+        id: "copy-row",
+        label: this.strings.copyRow ?? "Copy row",
+        onSelect: () => {
+          const line = visible
+            .map((c) => getCellText(getCellValue(c, row.data), labels).replace(/\t|\r|\n/g, " "))
+            .join("\t");
+          void navigator.clipboard?.writeText?.(line);
+        },
+      },
+    ];
+
+    if (text !== "" && isFilterable(col, this.enableColumnFilters !== false)) {
+      items.push({
+        id: "filter-by-value",
+        label: formatMessage(this.strings.filterByValue ?? 'Filter by "{value}"', {
+          value: text.length > 24 ? `${text.slice(0, 24)}…` : text,
+        }),
+        onSelect: () => {
+          this.applyColumnFilter(cell.columnId, text);
+        },
+      });
+    }
+
+    if (!isStructuralColumn(col) && cell.columnId !== "") {
+      const currentPin = isPinned(col, this.pinnedColumns);
+      items.push({
+        id: currentPin ? "unpin" : "pin-left",
+        label: currentPin
+          ? (this.strings.unpinColumn ?? "Unpin column")
+          : (this.strings.pinLeft ?? "Pin left"),
+        separatorBefore: true,
+        onSelect: () => {
+          this.setColumnPin(cell.columnId, currentPin ? "none" : "left");
+        },
+      });
+      if (isHideable(col) && visible.length > 1) {
+        items.push({
+          id: "hide-col",
+          label: this.strings.hideColumn ?? "Hide column",
+          onSelect: () => {
+            this.hideColumnFromMenu(cell.columnId);
+          },
+        });
+      }
+    }
+
+    const custom =
+      this.contextMenuItems?.({
+        row: row.data,
+        columnId: cell.columnId,
+        value: cell.rawValue,
+      }) ?? [];
+    for (let i = 0; i < custom.length; i++) {
+      const cItem = custom[i]!;
+      items.push({
+        ...cItem,
+        separatorBefore: i === 0 ? true : cItem.separatorBefore,
+      });
+    }
+
+    const winW = typeof window !== "undefined" ? (window.innerWidth || 1024) : 1024;
+    const winH = typeof window !== "undefined" ? (window.innerHeight || 800) : 800;
+    this.activeContextMenu = {
+      x: Math.min(Math.max(8, event.clientX), Math.max(8, winW - 210)),
+      y: Math.min(Math.max(8, event.clientY), Math.max(8, winH - 240)),
+      items,
+    };
+    this.attachContextListeners();
+    this.cdr.markForCheck();
+  }
+
+  protected invokeContextMenuItem(item: ContextMenuItem): void {
+    this.closeContextMenu();
+    item.onSelect();
+  }
+
+  private closeContextMenu(): void {
+    if (!this.activeContextMenu && !this.detachContextListeners) return;
+    this.activeContextMenu = null;
+    this.detachContextListeners?.();
+    this.detachContextListeners = null;
+    this.cdr.markForCheck();
+  }
+
+  private attachContextListeners(): void {
+    this.detachContextListeners?.();
+    const onDown = (ev: Event): void => {
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest?.(".tbx-context-menu")) return;
+      this.zone.run(() => this.closeContextMenu());
+    };
+    const onKey = (ev: KeyboardEvent): void => {
+      if (ev.key === "Escape") this.zone.run(() => this.closeContextMenu());
+    };
+    this.zone.runOutsideAngular(() => {
+      this.document.addEventListener("pointerdown", onDown, true);
+      this.document.addEventListener("keydown", onKey);
+    });
+    this.detachContextListeners = () => {
+      this.document.removeEventListener("pointerdown", onDown, true);
+      this.document.removeEventListener("keydown", onKey);
+    };
+  }
+
+  protected onHostKeydown(event: KeyboardEvent): void {
+    if (!this.enableKeyboardNavigation || this.editingCell || this.editingRowId) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.nodeName === "INPUT" || target.nodeName === "SELECT" || target.nodeName === "TEXTAREA")
+    ) {
+      const inpType = (target as { type?: string }).type;
+      if (inpType !== "checkbox" && inpType !== "radio") return;
+    }
+    if (this.rows.length === 0 || this.headers.length === 0) return;
+
+    const rawColumns =
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "c" &&
+      this.enableRangeSelection &&
+      this.cellRange
+    ) {
+      const tsv = formatRangeTsv(this.currentDisplayData, visible, this.cellRange, {
+        yes: this.strings.booleanYes,
+        no: this.strings.booleanNo,
+      });
+      if (tsv) {
+        event.preventDefault();
+        void navigator.clipboard?.writeText?.(tsv);
+      }
+      return;
+    }
+
+    const navKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"];
+    if (navKeys.includes(event.key)) {
+      const base = this.focusedCell ?? { rowIndex: 0, colIndex: 0 };
+      const next = moveFocusCoord(base, event.key, this.currentDisplayData.length, visible.length);
+      if (!next) return;
+      event.preventDefault();
+      this.focusedCell = next;
+      if (this.enableRangeSelection) {
+        if (event.shiftKey) {
+          const anchor = this.rangeAnchor ?? base;
+          this.rangeAnchor = anchor;
+          this.cellRange = normalizeCellRange(anchor, next);
+        } else {
+          this.rangeAnchor = next;
+          this.cellRange = normalizeCellRange(next, next);
+        }
+      }
+      this.recompute();
+      this.cdr.markForCheck();
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => {
+          const el = this.hostRef.nativeElement?.querySelector?.(
+            `[data-tbx-focus="cell:${next.rowIndex}:${next.colIndex}"]`,
+          ) as HTMLElement | null;
+          el?.focus?.({ preventScroll: true });
+        });
+      }
+      return;
+    }
+
+    if ((event.key === "Enter" || event.key === "F2") && this.focusedCell) {
+      const rowView = this.rows.find((r) => r.rowIndex === this.focusedCell!.rowIndex);
+      const cellView = rowView?.cells[this.focusedCell.colIndex];
+      if (rowView && cellView && cellView.editable) {
+        event.preventDefault();
+        if (this.editMode === "row") {
+          this.startRowEdit(rowView);
+        } else {
+          this.cellValidationError = null;
+          this.editingCell = { rowId: rowView.id, columnId: cellView.columnId };
+          this.editingBooleanValue = Boolean(cellView.rawValue);
+          this.editingValue =
+            cellView.rawValue !== null && cellView.rawValue !== undefined
+              ? String(cellView.rawValue)
+              : "";
+          this.cdr.markForCheck();
+        }
+      }
+      return;
+    }
+
+    if (event.key === " " && this.focusedCell && this.enableSelection) {
+      if (target && (target.nodeName === "BUTTON" || target.nodeName === "INPUT")) return;
+      const rowView = this.rows.find((r) => r.rowIndex === this.focusedCell!.rowIndex);
+      if (rowView) {
+        event.preventDefault();
+        this.toggleRow(rowView);
+      }
+    }
+  }
+
+  protected onHostPaste(event: ClipboardEvent): void {
+    if (!this.enableRangeSelection || !this.focusedCell) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.nodeName === "INPUT" || target.nodeName === "SELECT" || target.nodeName === "TEXTAREA")
+    ) {
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    const matrix = parseClipboardTsv(text);
+    if (matrix.length === 0) return;
+    event.preventDefault();
+
+    const rawColumns =
+      this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+    const startR = this.focusedCell.rowIndex;
+    const startC = this.focusedCell.colIndex;
+    let maxR = startR;
+    let maxC = startC;
+
+    for (let rOff = 0; rOff < matrix.length; rOff++) {
+      const targetRow = this.currentDisplayData[startR + rOff];
+      if (!targetRow) break;
+      maxR = startR + rOff;
+      const cells = matrix[rOff]!;
+      for (let cOff = 0; cOff < cells.length; cOff++) {
+        const col = visible[startC + cOff];
+        if (!col) break;
+        maxC = Math.max(maxC, startC + cOff);
+        if (!isEditable(col)) continue;
+        const cid = getColumnId(col);
+        const oldVal = getCellValue(col, targetRow);
+        const coerced = coerceEditedValue(cells[cOff], col.meta?.editType);
+        if (validateEditedCell(col, coerced, targetRow) !== null) continue;
+        this.writeMutatedRowProperty(targetRow, col, cid, coerced);
+        if (oldVal !== coerced) {
+          this.dirtyCells.add(`${this.getRowId(targetRow)}::${cid}`);
+          this.cellEdit.emit({
+            row: targetRow,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
+        }
+      }
+    }
+
+    this.cellRange = normalizeCellRange(
+      { rowIndex: startR, colIndex: startC },
+      { rowIndex: maxR, colIndex: maxC },
+    );
+    this.recompute();
     this.cdr.markForCheck();
   }
 
@@ -3171,7 +4446,7 @@ export class TableXComponent<TData>
   // Export (spec section 5 — identical flow in every adapter)
   // ---------------------------------------------------------------------
 
-  protected async runBulkExport(format: "excel" | "csv"): Promise<void> {
+  protected async runBulkExport(format: "excel" | "csv" | "pdf"): Promise<void> {
     if (this.allAcrossSelected) {
       await this.runExport(format);
       return;
@@ -3185,7 +4460,7 @@ export class TableXComponent<TData>
     await this.runExport(format);
   }
 
-  protected async runExport(format: "excel" | "csv" | "clipboard"): Promise<void> {
+  protected async runExport(format: ExportFormat): Promise<void> {
     this.closeMenus();
 
     // 1. The host owns the export when it is listening for it.
@@ -3207,7 +4482,7 @@ export class TableXComponent<TData>
   }
 
   private async exportRowsWithFormat(
-    format: "excel" | "csv" | "clipboard",
+    format: ExportFormat,
     rows: readonly TData[],
   ): Promise<void> {
     if (rows.length === 0) {
@@ -3238,6 +4513,25 @@ export class TableXComponent<TData>
       } else {
         this.notify.emit({ type: "error", message: "Failed to copy to clipboard" });
       }
+      return;
+    }
+
+    if (format === "pdf") {
+      const count = downloadPdf({
+        filename: timestampedFilename(prefix),
+        caption: this.caption,
+        rows,
+        columns: exportColumns,
+        badgeRules: this.badgeRules,
+        serialHeader: this.strings.serialHeader,
+      });
+      this.notify.emit({
+        type: "success",
+        message: formatMessage(
+          this.strings.exportPdfSuccess ?? "Exported {count} records to PDF (.pdf)",
+          { count: count.toLocaleString() },
+        ),
+      });
       return;
     }
 
@@ -3481,12 +4775,20 @@ export class TableXComponent<TData>
 
   /** Rebuild everything the template reads. Cheap enough to never be partial. */
   protected onTableWrapScroll(event: Event): void {
-    if (!this.enableVirtualization) return;
+    this.closeContextMenu();
     const target = event.currentTarget as HTMLElement | null;
-    const nextTop = target?.scrollTop ?? 0;
-    if (Math.abs(nextTop - this.virtualScrollTop) >= 1) {
-      this.virtualScrollTop = nextTop;
-      this.recompute();
+    if (this.enableVirtualization) {
+      const nextTop = target?.scrollTop ?? 0;
+      if (Math.abs(nextTop - this.virtualScrollTop) >= 1) {
+        this.virtualScrollTop = nextTop;
+        this.recompute();
+      }
+    }
+    if (target && this.isInfiniteMode && this.hasMore && !this.isLoading && !this.isLoadingMore) {
+      const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
+      if (remaining <= 120) {
+        this.loadMore.emit(this.nextCursor);
+      }
     }
   }
 
@@ -3499,6 +4801,8 @@ export class TableXComponent<TData>
     const headerRows = buildHeaderRows(rawColumns, this.hiddenColumns);
     this.hasHeaderGroups = headerRows.hasGroups;
     this.hasExpandColumn = Boolean(this.expandedRowSlot || this.renderExpandedRow);
+    const firstEd = visible.find((c) => isEditable(c));
+    this.firstEditableColumnId = firstEd ? getColumnId(firstEd) : "";
     const labels = { yes: strings.booleanYes, no: strings.booleanNo };
 
     // Compute sticky left/right offsets matching React & Vanilla
@@ -3509,6 +4813,11 @@ export class TableXComponent<TData>
     const hasLeftPinned = visible.some((c) => isPinned(c, this.pinnedColumns) === "left");
 
     if (hasLeftPinned) {
+      if (this.enableRowReorder) {
+        leftOffsets.set("__row_drag", currentLeft);
+        currentLeft += 36;
+        lastLeftPinnedId = "__row_drag";
+      }
       if (this.hasExpandColumn) {
         leftOffsets.set("__expand", currentLeft);
         currentLeft += 40;
@@ -3549,6 +4858,8 @@ export class TableXComponent<TData>
       }
     }
 
+    this.rowDragPinnedLeft = leftOffsets.get("__row_drag") ?? null;
+    this.rowDragIsLastLeftPinned = lastLeftPinnedId === "__row_drag";
     this.expandPinnedLeft = leftOffsets.get("__expand") ?? null;
     this.expandIsLastLeftPinned = lastLeftPinnedId === "__expand";
     this.selectPinnedLeft = leftOffsets.get("__select") ?? null;
@@ -3636,7 +4947,17 @@ export class TableXComponent<TData>
           ...(unpaginatedVirtual ? { paginate: false } : {}),
         })
       : null;
-    const displayData = clientPaged ? clientPaged.items : this.data;
+    const baseData = this.reorderedData ?? (clientPaged ? clientPaged.items : this.data);
+    const treeNodes: TreeRowNode<TData>[] | null = this.isTreeEnabled
+      ? flattenTreeRows(baseData, {
+          childrenKey: this.childrenKey,
+          getSubRows: this.getSubRows,
+          getRowId: this.getRowId,
+          expandedIds: this.treeExpandedIds,
+        })
+      : null;
+    const displayData = treeNodes ? treeNodes.map((n) => n.row) : baseData;
+    this.currentDisplayData = displayData;
     const effectiveTotal = clientPaged ? clientPaged.total : (this.total ?? this.data.length);
 
     const filterSig = JSON.stringify([this.query.q ?? "", this.query.filter ?? {}]);
@@ -3653,7 +4974,7 @@ export class TableXComponent<TData>
     const rowKeys = new Set<string>();
 
     const virtualWin =
-      this.enableVirtualization && !this.activeGroupBy
+      this.enableVirtualization && !this.isTreeEnabled && this.activeGroupBy.length === 0
         ? computeVirtualWindow({
             totalRows: displayData.length,
             scrollTop: this.virtualScrollTop,
@@ -3669,11 +4990,17 @@ export class TableXComponent<TData>
       : displayData;
     const virtualStartOffset = virtualWin ? virtualWin.startIndex : 0;
 
-    this.rows = windowedData.map((row, sliceIndex) => {
-      const rowIndex = virtualStartOffset + sliceIndex;
-      const id = this.getRowId(row);
-      const selected = this.allAcrossSelected || this.selectedIds.has(id);
-      const expanded = this.hasExpandColumn && this.expandedRowIds.has(id);
+    const buildRowView = (
+      row: TData,
+      rowIndex: number,
+      opts?: { pinnedVariant?: "top" | "bottom"; treeNode?: TreeRowNode<TData> },
+    ): NexGridRowView<TData> => {
+      const pinnedVariant = opts?.pinnedVariant;
+      const tNode = opts?.treeNode;
+      const id = tNode ? tNode.id : this.getRowId(row);
+      const selected = !pinnedVariant && (this.allAcrossSelected || this.selectedIds.has(id));
+      const expanded = !pinnedVariant && this.hasExpandColumn && this.expandedRowIds.has(id);
+      const isRowEditing = !pinnedVariant && this.editingRowId === id;
       const expandedText =
         expanded && !this.expandedRowSlot && this.renderExpandedRow
           ? this.renderExpandedRow(row)
@@ -3687,26 +5014,50 @@ export class TableXComponent<TData>
           this.cellTemplates.get(colId) ??
           (accessor ? this.cellTemplates.get(accessor) : undefined) ??
           null;
+        const inRange =
+          !pinnedVariant &&
+          this.enableRangeSelection &&
+          isCellInRange(rowIndex, columnIndex, this.cellRange);
+        const isFillCorner =
+          inRange &&
+          this.cellRange !== null &&
+          rowIndex === this.cellRange.maxRow &&
+          columnIndex === this.cellRange.maxCol;
         return {
           key: header?.key ?? String(columnIndex),
           columnId: colId,
+          columnIndex,
           rawValue: value,
           header: header?.title ?? "",
           align: header?.align ?? "left",
           template,
           context: template === null ? null : { $implicit: row, value, column, rowIndex },
           text: template === null ? cellText(column, row, value, labels) : "",
-          editable: isEditable(column),
+          editable: !pinnedVariant && isEditable(column),
           editType: column.meta?.editType ?? "text",
           editOptions: column.meta?.editOptions,
+          dirty: !pinnedVariant && this.dirtyCells.has(`${id}::${colId}`),
+          focused:
+            !pinnedVariant &&
+            this.focusedCell?.rowIndex === rowIndex &&
+            this.focusedCell?.colIndex === columnIndex,
+          inRange,
+          isFillHandleCorner: isFillCorner,
+          isTreeColumn: Boolean(tNode && columnIndex === 0),
+          treeDepth: tNode && columnIndex === 0 ? tNode.depth : 0,
+          treeHasChildren: Boolean(tNode && columnIndex === 0 && tNode.hasChildren),
+          treeExpanded: Boolean(tNode && columnIndex === 0 && tNode.isExpanded),
           pinnedLeft: leftOffsets.get(colId) ?? null,
           pinnedRight: rightOffsets.get(colId) ?? null,
           isLastLeftPinned: lastLeftPinnedId === colId,
           isFirstRightPinned: firstRightPinnedId === colId,
         };
       });
+      const candidateKey = pinnedVariant
+        ? `${pinnedVariant}-${id || rowIndex}`
+        : (id === "" ? String(rowIndex) : id);
       return {
-        key: uniqueKey(id === "" ? String(rowIndex) : id, rowKeys),
+        key: uniqueKey(candidateKey, rowKeys),
         id,
         rowIndex,
         data: row,
@@ -3716,16 +5067,64 @@ export class TableXComponent<TData>
         expandedText,
         expandedContext: { $implicit: row, rowIndex },
         selectLabel: formatMessage(strings.selectRowLabel, { id }),
+        pinnedVariant,
+        isRowEditing,
         cells,
       };
+    };
+
+    this.pinnedTopRowViews = (this.pinnedTopRows ?? []).map((r, i) =>
+      buildRowView(r, i, { pinnedVariant: "top" }),
+    );
+    this.pinnedBottomRowViews = (this.pinnedBottomRows ?? []).map((r, i) =>
+      buildRowView(r, i, { pinnedVariant: "bottom" }),
+    );
+
+    this.rows = windowedData.map((row, sliceIndex) => {
+      const rowIndex = virtualStartOffset + sliceIndex;
+      return buildRowView(row, rowIndex, {
+        treeNode: treeNodes ? treeNodes[rowIndex] : undefined,
+      });
     });
 
-    if (this.activeGroupBy && displayData.length > 0) {
+    if (!this.isTreeEnabled && this.activeGroupBy.length > 0 && displayData.length > 0) {
       const rowByIndex = new Map<number, NexGridRowView<TData>>();
       for (const r of this.rows) {
         rowByIndex.set(r.rowIndex, r);
       }
-      const groups = groupRows(displayData, this.activeGroupBy, rawColumns, labels);
+      const nested = buildNestedGroupItems(
+        displayData,
+        this.activeGroupBy,
+        rawColumns,
+        this.collapsedGroupKeys,
+        labels,
+      );
+      this.bodyGroupEntries = nested
+        .map((item): TableXBodyGroupEntry<TData> | null => {
+          if (item.kind === "group") {
+            return {
+              kind: "group",
+              key: item.key,
+              displayValue: item.displayValue,
+              columnTitle: item.columnTitle,
+              count: item.count,
+              depth: item.depth,
+              collapsed: item.collapsed,
+              summaries: item.summaries,
+            };
+          }
+          const rv = rowByIndex.get(item.originalIndex);
+          if (!rv) return null;
+          return {
+            kind: "row",
+            key: `g-row-${rv.key}`,
+            row: rv,
+          };
+        })
+        .filter((e): e is TableXBodyGroupEntry<TData> => e !== null);
+
+      const primaryGroupCol = this.activeGroupBy[0]!;
+      const groups = groupRows(displayData, primaryGroupCol, rawColumns, labels);
       this.rowGroups = groups.map((grp) => ({
         key: grp.key,
         displayValue: grp.displayValue,
@@ -3738,7 +5137,24 @@ export class TableXComponent<TData>
           .filter((r): r is NexGridRowView<TData> => r !== undefined),
       }));
     } else {
+      this.bodyGroupEntries = [];
       this.rowGroups = [];
+    }
+
+    if (this.enableRangeSelection && this.cellRange) {
+      const stats = computeRangeStats(displayData, visible, this.cellRange);
+      if (stats && stats.cellCount > 1) {
+        const parts = [`Count: ${stats.cellCount}`];
+        if (stats.numericCount > 0 && stats.sum !== null && stats.avg !== null) {
+          parts.push(`Sum: ${Number(stats.sum.toFixed(2)).toLocaleString()}`);
+          parts.push(`Avg: ${Number(stats.avg.toFixed(2)).toLocaleString()}`);
+        }
+        this.rangeStatsText = parts.join(" · ");
+      } else {
+        this.rangeStatsText = "";
+      }
+    } else {
+      this.rangeStatsText = "";
     }
 
     this.hasSummary =
@@ -3788,6 +5204,7 @@ export class TableXComponent<TData>
 
     this.columnSpan =
       visible.length +
+        (this.enableRowReorder ? 1 : 0) +
         (this.hasExpandColumn ? 1 : 0) +
         (this.showSerialNumber ? 1 : 0) +
         (this.enableSelection ? 1 : 0) || 1;

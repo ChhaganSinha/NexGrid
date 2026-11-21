@@ -105,12 +105,30 @@ export interface TableXCellView<TData> {
   context: TableXCellTemplateContext<TData> | null;
   /** Plain-text rendering, used when there is no template. */
   text: string;
+  /** Column index within visible leaf columns. */
+  columnIndex: number;
   /** Whether double-clicking this cell enters inline edit mode. */
   editable: boolean;
   /** Inline editor control type. */
-  editType: "text" | "number" | "select";
+  editType: "text" | "number" | "select" | "date" | "boolean";
   /** Select options when `editType === 'select'`. */
   editOptions?: readonly string[];
+  /** Whether this cell has been modified during the current session. */
+  dirty?: boolean;
+  /** Whether this cell currently holds keyboard focus. */
+  focused?: boolean;
+  /** Whether this cell falls inside the active rectangular range selection. */
+  inRange?: boolean;
+  /** True on the bottom-right corner cell of the active range selection (renders fill handle). */
+  isFillHandleCorner?: boolean;
+  /** Tree indentation depth on column 0 when `enableTreeData` is active. */
+  treeDepth?: number;
+  /** Whether this tree node has child rows. */
+  treeHasChildren?: boolean;
+  /** Whether this tree node's child rows are currently expanded. */
+  treeExpanded?: boolean;
+  /** True on column 0 when `enableTreeData` is active. */
+  isTreeColumn?: boolean;
   /** Left sticky pixel offset when pinned left, else `null`. */
   pinnedLeft?: number | null;
   /** Right sticky pixel offset when pinned right, else `null`. */
@@ -142,6 +160,10 @@ export interface TableXRowView<TData> {
   expandedContext: TableXExpandedRowTemplateContext<TData>;
   /** Accessible name for this row's selection checkbox. */
   selectLabel: string;
+  /** Sticky pinned variant (`"top"` or `"bottom"`) when rendered from `pinnedTopRows` / `pinnedBottomRows`. */
+  pinnedVariant?: "top" | "bottom";
+  /** True when `editMode === 'row'` and this row is currently being edited. */
+  isRowEditing?: boolean;
   cells: TableXCellView<TData>[];
 }
 
@@ -199,16 +221,34 @@ export interface TableXRangePart {
   value: string;
 }
 
-/** One collapsible group section in `<tbody>` when `groupBy` is active. */
+/** One collapsible group section or row item in `<tbody>` when single or nested `groupBy` is active. */
 export interface TableXGroupView<TData> {
   key: string;
   displayValue: string;
   columnTitle: string;
   count: number;
+  depth?: number;
   collapsed: boolean;
   summaries: readonly RowGroupSummary[];
   rows: TableXRowView<TData>[];
 }
+
+export type TableXBodyGroupEntry<TData> =
+  | {
+      kind: "group";
+      key: string;
+      displayValue: string;
+      columnTitle: string;
+      count: number;
+      depth: number;
+      collapsed: boolean;
+      summaries: readonly RowGroupSummary[];
+    }
+  | {
+      kind: "row";
+      key: string;
+      row: TableXRowView<TData>;
+    };
 
 // Backwards-compatible aliases
 export type NexGridHeaderView = TableXHeaderView;
