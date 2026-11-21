@@ -221,6 +221,9 @@ class MockNode {
 
 function matches(node, selector) {
   if (!node) return false;
+  if (selector.includes(",")) {
+    return selector.split(",").some((part) => matches(node, part.trim()));
+  }
   if (selector.startsWith(".")) {
     const cls = selector.slice(1);
     return node.classList?.contains(cls) ?? false;
@@ -287,7 +290,14 @@ class MockDocument extends MockNode {
 class MockEvent {
   constructor(type, init = {}) {
     this.type = type;
+    this.button = init.button ?? 0;
     this.shiftKey = Boolean(init.shiftKey);
+    this.ctrlKey = Boolean(init.ctrlKey);
+    this.metaKey = Boolean(init.metaKey);
+    this.clientX = init.clientX ?? 100;
+    this.clientY = init.clientY ?? 100;
+    this.clipboardData = init.clipboardData ?? null;
+    this.dataTransfer = init.dataTransfer ?? null;
     this.key = init.key || "";
     this.target = null;
     this.currentTarget = null;
@@ -1431,6 +1441,329 @@ test("groupBy renders collapsible group header rows with counts, summaries, and 
   assert.ok(ungroupBtn, "Ungroup quick action appears on active grouped column");
   ungroupBtn.dispatchEvent(new MockMouseEvent("click"));
   assert.equal(container.querySelectorAll(".tbx-group-row").length, 0, "Table returns to flat rows on Ungroup");
+
+  handle.destroy();
+});
+
+test("keyboard arrow navigation, Enter to edit, and Shift+Click contiguous row selection", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const rows = [
+    { id: "1", name: "Alice", score: 80 },
+    { id: "2", name: "Bob", score: 85 },
+    { id: "3", name: "Charlie", score: 90 },
+    { id: "4", name: "Diana", score: 95 },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Keyboard & Shift Select",
+    columns: [
+      { accessorKey: "name", header: "Name", meta: { editable: true } },
+      { accessorKey: "score", header: "Score", meta: { editable: true, editType: "number" } },
+    ],
+    data: rows,
+    clientSidePagination: true,
+    enableSelection: true,
+    enableKeyboardNavigation: true,
+  });
+
+  // Shift+Click contiguous row selection from row 0 to row 2 (selects rows 1, 2, 3)
+  const rowChecks = container.querySelectorAll(".tbx-td--select").map((td) => td.querySelector(".tbx-checkbox"));
+  assert.equal(rowChecks.length, 4);
+  rowChecks[0].checked = true;
+  rowChecks[0].dispatchEvent(new MockEvent("change"));
+  assert.deepEqual(handle.getSelection(), ["1"]);
+
+  rowChecks[2].checked = true;
+  rowChecks[2].dispatchEvent(new MockEvent("change", { shiftKey: true }));
+  assert.deepEqual(handle.getSelection(), ["1", "2", "3"], "Shift+Click selects contiguous range 0..2");
+
+  // Keyboard navigation on root: ArrowDown -> cell (1, 0), ArrowRight -> cell (1, 1), Enter -> opens editor
+  const root = container.querySelector(".tbx-root");
+  root.dispatchEvent(new MockKeyboardEvent("keydown", { key: "ArrowDown" }));
+  let focused = container.querySelector(".tbx-td--focused");
+  assert.ok(focused, "Focused cell exists after ArrowDown");
+  assert.equal(focused.getAttribute("data-row-idx"), "1");
+  assert.equal(focused.getAttribute("data-col-idx"), "0");
+
+  root.dispatchEvent(new MockKeyboardEvent("keydown", { key: "ArrowRight" }));
+  focused = container.querySelector(".tbx-td--focused");
+  assert.equal(focused.getAttribute("data-col-idx"), "1");
+
+  root.dispatchEvent(new MockKeyboardEvent("keydown", { key: "Enter" }));
+  assert.ok(container.querySelector(".tbx-cell-edit-input"), "Pressing Enter on focused editable cell opens editor");
+
+  handle.destroy();
+});
+
+test("right-click cell context menu filters by cell value and invokes custom contextMenuItems", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  let customActionPayload = null;
+  const handle = createTableX(container, {
+    caption: "Context Menu Grid",
+    columns: [
+      { accessorKey: "name", header: "Name" },
+      { accessorKey: "dept", header: "Department" },
+    ],
+    data: [
+      { id: "1", name: "Alice", dept: "Engineering" },
+      { id: "2", name: "Bob", dept: "Sales" },
+    ],
+    clientSidePagination: true,
+    enableContextMenu: true,
+    contextMenuItems: ({ row, columnId, value }) => [
+      {
+        id: "inspect",
+        label: `Inspect ${row.name}`,
+        onSelect: () => {
+          customActionPayload = { id: row.id, columnId, value };
+        },
+      },
+    ],
+  });
+
+  // Right-click Department cell of row 0 ("Engineering")
+  const firstRowCells = container.querySelectorAll(".tbx-row")[0].querySelectorAll(".tbx-td");
+  const deptTd = firstRowCells[firstRowCells.length - 1];
+  deptTd.dispatchEvent(new MockMouseEvent("contextmenu", { clientX: 120, clientY: 160 }));
+
+  const menu = document.body.querySelector(".tbx-context-menu");
+  assert.ok(menu, "Context menu mounts on document.body");
+
+  const customBtn = menu.querySelector('[data-ctx-action="inspect"]');
+  assert.ok(customBtn, "Custom context menu item renders");
+  customBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.deepEqual(customActionPayload, { id: "1", columnId: "dept", value: "Engineering" });
+  assert.equal(document.body.querySelector(".tbx-context-menu"), null, "Context menu closes after click");
+
+  // Re-open and click "Filter by "Engineering""
+  const deptTd2 = container.querySelectorAll(".tbx-row")[0].querySelectorAll(".tbx-td").at(-1);
+  deptTd2.dispatchEvent(new MockMouseEvent("contextmenu"));
+  const filterBtn = document.body.querySelector('[data-ctx-action="filter-by-value"]');
+  assert.ok(filterBtn);
+  filterBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(handle.getQuery().filter?.dept, "Engineering");
+  assert.equal(container.querySelectorAll(".tbx-row").length, 1);
+
+  handle.destroy();
+});
+
+test("hierarchical tree data expands/collapses nested children and renders pinnedTopRows & pinnedBottomRows", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const treeRows = [
+    {
+      id: "eng",
+      name: "Engineering",
+      budget: 500,
+      children: [
+        { id: "fe", name: "Frontend", budget: 200 },
+        { id: "be", name: "Backend", budget: 300 },
+      ],
+    },
+    { id: "ops", name: "Operations", budget: 150 },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Org Tree",
+    columns: [
+      { accessorKey: "name", header: "Unit" },
+      { accessorKey: "budget", header: "Budget" },
+    ],
+    data: treeRows,
+    clientSidePagination: true,
+    enableTreeData: true,
+    defaultExpandedDepth: 0,
+    pinnedTopRows: [{ id: "top-pin", name: "Company Target", budget: 1000 }],
+    pinnedBottomRows: [{ id: "bot-pin", name: "Contingency Reserve", budget: 50 }],
+  });
+
+  assert.equal(container.querySelectorAll(".tbx-row--pinned-top").length, 1);
+  assert.equal(container.querySelectorAll(".tbx-row--pinned-bottom").length, 1);
+  // 2 root tree rows + 1 top pinned + 1 bottom pinned = 4 total .tbx-row
+  assert.equal(container.querySelectorAll(".tbx-row").length, 4);
+
+  const treeToggle = container.querySelector(".tbx-tree-toggle");
+  assert.ok(treeToggle, "Root node with children renders expand chevron");
+  treeToggle.dispatchEvent(new MockMouseEvent("click"));
+
+  // Expanding Engineering adds 2 child rows -> 6 total .tbx-row
+  assert.equal(container.querySelectorAll(".tbx-row").length, 6);
+  const labels = container.querySelectorAll(".tbx-tree-label").map((n) => n.textContent);
+  assert.deepEqual(labels, ["Engineering", "Frontend", "Backend", "Operations"]);
+
+  handle.destroy();
+});
+
+test("full-row editMode, date & boolean editors, validateCell error blocking, and dirty cell markers", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  let rowEditEvent = null;
+  const rows = [
+    { id: "1", title: "Task A", score: 80, dueDate: "2026-05-01", done: false },
+  ];
+
+  const handle = createTableX(container, {
+    caption: "Row Edit & Validation",
+    columns: [
+      { accessorKey: "title", header: "Title", meta: { editable: true } },
+      {
+        accessorKey: "score",
+        header: "Score",
+        meta: {
+          editable: true,
+          editType: "number",
+          validateCell: (v) => (Number(v) > 100 ? "Max 100" : null),
+        },
+      },
+      { accessorKey: "dueDate", header: "Due", meta: { editable: true, editType: "date" } },
+      { accessorKey: "done", header: "Done", meta: { editable: true, editType: "boolean" } },
+    ],
+    data: rows,
+    clientSidePagination: true,
+    showSerialNumber: false,
+    editMode: "row",
+    onRowEdit: (ev) => {
+      rowEditEvent = ev;
+    },
+  });
+
+  // Double-click Title cell -> opens editors across ALL 4 editable columns in the row!
+  const firstCell = container.querySelector(".tbx-cell--editable");
+  firstCell.dispatchEvent(new MockMouseEvent("dblclick"));
+  assert.ok(container.querySelector(".tbx-row--editing"), "Row enters editing mode");
+  const inputs = container.querySelectorAll(".tbx-cell-edit-wrap");
+  assert.equal(inputs.length, 4, "All 4 editable columns render editors simultaneously");
+
+  const scoreInput = inputs[1].querySelector("input");
+  const dateInput = inputs[2].querySelector("input");
+  const boolInput = inputs[3].querySelector("input");
+  assert.equal(dateInput.getAttribute("type"), "date");
+  assert.equal(boolInput.getAttribute("type"), "checkbox");
+
+  // Enter invalid score 150 -> Save is blocked and shows .tbx-cell-edit-error
+  scoreInput.value = "150";
+  scoreInput.dispatchEvent(new MockEvent("input"));
+  container.querySelector(".tbx-cell-edit-btn--save").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(rowEditEvent, null, "Invalid row edit is blocked");
+  assert.equal(container.querySelector(".tbx-cell-edit-error")?.textContent, "Max 100");
+
+  // Fix score to 95 and toggle done = true -> Save commits and marks dirty cells!
+  const refreshedWraps = container.querySelectorAll(".tbx-cell-edit-wrap");
+  const fixedScore = refreshedWraps[1].querySelector("input");
+  const fixedBool = refreshedWraps[3].querySelector("input");
+  fixedScore.value = "95";
+  fixedScore.dispatchEvent(new MockEvent("input"));
+  fixedBool.checked = true;
+  fixedBool.dispatchEvent(new MockEvent("change"));
+  container.querySelector(".tbx-cell-edit-btn--save").dispatchEvent(new MockMouseEvent("click"));
+
+  assert.ok(rowEditEvent, "onRowEdit fired once validation passed");
+  assert.equal(rowEditEvent.updatedRow.score, 95);
+  assert.equal(rowEditEvent.updatedRow.done, true);
+  assert.equal(container.querySelectorAll(".tbx-td--dirty").length, 2, "2 modified cells carry .tbx-td--dirty");
+
+  handle.destroy();
+});
+
+test("saved views menu, row drag-reorder, infinite scroll Load More, nested groupBy, and cell range paste/stats", () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  let loadMoreCalls = 0;
+  let reordered = null;
+  let savedViewsSnapshot = [];
+
+  const handle = createTableX(container, {
+    caption: "Power Grid",
+    columns: [
+      { accessorKey: "region", header: "Region" },
+      { accessorKey: "dept", header: "Dept" },
+      { accessorKey: "amount", header: "Amount", meta: { editable: true, editType: "number" } },
+    ],
+    data: [
+      { id: "1", region: "APAC", dept: "Eng", amount: 100 },
+      { id: "2", region: "APAC", dept: "Sales", amount: 200 },
+      { id: "3", region: "EMEA", dept: "Eng", amount: 300 },
+    ],
+    clientSidePagination: true,
+    showSerialNumber: false,
+    enableSavedViews: true,
+    onSavedViewsChange: (views) => {
+      savedViewsSnapshot = views;
+    },
+    enableRowReorder: true,
+    onRowOrderChange: (ev) => {
+      reordered = ev;
+    },
+    enableInfiniteScroll: true,
+    hasMore: true,
+    nextCursor: "cur-2",
+    onLoadMore: (cursor) => {
+      if (cursor === "cur-2") loadMoreCalls++;
+    },
+    enableRangeSelection: true,
+  });
+
+  // 1. Infinite scroll footer button
+  const loadMoreBtn = container.querySelector(".tbx-load-more-btn");
+  assert.ok(loadMoreBtn, "Load more button renders when hasMore=true");
+  loadMoreBtn.dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(loadMoreCalls, 1);
+
+  // 2. Saved views: open menu, save "High Value", verify it appears
+  const viewsBtn = Array.from(container.querySelectorAll(".tbx-btn")).find((b) =>
+    b.textContent.includes("Views"),
+  );
+  assert.ok(viewsBtn, "Views toolbar button renders");
+  viewsBtn.dispatchEvent(new MockMouseEvent("click"));
+  const viewInput = container.querySelector(".tbx-views-input");
+  viewInput.value = "Default APAC";
+  container.querySelector(".tbx-views-save-btn").dispatchEvent(new MockMouseEvent("click"));
+  assert.equal(savedViewsSnapshot.length, 1);
+  assert.equal(savedViewsSnapshot[0].name, "Default APAC");
+  viewsBtn.dispatchEvent(new MockMouseEvent("click")); // close menu
+
+  // 3. Row drag-and-drop reorder: drag row 0 onto row 2
+  const dataRows = container.querySelectorAll(".tbx-row");
+  dataRows[0].dispatchEvent(new MockEvent("dragstart"));
+  dataRows[2].dispatchEvent(new MockEvent("drop"));
+  assert.ok(reordered, "onRowOrderChange emitted");
+  assert.equal(reordered.fromIndex, 0);
+  assert.equal(reordered.toIndex, 2);
+  assert.deepEqual(
+    reordered.rows.map((r) => r.id),
+    ["2", "3", "1"],
+  );
+
+  // 4. Rectangular cell range paste & footer range stats badge
+  // Focus row 0, col 2 (Amount) via pointerdown, then paste 2 vertical numbers "500\n700"
+  const amountTd0 = container.querySelectorAll(".tbx-row")[0].querySelectorAll(".tbx-td").at(-1);
+  amountTd0.dispatchEvent(new MockMouseEvent("pointerdown", { button: 0 }));
+  const root = container.querySelector(".tbx-root");
+  root.dispatchEvent(
+    new MockEvent("paste", {
+      clipboardData: {
+        getData: () => "500\n700",
+      },
+    }),
+  );
+  const statsBadge = container.querySelector(".tbx-range-stats-badge");
+  assert.ok(statsBadge, "Range stats badge appears in footer for multi-cell range");
+  assert.ok(statsBadge.textContent.includes("Sum: 1,200"), `Expected Sum: 1,200 in "${statsBadge.textContent}"`);
+  assert.ok(statsBadge.textContent.includes("Avg: 600"));
+  assert.ok(container.querySelector(".tbx-fill-handle"), "Fill handle renders on bottom-right range cell");
+
+  // 5. Multi-column nested grouping via update({ groupBy: ["region", "dept"] })
+  handle.update({ groupBy: ["region", "dept"] });
+  const nestedGroupRows = container.querySelectorAll(".tbx-group-row");
+  assert.ok(nestedGroupRows.length >= 4, "Renders outer Region and nested Dept group header rows");
+  assert.equal(nestedGroupRows[1].getAttribute("data-group-depth"), "1");
 
   handle.destroy();
 });

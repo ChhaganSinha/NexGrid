@@ -8,10 +8,15 @@
 // row, which is exactly the boilerplate `TableX.AspNetCore` exists to remove.
 
 import type {
+  ContextMenuItem,
   Density,
+  EditMode,
   ExcelBadgeRule,
   ExportFormat,
   PagedResponse,
+  RowEditEvent,
+  RowOrderChangeEvent,
+  SavedGridView,
   TableXColumn,
   TableXLocale,
   QueryState,
@@ -69,8 +74,8 @@ export interface TableXOptions<TData> {
    * total counts, search, and sorting internally. Default is auto (true when no endpoint or onQueryChange).
    */
   clientSidePagination?: boolean;
-  /** Explicit pagination mode: `"server"` (default with endpoint/onQueryChange) or `"client"`. */
-  paginationMode?: "client" | "server";
+  /** Explicit pagination mode: `"server"` (default with endpoint/onQueryChange), `"client"`, or `"infinite"`. */
+  paginationMode?: "client" | "server" | "infinite";
   /** Explicit list of row fields searched by global search in client-side mode. Defaults to visible columns. */
   searchableFields?: (keyof TData & string)[];
   /**
@@ -176,10 +181,54 @@ export interface TableXOptions<TData> {
   virtualHeight?: number;
   /** Extra buffer rows rendered above and below the virtual viewport. Default `6`. */
   virtualOverscan?: number;
-  /** Group displayed rows by a column id or property name, rendering collapsible group header rows. */
-  groupBy?: string;
-  /** Called when the active `groupBy` column changes via the column quick-action menu. */
-  onGroupByChange?: (columnId: string | undefined) => void;
+  /** Group displayed rows by one or more column ids/fields (`"dept"` or `["region", "dept"]`). */
+  groupBy?: string | readonly string[];
+  /** Called when the active `groupBy` column(s) change via the column quick-action menu. */
+  onGroupByChange?: (columnId: string | undefined, allGroupBy: string[]) => void;
+  /** Enable spreadsheet arrow-key cell focus & Enter/F2/Space shortcuts. Default `true`. */
+  enableKeyboardNavigation?: boolean;
+  /** Enable right-click cell/row context menu. Default `true`. */
+  enableContextMenu?: boolean;
+  /** Custom context menu items appended when right-clicking a cell. */
+  contextMenuItems?: (ctx: { row: TData; columnId: string; value: unknown }) => readonly ContextMenuItem[];
+  /** Enable hierarchical tree data (`children` or `getSubRows`). Default `false`. */
+  enableTreeData?: boolean;
+  /** Property name holding child rows when `enableTreeData` is `true`. Default `"children"`. */
+  childrenKey?: string;
+  /** Custom child-row extractor enabling hierarchical tree rows. */
+  getSubRows?: (row: TData) => readonly TData[] | undefined;
+  /** Initial expanded tree depth (`0` = collapsed, `1` = root expanded, `-1` = expand all). Default `0`. */
+  defaultExpandedDepth?: number;
+  /** Rows frozen at the top of `<tbody>`. */
+  pinnedTopRows?: readonly TData[];
+  /** Rows frozen at the bottom of `<tbody>`. */
+  pinnedBottomRows?: readonly TData[];
+  /** Editing mode: `"cell"` (default) or `"row"` (full-row editing). */
+  editMode?: EditMode;
+  /** Called when a full-row edit (`editMode: "row"`) is saved. */
+  onRowEdit?: (event: RowEditEvent<TData>) => void;
+  /** Show the Saved Views / Filter Presets menu in the toolbar. Default `false`. */
+  enableSavedViews?: boolean;
+  /** Initial or controlled saved view presets. */
+  savedViews?: readonly SavedGridView[];
+  /** Called whenever saved views are added or deleted. */
+  onSavedViewsChange?: (views: SavedGridView[]) => void;
+  /** Enable drag-and-drop row reordering handle column. Default `false`. */
+  enableRowReorder?: boolean;
+  /** Called when rows are reordered via drag-and-drop. */
+  onRowOrderChange?: (event: RowOrderChangeEvent<TData>) => void;
+  /** Enable infinite-scroll / Load More pagination mode. Default `false`. */
+  enableInfiniteScroll?: boolean;
+  /** Whether additional server records exist in infinite-scroll mode. */
+  hasMore?: boolean;
+  /** Whether a next-page / cursor request is currently in flight. */
+  isLoadingMore?: boolean;
+  /** Optional opaque cursor passed back to `onLoadMore(nextCursor)`. */
+  nextCursor?: string | null;
+  /** Called when scrolling near the bottom (or clicking Load More) in infinite mode. */
+  onLoadMore?: (cursor: string | null) => void;
+  /** Enable Excel-style rectangular cell range selection, status-bar stats, fill handle, and TSV copy/paste. Default `false`. */
+  enableRangeSelection?: boolean;
   /** Called when column order changes via drag-and-drop reordering. */
   onColumnOrderChange?: (newOrder: string[]) => void;
   /** Called when a cell's value is committed via inline cell editing. */
@@ -213,8 +262,8 @@ export interface TableXOptions<TData> {
   fetchPage?: (page: number, pageSize: number, query: QueryState) => Promise<PagedResponse<TData>>;
   /** Maximum rows collected during a full dataset export walk. Defaults to DEFAULT_ROW_CAP (2000). Pass 0 for uncapped. */
   maxExportRows?: number;
-  /** Export button presentation: "menu" (default), "excel" (1-click direct), "csv" (1-click direct), or "split". */
-  exportMode?: "menu" | "split" | "excel" | "csv";
+  /** Export button presentation: "menu" (default), "excel", "csv", "pdf", or "split". */
+  exportMode?: "menu" | "split" | "excel" | "csv" | "pdf";
   /** Shortcut for direct 1-click export (defaults to "excel" when true). */
   quickExport?: boolean | ExportFormat;
   /**
@@ -252,8 +301,14 @@ export interface TableXUpdate<TData> {
   isLoading: boolean;
   /** Error flag; replaces the grid with the error card. */
   error: boolean;
-  /** Active row-grouping column id (`null` or `""` to ungroup). */
-  groupBy: string | null;
+  /** Active row-grouping column(s) (`null` or `""` to ungroup). */
+  groupBy: string | readonly string[] | null;
+  /** Infinite scroll: whether more rows are available. */
+  hasMore: boolean;
+  /** Infinite scroll: whether more rows are currently loading. */
+  isLoadingMore: boolean;
+  /** Infinite scroll: updated cursor token. */
+  nextCursor: string | null;
 }
 export type NexGridUpdate<TData> = TableXUpdate<TData>;
 

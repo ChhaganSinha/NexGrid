@@ -94,6 +94,9 @@ public enum TableXExportMode
 
     /// <summary>Direct 1-click CSV export button.</summary>
     Csv = 3,
+
+    /// <summary>Direct 1-click PDF report export button.</summary>
+    Pdf = 4,
 }
 
 /// <summary>Sticky horizontal pin side for a column.</summary>
@@ -136,4 +139,20 @@ public enum TableXEditType
 
     /// <summary>Dropdown select populated from <c>edit-options</c>.</summary>
     Select = 2,
+
+    /// <summary>Native HTML date input (<c>YYYY-MM-DD</c>).</summary>
+    Date = 3,
+
+    /// <summary>Checkbox toggle for boolean columns.</summary>
+    Boolean = 4,
+}
+
+/// <summary>Editing granularity when editable columns are triggered.</summary>
+public enum TableXEditMode
+{
+    /// <summary>Single-cell inline editor (the default).</summary>
+    Cell = 0,
+
+    /// <summary>Full-row editor opening inputs across all editable columns in the row.</summary>
+    Row = 1,
 }

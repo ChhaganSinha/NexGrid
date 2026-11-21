@@ -235,6 +235,46 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("show-serial-number")]
     public bool? ShowSerialNumber { get; set; }
 
+    /// <summary>Enable spreadsheet arrow-key cell navigation and Enter/F2 editing. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-keyboard-navigation")]
+    public bool? EnableKeyboardNavigation { get; set; }
+
+    /// <summary>Enable right-click cell/row context menu. Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-context-menu")]
+    public bool? EnableContextMenu { get; set; }
+
+    /// <summary>Enable hierarchical tree rows expanded via nested child arrays.</summary>
+    [HtmlAttributeName("enable-tree-data")]
+    public bool? EnableTreeData { get; set; }
+
+    /// <summary>Property name holding child rows when <see cref="EnableTreeData"/> is active (defaults to <c>children</c>).</summary>
+    [HtmlAttributeName("children-key")]
+    public string? ChildrenKey { get; set; }
+
+    /// <summary>Initial tree expansion depth (<c>0</c> = collapsed, <c>-1</c> = expand all).</summary>
+    [HtmlAttributeName("default-expanded-depth")]
+    public int? DefaultExpandedDepth { get; set; }
+
+    /// <summary>Editing granularity: <c>Cell</c> (default) or <c>Row</c>.</summary>
+    [HtmlAttributeName("edit-mode")]
+    public string? EditMode { get; set; }
+
+    /// <summary>Show the toolbar Saved Views preset dropdown.</summary>
+    [HtmlAttributeName("enable-saved-views")]
+    public bool? EnableSavedViews { get; set; }
+
+    /// <summary>Enable drag-and-drop row reordering handle column.</summary>
+    [HtmlAttributeName("enable-row-reorder")]
+    public bool? EnableRowReorder { get; set; }
+
+    /// <summary>Enable infinite scroll / Load More footer mode.</summary>
+    [HtmlAttributeName("enable-infinite-scroll")]
+    public bool? EnableInfiniteScroll { get; set; }
+
+    /// <summary>Enable rectangular cell range selection, status-bar stats, and TSV clipboard copy/paste.</summary>
+    [HtmlAttributeName("enable-range-selection")]
+    public bool? EnableRangeSelection { get; set; }
+
     /// <summary>Optional in-memory dataset serialized into JSON for client-side mode.</summary>
     [HtmlAttributeName("data")]
     public object? Data { get; set; }
@@ -393,6 +433,17 @@ public class TableXTagHelper : TagHelper
         EnableRowsPerPage = EnableRowsPerPage,
         EnableJumpToPage = EnableJumpToPage,
         ShowSerialNumber = ShowSerialNumber,
+        EnableKeyboardNavigation = EnableKeyboardNavigation,
+        EnableContextMenu = EnableContextMenu,
+        EnableTreeData = EnableTreeData,
+        ChildrenKey = NullIfBlank(ChildrenKey),
+        DefaultExpandedDepth = DefaultExpandedDepth,
+        EditMode = TableXConfigSerializer.ToToken(
+            TableXAttribute.ParseEnum<TableXEditMode>(EditMode, TagName, "edit-mode")),
+        EnableSavedViews = EnableSavedViews,
+        EnableRowReorder = EnableRowReorder,
+        EnableInfiniteScroll = EnableInfiniteScroll,
+        EnableRangeSelection = EnableRangeSelection,
         Query = BuildQueryConfig(),
     };
 

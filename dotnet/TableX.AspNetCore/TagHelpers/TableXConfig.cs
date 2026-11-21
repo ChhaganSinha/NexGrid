@@ -72,6 +72,7 @@ internal static class TableXConfigSerializer
         TableXExportMode.Split => "split",
         TableXExportMode.Excel => "excel",
         TableXExportMode.Csv => "csv",
+        TableXExportMode.Pdf => "pdf",
         _ => null,
     };
 
@@ -97,6 +98,15 @@ internal static class TableXConfigSerializer
         TableXEditType.Text => "text",
         TableXEditType.Number => "number",
         TableXEditType.Select => "select",
+        TableXEditType.Date => "date",
+        TableXEditType.Boolean => "boolean",
+        _ => null,
+    };
+
+    internal static string? ToToken(TableXEditMode? editMode) => editMode switch
+    {
+        TableXEditMode.Cell => "cell",
+        TableXEditMode.Row => "row",
         _ => null,
     };
 
@@ -197,6 +207,26 @@ internal sealed class TableXConfig
     public bool? EnableJumpToPage { get; set; }
 
     public bool? ShowSerialNumber { get; set; }
+
+    public bool? EnableKeyboardNavigation { get; set; }
+
+    public bool? EnableContextMenu { get; set; }
+
+    public bool? EnableTreeData { get; set; }
+
+    public string? ChildrenKey { get; set; }
+
+    public int? DefaultExpandedDepth { get; set; }
+
+    public string? EditMode { get; set; }
+
+    public bool? EnableSavedViews { get; set; }
+
+    public bool? EnableRowReorder { get; set; }
+
+    public bool? EnableInfiniteScroll { get; set; }
+
+    public bool? EnableRangeSelection { get; set; }
 
     public TableXQueryConfig? Query { get; set; }
 }

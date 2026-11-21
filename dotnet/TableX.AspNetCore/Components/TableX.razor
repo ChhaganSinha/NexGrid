@@ -308,6 +308,46 @@
     [Parameter]
     public bool ShowSerialNumber { get; set; } = true;
 
+    /// <summary>Enable spreadsheet arrow-key cell navigation.</summary>
+    [Parameter]
+    public bool? EnableKeyboardNavigation { get; set; }
+
+    /// <summary>Enable right-click cell/row context menu.</summary>
+    [Parameter]
+    public bool? EnableContextMenu { get; set; }
+
+    /// <summary>Enable hierarchical tree rows.</summary>
+    [Parameter]
+    public bool? EnableTreeData { get; set; }
+
+    /// <summary>Property name holding child rows when <see cref="EnableTreeData"/> is active.</summary>
+    [Parameter]
+    public string? ChildrenKey { get; set; }
+
+    /// <summary>Initial tree expansion depth.</summary>
+    [Parameter]
+    public int? DefaultExpandedDepth { get; set; }
+
+    /// <summary>Editing granularity (<see cref="TableXEditMode.Cell"/> or <see cref="TableXEditMode.Row"/>).</summary>
+    [Parameter]
+    public TableXEditMode? EditMode { get; set; }
+
+    /// <summary>Show the toolbar Saved Views preset dropdown.</summary>
+    [Parameter]
+    public bool? EnableSavedViews { get; set; }
+
+    /// <summary>Enable drag-and-drop row reordering handle column.</summary>
+    [Parameter]
+    public bool? EnableRowReorder { get; set; }
+
+    /// <summary>Enable infinite scroll / Load More mode.</summary>
+    [Parameter]
+    public bool? EnableInfiniteScroll { get; set; }
+
+    /// <summary>Enable rectangular cell range selection, status-bar stats, and TSV clipboard copy/paste.</summary>
+    [Parameter]
+    public bool? EnableRangeSelection { get; set; }
+
     /// <summary>
     /// Optional in-memory dataset for client-side mode.
     /// </summary>
@@ -407,6 +447,16 @@
         EnableRowsPerPage = EnableRowsPerPage,
         EnableJumpToPage = EnableJumpToPage,
         ShowSerialNumber = ShowSerialNumber,
+        EnableKeyboardNavigation = EnableKeyboardNavigation,
+        EnableContextMenu = EnableContextMenu,
+        EnableTreeData = EnableTreeData,
+        ChildrenKey = string.IsNullOrWhiteSpace(ChildrenKey) ? null : ChildrenKey,
+        DefaultExpandedDepth = DefaultExpandedDepth,
+        EditMode = TableXConfigSerializer.ToToken(EditMode),
+        EnableSavedViews = EnableSavedViews,
+        EnableRowReorder = EnableRowReorder,
+        EnableInfiniteScroll = EnableInfiniteScroll,
+        EnableRangeSelection = EnableRangeSelection,
         Query = BuildQueryConfig(),
     });
 

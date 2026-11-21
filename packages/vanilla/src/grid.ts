@@ -22,17 +22,24 @@ import {
   DEFAULT_ROW_CAP,
   DEFAULT_VIRTUAL_HEIGHT,
   PAGE_SIZES,
+  buildNestedGroupItems,
   buildQueryUrl,
+  coerceEditedValue,
+  collectInitialExpandedTreeIds,
   computeAggregation,
+  computeRangeStats,
   computeVirtualWindow,
   copyToClipboard,
   defaultQuery,
   downloadCsv,
   downloadExcel,
+  downloadPdf,
   fetchAllPages,
   filePrefixFromCaption,
+  flattenTreeRows,
   formatFilterPillValue,
   formatMessage,
+  formatRangeTsv,
   getCellText,
   getCellValue,
   getColumnId,
@@ -43,6 +50,7 @@ import {
   getRecordRange,
   groupRows,
   initialHiddenColumns,
+  isCellInRange,
   isEditable,
   isExportable,
   isFilterable,
@@ -52,15 +60,25 @@ import {
   isPinned,
   isSortable,
   isStructuralColumn,
+  loadSavedViews,
+  moveFocusCoord,
+  normalizeCellRange,
+  normalizeGroupBy,
+  parseClipboardTsv,
   parseMultiFilterValues,
   primarySort,
+  removeSavedView,
+  reorderArrayItem,
   resolveLocale,
   searchableColumnIds,
+  selectContiguousRowIds,
   serialNumber,
   serializeMultiFilterValues,
   timestampedFilename,
   toExportColumns,
   totalPagesFor,
+  upsertSavedView,
+  validateEditedCell,
   visibleColumns,
   withFilter,
   withPage,
@@ -76,11 +94,16 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  type CellCoord,
   type ClientQueryOptions,
+  type ContextMenuItem,
   type Density,
+  type NormalizedCellRange,
   type PagedResponse,
   type QueryState,
+  type SavedGridView,
   type TableXLocale,
+  type TreeRowNode,
 } from "@nexgrid/core";
 
 import { append, el, replaceChildren, type ElementChild } from "./dom.js";
@@ -122,8 +145,8 @@ import type {
 /** Debounce applied to the search field before a query is emitted. */
 const SEARCH_DEBOUNCE_MS = 350;
 
-/** The three dropdowns, keyed so only one can be open at a time. */
-type MenuName = "columns" | "density" | "export";
+/** Toolbar dropdowns, keyed so only one can be open at a time. */
+type MenuName = "columns" | "density" | "export" | "views";
 
 /** A listener registered outside the grid's own subtree, tracked for teardown. */
 interface GlobalListener {
@@ -196,8 +219,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
   } | null = null;
   private readonly columnWidths: Record<string, number> = {};
   private pinnedColumns: Record<string, "left" | "right" | "none"> = {};
-  private activeGroupBy: string | undefined;
+  private activeGroupBy: string[] = [];
   private collapsedGroups = new Set<string>();
+  private treeExpandedIds = new Set<string>();
+  private savedViewsList: SavedGridView[] = [];
+  private focusedCell: CellCoord | null = null;
+  private rangeAnchor: CellCoord | null = null;
+  private cellRange: NormalizedCellRange | null = null;
+  private isDraggingRange = false;
+  private isFillingRange = false;
+  private lastSelectedRowIndex: number | null = null;
+  private activeContextMenuEl: HTMLElement | null = null;
+  private editingRowId: string | null = null;
+  private rowEditDraft: Record<string, unknown> = {};
+  private cellValidationError: string | null = null;
+  private dirtyCells = new Set<string>();
+  private draggedRowIndex: number | null = null;
+  private hasMore = false;
+  private isLoadingMore = false;
+  private nextCursor: string | null = null;
   private focusMenuOnRender = false;
   private mounted: "grid" | "error" | null = null;
   private destroyed = false;
@@ -231,6 +271,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private readonly jumpInput: HTMLInputElement | null = null;
   private readonly filterPillsBar: HTMLDivElement;
   private readonly selectAllBanner: HTMLDivElement;
+  private readonly infiniteFooter: HTMLDivElement;
   private expandedRows = new Set<string>();
   private editingCell: { rowId: string; columnId: string } | null = null;
   private draggedColumnId: string | null = null;
@@ -246,7 +287,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.columns = options.columns;
     this.query = options.query ?? defaultQuery();
     this.density = options.density ?? "default";
-    this.activeGroupBy = options.groupBy?.trim() || undefined;
+    this.activeGroupBy = normalizeGroupBy(options.groupBy);
+    this.hasMore = options.hasMore ?? false;
+    this.isLoadingMore = options.isLoadingMore ?? false;
+    this.nextCursor = options.nextCursor ?? null;
+    this.savedViewsList = options.savedViews
+      ? [...options.savedViews]
+      : loadSavedViews(options.storageKey);
     this.hidden = initialHiddenColumns(flattenColumns(this.columns));
     this.isLoading = options.isLoading ?? false;
     this.isError = options.error ?? false;
@@ -266,7 +313,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.pinnedColumns = { ...persisted.pinnedColumns };
         }
         if (persisted.groupBy !== undefined) {
-          this.activeGroupBy = persisted.groupBy || undefined;
+          this.activeGroupBy = normalizeGroupBy(persisted.groupBy);
         }
         if (persisted.hiddenColumns && Array.isArray(persisted.hiddenColumns)) {
           const hiddenMap: Record<string, boolean> = {};
@@ -305,12 +352,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
       this.total = options.total ?? 0;
     }
 
+    if (this.isTreeEnabled() && (options.defaultExpandedDepth ?? 0) !== 0) {
+      this.treeExpandedIds = collectInitialExpandedTreeIds(
+        this.data,
+        options.defaultExpandedDepth ?? 0,
+        {
+          childrenKey: options.childrenKey,
+          getSubRows: options.getSubRows,
+          getRowId: this.rowId,
+        },
+      );
+    }
+
     this.filterPillsBar = el("div", { class: "tbx-filter-pills-bar", style: { display: "none" } });
     this.selectAllBanner = el("div", {
       class: "tbx-select-all-banner",
       attrs: { role: "status", "aria-live": "polite" },
       style: { display: "none" },
     });
+    this.infiniteFooter = el("div", { class: "tbx-infinite-footer", style: { display: "none" } });
 
     // ---- Root -------------------------------------------------------------
     const rootClasses = ["tbx-root"];
@@ -352,6 +412,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
       startGroup.appendChild(this.searchWrap);
     }
 
+    if (options.enableSavedViews) {
+      const viewsBtn = this.createMenuButton(
+        "views",
+        slidersIcon(),
+        this.locale.viewsButton ?? "Views",
+        chevronDownIcon("tbx-icon tbx-chevron"),
+      );
+      endGroup.appendChild(this.wrapMenu("views", viewsBtn));
+    }
+
     const showColumns = options.enableColumns !== false && options.showColumnsButton !== false;
     if (showColumns) {
       const columnsButton = this.createMenuButton("columns", columnsIcon(), this.locale.columnsButton);
@@ -371,8 +441,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
         ? (typeof options.quickExport === "string" ? options.quickExport : "excel")
         : (options.exportMode ?? "menu");
 
-      if (mode === "excel" || mode === "csv") {
-        const btnLabel = mode === "excel" ? (this.locale.exportExcelButton ?? "Export Excel") : (this.locale.exportCsvButton ?? "Export CSV");
+      if (mode === "excel" || mode === "csv" || mode === "pdf") {
+        const btnLabel =
+          mode === "excel"
+            ? (this.locale.exportExcelButton ?? "Export Excel")
+            : mode === "pdf"
+              ? (this.locale.exportPdfButton ?? "Export PDF")
+              : (this.locale.exportCsvButton ?? "Export CSV");
         this.exportLabel = el("span", { text: btnLabel });
         const exportButton = el(
           "button",
@@ -537,13 +612,35 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     // ---- Global listeners --------------------------------------------------
     this.addGlobalListener(document, "pointerdown", this.handleDocumentPointerDown);
+    this.addGlobalListener(document, "pointerup", () => {
+      this.isDraggingRange = false;
+      this.isFillingRange = false;
+    });
     this.addGlobalListener(document, "keydown", this.handleDocumentKeyDown);
+    this.root.addEventListener("keydown", (e) => this.handleGridKeyDown(e));
+    this.root.addEventListener("paste", (e) => this.handleGridPaste(e));
     this.tableWrap.addEventListener("scroll", () => {
+      this.closeContextMenu();
       if (this.options.enableVirtualization) {
         const nextTop = this.tableWrap.scrollTop ?? 0;
         if (Math.abs(nextTop - this.virtualScrollTop) >= 1) {
           this.virtualScrollTop = nextTop;
           this.renderBody();
+        }
+      }
+      if (
+        this.isInfiniteMode() &&
+        this.hasMore &&
+        !this.isLoading &&
+        !this.isLoadingMore &&
+        typeof this.tableWrap.scrollHeight === "number"
+      ) {
+        const remaining =
+          this.tableWrap.scrollHeight -
+          (this.tableWrap.scrollTop ?? 0) -
+          (this.tableWrap.clientHeight ?? 0);
+        if (remaining <= 120) {
+          this.options.onLoadMore?.(this.nextCursor);
         }
       }
       if (this.openFilterColumn !== null) {
@@ -618,8 +715,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     if (patch.isLoading !== undefined) this.isLoading = patch.isLoading;
     if (patch.error !== undefined) this.isError = patch.error;
+    if (patch.hasMore !== undefined) this.hasMore = patch.hasMore;
+    if (patch.isLoadingMore !== undefined) this.isLoadingMore = patch.isLoadingMore;
+    if (patch.nextCursor !== undefined) this.nextCursor = patch.nextCursor;
     if (patch.groupBy !== undefined) {
-      this.activeGroupBy = patch.groupBy?.trim() || undefined;
+      this.activeGroupBy = normalizeGroupBy(patch.groupBy);
       this.collapsedGroups.clear();
     }
 
@@ -686,6 +786,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.globalListeners.length = 0;
 
     this.root.remove();
+    this.closeContextMenu();
     this.mounted = null;
   }
 
@@ -768,6 +869,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private readonly handleDocumentPointerDown = (event: Event): void => {
     const target = event.target;
+    if (this.activeContextMenuEl) {
+      if (!(target instanceof Node && this.activeContextMenuEl.contains(target))) {
+        this.closeContextMenu();
+      }
+    }
     if (this.openMenu !== null) {
       const wrap = this.menuWraps.get(this.openMenu);
       if (!(wrap && target instanceof Node && wrap.contains(target))) {
@@ -788,6 +894,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private readonly handleDocumentKeyDown = (event: Event): void => {
     if (!(event instanceof KeyboardEvent) || event.key !== "Escape") return;
+    if (this.activeContextMenuEl) {
+      this.closeContextMenu();
+      return;
+    }
+    if (this.editingRowId !== null) {
+      this.editingRowId = null;
+      this.rowEditDraft = {};
+      this.cellValidationError = null;
+      this.render();
+      return;
+    }
     if (this.openFilterColumn !== null) {
       this.openFilterColumn = null;
       this.render();
@@ -1002,7 +1119,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
   }
 
-  private async runExport(format: "excel" | "csv" | "clipboard"): Promise<void> {
+  private async runExport(format: "excel" | "csv" | "pdf" | "clipboard"): Promise<void> {
     if (this.isExporting) return;
     this.setOpenMenu(null, { returnFocusTo: "export" });
 
@@ -1032,7 +1149,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     await this.exportRowsWithFormat(format, rows);
   }
 
-  private async runBulkExport(format: "excel" | "csv"): Promise<void> {
+  private async runBulkExport(format: "excel" | "csv" | "pdf"): Promise<void> {
     if (this.isExporting) return;
     if (this.allAcrossSelected) {
       await this.runExport(format);
@@ -1048,7 +1165,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   }
 
   private async exportRowsWithFormat(
-    format: "excel" | "csv" | "clipboard",
+    format: "excel" | "csv" | "pdf" | "clipboard",
     rows: readonly TData[],
   ): Promise<void> {
     if (rows.length === 0) {
@@ -1072,6 +1189,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
       } else {
         this.notify("error", "Failed to copy to clipboard");
       }
+      return;
+    }
+
+    if (format === "pdf") {
+      const count = downloadPdf({
+        filename: timestampedFilename(prefix),
+        caption: this.caption,
+        rows,
+        columns,
+        badgeRules: this.options.badgeRules,
+        serialHeader: this.locale.serialHeader,
+      });
+      this.notify(
+        "success",
+        formatMessage(
+          this.locale.exportPdfSuccess ?? "Exported {count} records to PDF (.pdf)",
+          { count: count.toLocaleString() },
+        ),
+      );
       return;
     }
 
@@ -1125,8 +1261,28 @@ class NexGridController<TData> implements TableXHandle<TData> {
     return this.options.enableSelection === true;
   }
 
+  private isTreeEnabled(): boolean {
+    return this.options.enableTreeData === true || typeof this.options.getSubRows === "function";
+  }
+
+  private isInfiniteMode(): boolean {
+    return this.options.enableInfiniteScroll === true || this.options.paginationMode === "infinite";
+  }
+
+  private displayedDataList(): TData[] {
+    if (this.isTreeEnabled()) {
+      return flattenTreeRows(this.data, {
+        childrenKey: this.options.childrenKey,
+        getSubRows: this.options.getSubRows,
+        getRowId: this.rowId,
+        expandedIds: this.treeExpandedIds,
+      }).map((n) => n.row);
+    }
+    return this.data;
+  }
+
   private pageRowIds(): string[] {
-    return this.data.map((row) => this.rowId(row));
+    return this.displayedDataList().map((row) => this.rowId(row));
   }
 
   private isSingleSelection(): boolean {
@@ -1251,6 +1407,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.renderFilterPopover();
     this.renderBody();
     this.renderSummary();
+    this.renderInfiniteFooter();
     this.renderCards();
     this.renderFooter();
     this.renderBulkBar();
@@ -1300,7 +1457,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const children: HTMLElement[] = [];
       if (this.options.showToolbar !== false) children.push(this.toolbar);
       if (this.options.showFilterPills !== false) children.push(this.filterPillsBar);
-      children.push(this.selectAllBanner, this.tableWrap, this.cards);
+      children.push(this.selectAllBanner, this.tableWrap, this.infiniteFooter, this.cards);
       if (this.options.showFooter !== false) children.push(this.footer);
       replaceChildren(this.root, children);
     }
@@ -1318,7 +1475,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       columnOrder: this.columns.map(getColumnId).filter(Boolean) as string[],
       hiddenColumns: hiddenList,
       pinnedColumns: { ...this.pinnedColumns },
-      groupBy: this.activeGroupBy ?? "",
+      groupBy: [...this.activeGroupBy],
     });
   }
 
@@ -1331,7 +1488,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       delete this.columnWidths[key];
     }
     this.pinnedColumns = {};
-    this.activeGroupBy = this.options.groupBy?.trim() || undefined;
+    this.activeGroupBy = normalizeGroupBy(this.options.groupBy);
     this.collapsedGroups.clear();
     this.columns = [...this.options.columns];
     this.hidden = initialHiddenColumns(this.leafCols());
@@ -1529,6 +1686,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
         defaultLabel = this.locale.exportExcelButton ?? "Export Excel";
       } else if (mode === "csv") {
         defaultLabel = this.locale.exportCsvButton ?? "Export CSV";
+      } else if (mode === "pdf") {
+        defaultLabel = this.locale.exportPdfButton ?? "Export PDF";
       }
 
       this.exportLabel.textContent = this.isExporting
@@ -1539,6 +1698,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const exportButton = this.menuButtons.get("export");
     if (exportButton) exportButton.disabled = this.isExporting;
 
+    this.syncMenu("views", () => this.buildViewsMenu());
     this.syncMenu("columns", () => this.buildColumnsMenu());
     this.syncMenu("density", () => this.buildDensityMenu());
     this.syncMenu("export", () => this.buildExportMenu());
@@ -1726,9 +1886,112 @@ class NexGridController<TData> implements TableXHandle<TData> {
     return this.buildMenu("density", "", items);
   }
 
+  private buildViewsMenu(): HTMLElement {
+    const input = el("input", {
+      class: "tbx-views-input",
+      attrs: {
+        type: "text",
+        placeholder: this.locale.viewNamePlaceholder ?? "View name…",
+        "aria-label": this.locale.viewNamePlaceholder ?? "View name…",
+      },
+    }) as HTMLInputElement;
+
+    const commitSave = () => {
+      const name = input.value.trim();
+      if (!name) return;
+      this.savedViewsList = upsertSavedView(
+        this.savedViewsList,
+        {
+          name,
+          query: this.query,
+          hiddenColumns: { ...this.hidden },
+          pinnedColumns: { ...this.pinnedColumns },
+          columnOrder: this.columns.map(getColumnId).filter(Boolean) as string[],
+          groupBy: [...this.activeGroupBy],
+          density: this.density,
+        },
+        this.options.storageKey,
+      );
+      this.options.onSavedViewsChange?.([...this.savedViewsList]);
+      input.value = "";
+      this.renderToolbar();
+    };
+
+    input.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitSave();
+      }
+    });
+
+    const saveBtn = el("button", {
+      class: "tbx-views-save-btn",
+      attrs: { type: "button" },
+      text: this.locale.saveCurrentView ?? "Save view",
+    });
+    saveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      commitSave();
+    });
+
+    const items: ElementChild[] = [
+      el("div", { class: "tbx-views-save-row" }, [input, saveBtn]),
+      el("div", { class: "tbx-menu-separator" }),
+    ];
+
+    if (this.savedViewsList.length === 0) {
+      items.push(
+        el("div", {
+          class: "tbx-views-empty",
+          text: this.locale.noSavedViews ?? "No saved views yet",
+        }),
+      );
+    } else {
+      for (const view of this.savedViewsList) {
+        const selectBtn = this.menuItem(
+          "menuitem",
+          `menu:views:${view.id}`,
+          [el("span", { text: view.name })],
+          () => {
+            if (view.density) this.density = view.density;
+            if (view.hiddenColumns) this.hidden = { ...view.hiddenColumns };
+            if (view.pinnedColumns) this.pinnedColumns = { ...view.pinnedColumns };
+            if (view.groupBy) this.activeGroupBy = [...view.groupBy];
+            this.collapsedGroups.clear();
+            this.setOpenMenu(null, { returnFocusTo: "views" });
+            this.applyQuery(view.query);
+          },
+        );
+
+        const delBtn = el(
+          "button",
+          {
+            class: "tbx-views-delete-btn",
+            attrs: { type: "button", "aria-label": `Delete view ${view.name}` },
+          },
+          [xIcon("tbx-icon")],
+        );
+        delBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.savedViewsList = removeSavedView(
+            this.savedViewsList,
+            view.id,
+            this.options.storageKey,
+          );
+          this.options.onSavedViewsChange?.([...this.savedViewsList]);
+          this.renderToolbar();
+        });
+
+        items.push(el("div", { class: "tbx-views-item-row" }, [selectBtn, delBtn]));
+      }
+    }
+
+    return this.buildMenu("views", "tbx-views-menu", items);
+  }
+
   private buildExportMenu(): HTMLElement {
     const option = (
-      key: "excel" | "csv" | "clipboard",
+      key: "excel" | "csv" | "pdf" | "clipboard",
       glyph: SVGSVGElement,
       title: string,
       subtitle: string,
@@ -1755,6 +2018,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
       ),
       option("csv", fileTextIcon(), this.locale.exportCsvTitle, this.locale.exportCsvSubtitle),
       option(
+        "pdf",
+        fileTextIcon("tbx-icon--pdf"),
+        this.locale.exportPdfTitle ?? "PDF Report (.pdf)",
+        this.locale.exportPdfSubtitle ?? "Printable multi-page landscape table",
+      ),
+      option(
         "clipboard",
         fileTextIcon(),
         this.locale.exportClipboardTitle,
@@ -1778,6 +2047,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const hasLeftPinned = visibleCols.some((c) => isPinned(c, this.pinnedColumns) === "left");
 
     if (hasLeftPinned) {
+      if (this.options.enableRowReorder) {
+        leftOffsets.set("__row_drag", currentLeft);
+        currentLeft += 36;
+        lastLeftPinnedId = "__row_drag";
+      }
+
       if (this.options.renderExpandedRow) {
         leftOffsets.set("__expand", currentLeft);
         currentLeft += 40;
@@ -1836,6 +2111,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const rowSpan = headerRows.hasGroups ? 2 : 1;
 
     const row1Cells: ElementChild[] = [];
+
+    if (this.options.enableRowReorder) {
+      const th = el("th", {
+        class: "tbx-th tbx-th--row-drag",
+        style: { width: "36px" },
+        attrs: rowSpan > 1 ? { rowspan: rowSpan } : {},
+      });
+      if (leftOffsets.has("__row_drag")) {
+        th.classList.add("tbx-th--pinned-left");
+        th.style.left = `${leftOffsets.get("__row_drag")}px`;
+        if (lastLeftPinnedId === "__row_drag") th.classList.add("tbx-pinned-border-left");
+      }
+      row1Cells.push(th);
+    }
 
     if (this.options.renderExpandedRow) {
       const th = el("th", {
@@ -2262,6 +2551,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const cols = this.visibleCols();
     const colSpan =
       cols.length +
+      (this.options.enableRowReorder ? 1 : 0) +
       (this.options.renderExpandedRow ? 1 : 0) +
       (this.showSerial() ? 1 : 0) +
       (this.selectionEnabled() ? 1 : 0);
@@ -2284,7 +2574,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return;
     }
 
-    if (this.data.length === 0) {
+    const pinnedTop = this.options.pinnedTopRows ?? [];
+    const pinnedBottom = this.options.pinnedBottomRows ?? [];
+
+    if (this.data.length === 0 && pinnedTop.length === 0 && pinnedBottom.length === 0) {
       replaceChildren(this.tbody, [
         el("tr", {}, [
           el("td", {
@@ -2298,13 +2591,46 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const rows: HTMLElement[] = [];
-    if (this.activeGroupBy) {
-      const groups = groupRows(this.data, this.activeGroupBy, this.columns, {
-        yes: this.locale.booleanYes,
-        no: this.locale.booleanNo,
+    const pushBuilt = (built: HTMLTableRowElement | HTMLTableRowElement[]) => {
+      if (Array.isArray(built)) rows.push(...built);
+      else rows.push(built);
+    };
+
+    for (let i = 0; i < pinnedTop.length; i++) {
+      const topRow = pinnedTop[i];
+      if (topRow !== undefined) {
+        pushBuilt(this.buildRow(topRow, i, cols, colSpan, { pinnedVariant: "top" }));
+      }
+    }
+
+    if (this.isTreeEnabled()) {
+      const treeNodes = flattenTreeRows(this.data, {
+        childrenKey: this.options.childrenKey,
+        getSubRows: this.options.getSubRows,
+        getRowId: this.rowId,
+        expandedIds: this.treeExpandedIds,
       });
-      for (const grp of groups) {
-        const isCollapsed = this.collapsedGroups.has(grp.key);
+      for (let idx = 0; idx < treeNodes.length; idx++) {
+        const node = treeNodes[idx]!;
+        pushBuilt(this.buildRow(node.row, idx, cols, colSpan, { treeNode: node }));
+      }
+    } else if (this.activeGroupBy.length > 0) {
+      const nestedItems = buildNestedGroupItems(
+        this.data,
+        this.activeGroupBy,
+        this.columns,
+        this.collapsedGroups,
+        {
+          yes: this.locale.booleanYes,
+          no: this.locale.booleanNo,
+        },
+      );
+      for (const item of nestedItems) {
+        if (item.kind === "row") {
+          pushBuilt(this.buildRow(item.row, item.originalIndex, cols, colSpan));
+          continue;
+        }
+        const isCollapsed = item.collapsed;
         const toggleBtn = el(
           "button",
           {
@@ -2312,7 +2638,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
             attrs: {
               type: "button",
               "aria-expanded": String(!isCollapsed),
-              "aria-label": `${isCollapsed ? "Expand" : "Collapse"} ${grp.displayValue}`,
+              "aria-label": `${isCollapsed ? "Expand" : "Collapse"} ${item.displayValue}`,
             },
           },
           [chevronRightIcon("tbx-icon")],
@@ -2320,16 +2646,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
         const innerChildren: ElementChild[] = [
           toggleBtn,
-          el("span", { class: "tbx-group-label", text: `${grp.columnTitle}:` }),
-          el("strong", { class: "tbx-group-value", text: grp.displayValue }),
-          el("span", { class: "tbx-group-count", text: grp.count.toLocaleString() }),
+          el("span", { class: "tbx-group-label", text: `${item.columnTitle}:` }),
+          el("strong", { class: "tbx-group-value", text: item.displayValue }),
+          el("span", { class: "tbx-group-count", text: item.count.toLocaleString() }),
         ];
 
-        if (grp.summaries.length > 0) {
+        if (item.summaries.length > 0) {
           const sumWrap = el(
             "span",
             { class: "tbx-group-summaries" },
-            grp.summaries.map((s) =>
+            item.summaries.map((s) =>
               el("span", { class: "tbx-group-summary-chip" }, [
                 el("span", { text: s.label }),
                 el("strong", { text: s.value }),
@@ -2343,37 +2669,33 @@ class NexGridController<TData> implements TableXHandle<TData> {
           "tr",
           {
             class: "tbx-group-row",
-            attrs: { "data-group-key": grp.key },
+            attrs: {
+              "data-group-key": item.key,
+              "data-group-depth": String(item.depth),
+            },
           },
           [
             el(
               "td",
-              { class: "tbx-group-cell", attrs: { colspan: String(colSpan) } },
+              {
+                class: "tbx-group-cell",
+                attrs: { colspan: String(colSpan) },
+                style: item.depth > 0 ? { paddingInlineStart: `${14 + item.depth * 18}px` } : undefined,
+              },
               [el("div", { class: "tbx-group-inner" }, innerChildren)],
             ),
           ],
         );
         grpRow.addEventListener("click", (e) => {
           e.stopPropagation();
-          if (this.collapsedGroups.has(grp.key)) {
-            this.collapsedGroups.delete(grp.key);
+          if (this.collapsedGroups.has(item.key)) {
+            this.collapsedGroups.delete(item.key);
           } else {
-            this.collapsedGroups.add(grp.key);
+            this.collapsedGroups.add(item.key);
           }
           this.renderBody();
         });
         rows.push(grpRow);
-
-        if (!isCollapsed) {
-          for (const entry of grp.entries) {
-            const built = this.buildRow(entry.row, entry.originalIndex, cols, colSpan);
-            if (Array.isArray(built)) {
-              rows.push(...built);
-            } else {
-              rows.push(built);
-            }
-          }
-        }
       }
     } else if (this.options.enableVirtualization) {
       const win = computeVirtualWindow({
@@ -2395,13 +2717,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
       for (let index = win.startIndex; index < win.endIndex; index++) {
         const row = this.data[index];
-        if (row === undefined) continue;
-        const built = this.buildRow(row, index, cols, colSpan);
-        if (Array.isArray(built)) {
-          rows.push(...built);
-        } else {
-          rows.push(built);
-        }
+        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan));
       }
       if (win.bottomSpacerHeight > 0) {
         rows.push(
@@ -2416,15 +2732,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
     } else {
       for (let index = 0; index < this.data.length; index++) {
         const row = this.data[index];
-        if (row === undefined) continue;
-        const built = this.buildRow(row, index, cols, colSpan);
-        if (Array.isArray(built)) {
-          rows.push(...built);
-        } else {
-          rows.push(built);
-        }
+        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan));
       }
     }
+
+    for (let i = 0; i < pinnedBottom.length; i++) {
+      const botRow = pinnedBottom[i];
+      if (botRow !== undefined) {
+        pushBuilt(this.buildRow(botRow, i, cols, colSpan, { pinnedVariant: "bottom" }));
+      }
+    }
+
     replaceChildren(this.tbody, rows);
   }
 
@@ -2433,10 +2751,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
     index: number,
     cols: readonly TableXVanillaColumn<TData>[],
     colSpan: number,
+    rowOpts?: {
+      pinnedVariant?: "top" | "bottom";
+      treeNode?: TreeRowNode<TData>;
+    },
   ): HTMLTableRowElement | HTMLTableRowElement[] {
-    const id = this.rowId(row);
-    const selected = this.isRowSelected(id);
-    const isExpanded = this.expandedRows.has(id);
+    const pinnedVariant = rowOpts?.pinnedVariant;
+    const treeNode = rowOpts?.treeNode;
+    const id = treeNode ? treeNode.id : this.rowId(row);
+    const selected = pinnedVariant ? false : this.isRowSelected(id);
+    const isExpanded = !pinnedVariant && this.expandedRows.has(id);
+    const isRowEditing = !pinnedVariant && this.editingRowId === id;
     const clickable = this.options.onRowClick !== undefined;
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
       this.getPinnedOffsets(cols);
@@ -2445,20 +2770,43 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (selected) classes.push("tbx-row--selected");
     if (clickable) classes.push("tbx-row--clickable");
     if (isExpanded) classes.push("tbx-row--expanded");
+    if (isRowEditing) classes.push("tbx-row--editing");
+    if (pinnedVariant === "top") classes.push("tbx-row--pinned-top");
+    else if (pinnedVariant === "bottom") classes.push("tbx-row--pinned-bottom");
 
     const cells: ElementChild[] = [];
 
+    if (this.options.enableRowReorder) {
+      const tdClasses = ["tbx-td", "tbx-td--row-drag"];
+      const tdStyle: Record<string, string | undefined> = { width: "36px" };
+      if (leftOffsets.has("__row_drag")) {
+        tdClasses.push("tbx-td--pinned-left");
+        tdStyle.left = `${leftOffsets.get("__row_drag")}px`;
+        if (lastLeftPinnedId === "__row_drag") tdClasses.push("tbx-pinned-border-left");
+      }
+      const grip = pinnedVariant
+        ? null
+        : el("span", {
+            class: "tbx-row-drag-handle",
+            attrs: { "aria-label": "Drag to reorder row", title: "Drag to reorder" },
+            text: "⋮⋮",
+          });
+      cells.push(el("td", { class: tdClasses.join(" "), style: tdStyle }, grip ? [grip] : []));
+    }
+
     // Row expansion chevron
     if (this.options.renderExpandedRow) {
-      const expandBtn = el(
-        "button",
-        {
-          class: isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn",
-          attrs: { type: "button", "aria-label": isExpanded ? "Collapse row" : "Expand row" },
-        },
-        [chevronRightIcon("tbx-icon")],
-      );
-      expandBtn.addEventListener("click", (e) => {
+      const expandBtn = pinnedVariant
+        ? null
+        : el(
+            "button",
+            {
+              class: isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn",
+              attrs: { type: "button", "aria-label": isExpanded ? "Collapse row" : "Expand row" },
+            },
+            [chevronRightIcon("tbx-icon")],
+          );
+      expandBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (this.expandedRows.has(id)) {
           this.expandedRows.delete(id);
@@ -2475,7 +2823,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
         tdStyle.left = `${leftOffsets.get("__expand")}px`;
         if (lastLeftPinnedId === "__expand") tdClasses.push("tbx-pinned-border-left");
       }
-      cells.push(el("td", { class: tdClasses.join(" "), style: tdStyle }, [expandBtn]));
+      cells.push(
+        el("td", { class: tdClasses.join(" "), style: tdStyle }, expandBtn ? [expandBtn] : []),
+      );
     }
 
     if (this.selectionEnabled()) {
@@ -2487,9 +2837,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (lastLeftPinnedId === "__select") tdClasses.push("tbx-pinned-border-left");
       }
       cells.push(
-        el("td", { class: tdClasses.join(" "), style: tdStyle }, [
-          this.buildRowCheckbox(id, selected, `row-select:${id}`),
-        ]),
+        el(
+          "td",
+          { class: tdClasses.join(" "), style: tdStyle },
+          pinnedVariant ? [] : [this.buildRowCheckbox(id, selected, `row-select:${id}`, index)],
+        ),
       );
     }
 
@@ -2501,16 +2853,21 @@ class NexGridController<TData> implements TableXHandle<TData> {
         tdStyle.left = `${leftOffsets.get("__serial")}px`;
         if (lastLeftPinnedId === "__serial") tdClasses.push("tbx-pinned-border-left");
       }
+      const serialText = pinnedVariant
+        ? "★"
+        : String(serialNumber(this.currentPage(), this.query.pageSize, index));
       cells.push(
         el("td", {
           class: tdClasses.join(" "),
           style: tdStyle,
-          text: String(serialNumber(this.currentPage(), this.query.pageSize, index)),
+          text: serialText,
         }),
       );
     }
 
-    for (const column of cols) {
+    let firstEditableRendered = false;
+    for (let colIdx = 0; colIdx < cols.length; colIdx++) {
+      const column = cols[colIdx]!;
       const colId = getColumnId(column);
       const meta = column.meta ?? {};
       const tdClasses = ["tbx-td"];
@@ -2526,16 +2883,175 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (firstRightPinnedId === colId) tdClasses.push("tbx-pinned-border-right");
       }
 
-      if (isEditable(column)) {
+      if (isEditable(column) && !pinnedVariant) {
         tdClasses.push("tbx-cell--editable");
       }
+      if (!pinnedVariant && this.dirtyCells.has(`${id}::${colId}`)) {
+        tdClasses.push("tbx-td--dirty");
+      }
 
-      const td = el("td", { class: tdClasses.join(" "), style: tdStyle });
-      this.renderCellInto(td, column, row, id);
+      const isFocused =
+        !pinnedVariant &&
+        this.focusedCell?.rowIndex === index &&
+        this.focusedCell?.colIndex === colIdx;
+      if (isFocused) {
+        tdClasses.push("tbx-td--focused");
+      }
+
+      const inRange =
+        !pinnedVariant &&
+        this.options.enableRangeSelection === true &&
+        isCellInRange(index, colIdx, this.cellRange);
+      if (inRange) {
+        tdClasses.push("tbx-td--in-range");
+      }
+
+      const tdAttrs: Record<string, string | number | boolean | null | undefined> = {};
+      if (!pinnedVariant && this.options.enableKeyboardNavigation !== false) {
+        tdAttrs["tabindex"] = isFocused ? 0 : -1;
+        tdAttrs["data-tbx-focus"] = `cell:${index}:${colIdx}`;
+        tdAttrs["data-row-idx"] = String(index);
+        tdAttrs["data-col-idx"] = String(colIdx);
+      }
+
+      const td = el("td", { class: tdClasses.join(" "), style: tdStyle, attrs: tdAttrs });
+
+      if (!pinnedVariant) {
+        td.addEventListener("pointerdown", (e: PointerEvent) => {
+          if (e.button !== 0) return;
+          const target = e.target as HTMLElement | null;
+          if (
+            target?.closest("input, select, button, .tbx-fill-handle")
+          ) {
+            return;
+          }
+          const prevFocus = this.focusedCell;
+          const coord: CellCoord = { rowIndex: index, colIndex: colIdx };
+          this.focusedCell = coord;
+          if (this.options.enableRangeSelection) {
+            if (e.shiftKey && this.rangeAnchor) {
+              this.cellRange = normalizeCellRange(this.rangeAnchor, coord);
+            } else {
+              this.rangeAnchor = coord;
+              this.cellRange = normalizeCellRange(coord, coord);
+              this.isDraggingRange = true;
+            }
+            this.renderBody();
+            this.renderFooter();
+          } else if (prevFocus?.rowIndex !== index || prevFocus?.colIndex !== colIdx) {
+            this.root
+              .querySelectorAll(".tbx-td--focused")
+              .forEach((n) => n.classList.remove("tbx-td--focused"));
+            td.classList.add("tbx-td--focused");
+            td.setAttribute("tabindex", "0");
+          }
+        });
+
+        if (this.options.enableRangeSelection) {
+          td.addEventListener("pointerenter", () => {
+            if (this.isDraggingRange && this.rangeAnchor) {
+              this.cellRange = normalizeCellRange(this.rangeAnchor, {
+                rowIndex: index,
+                colIndex: colIdx,
+              });
+              this.renderBody();
+              this.renderFooter();
+            } else if (this.isFillingRange && this.rangeAnchor) {
+              this.applyFillHandleToRow(index, cols);
+            }
+          });
+        }
+
+        if (this.options.enableContextMenu !== false) {
+          td.addEventListener("contextmenu", (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.openCellContextMenu(e, row, column, colId);
+          });
+        }
+      }
+
+      const showRowEditActions = isRowEditing && isEditable(column) && !firstEditableRendered;
+      if (showRowEditActions) firstEditableRendered = true;
+
+      this.renderCellInto(td, column, row, pinnedVariant ? undefined : id, {
+        treeNode: colIdx === 0 ? treeNode : undefined,
+        isRowEditing,
+        showRowEditActions,
+        cols,
+      });
+
+      if (
+        inRange &&
+        this.cellRange &&
+        index === this.cellRange.maxRow &&
+        colIdx === this.cellRange.maxCol
+      ) {
+        const handleEl = el("span", {
+          class: "tbx-fill-handle",
+          attrs: { "aria-hidden": "true" },
+        });
+        handleEl.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.isFillingRange = true;
+        });
+        td.appendChild(handleEl);
+      }
+
       cells.push(td);
     }
 
-    const tr = el("tr", { class: classes.join(" ") }, cells);
+    const trAttrs: Record<string, string | number | boolean | null | undefined> = {};
+    if (this.options.enableRowReorder && !pinnedVariant) {
+      trAttrs["draggable"] = "true";
+      trAttrs["data-row-index"] = String(index);
+    }
+
+    const tr = el("tr", { class: classes.join(" "), attrs: trAttrs }, cells);
+
+    if (this.options.enableRowReorder && !pinnedVariant) {
+      tr.addEventListener("dragstart", (e: DragEvent) => {
+        this.draggedRowIndex = index;
+        tr.classList.add("tbx-row--dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(index));
+        }
+      });
+      tr.addEventListener("dragover", (e: DragEvent) => {
+        e.preventDefault();
+        if (this.draggedRowIndex !== null && this.draggedRowIndex !== index) {
+          tr.classList.add("tbx-row--drag-over");
+        }
+      });
+      tr.addEventListener("dragleave", () => {
+        tr.classList.remove("tbx-row--drag-over");
+      });
+      tr.addEventListener("drop", (e: DragEvent) => {
+        e.preventDefault();
+        tr.classList.remove("tbx-row--drag-over");
+        const fromIdx = this.draggedRowIndex;
+        this.draggedRowIndex = null;
+        if (fromIdx === null || fromIdx === index) return;
+        this.data = reorderArrayItem(this.data, fromIdx, index);
+        if (this.isClientSide && this.rawClientData.length === this.data.length) {
+          this.rawClientData = [...this.data];
+        }
+        this.options.onRowOrderChange?.({
+          fromIndex: fromIdx,
+          toIndex: index,
+          rows: [...this.data],
+        });
+        this.render();
+      });
+      tr.addEventListener("dragend", () => {
+        this.draggedRowIndex = null;
+        tr.classList.remove("tbx-row--dragging");
+        tr.classList.remove("tbx-row--drag-over");
+      });
+    }
+
     if (clickable) {
       tr.addEventListener("click", () => this.options.onRowClick?.(row));
     }
@@ -2573,6 +3089,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const cells: HTMLElement[] = [];
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
       this.getPinnedOffsets(visibleCols);
+
+    if (this.options.enableRowReorder) {
+      const td = el("td", { class: "tbx-summary-cell" });
+      if (leftOffsets.has("__row_drag")) {
+        td.classList.add("tbx-td--pinned-left");
+        td.style.left = `${leftOffsets.get("__row_drag")}px`;
+        if (lastLeftPinnedId === "__row_drag") td.classList.add("tbx-pinned-border-left");
+      }
+      cells.push(td);
+    }
 
     if (this.options.renderExpandedRow) {
       const td = el("td", { class: "tbx-summary-cell" });
@@ -2736,6 +3262,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
       );
       csvBtn.addEventListener("click", () => void this.runBulkExport("csv"));
       actions.appendChild(csvBtn);
+
+      const pdfBtn = el(
+        "button",
+        { class: "tbx-bulk-btn", attrs: { type: "button" } },
+        [
+          fileTextIcon("tbx-icon--pdf"),
+          el("span", { text: this.locale.exportPdfButton ?? "Export PDF" }),
+        ],
+      );
+      pdfBtn.addEventListener("click", () => void this.runBulkExport("pdf"));
+      actions.appendChild(pdfBtn);
     }
 
     if (this.options.bulkActions) {
@@ -2803,7 +3340,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
           s.field.toLowerCase() === id.toLowerCase(),
       )?.dir ?? "";
     const pinState = isPinned(col, this.pinnedColumns) || "none";
-    const cacheKey = `${id}:${activeFilter ?? ""}:${sortDir}:${pinState}:${this.activeGroupBy ?? ""}`;
+    const cacheKey = `${id}:${activeFilter ?? ""}:${sortDir}:${pinState}:${this.activeGroupBy.join(",")}`;
 
     if (
       this.mountedFilterPopoverKey === cacheKey &&
@@ -2983,16 +3520,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
         }
 
         const colAccessKey = column.accessorKey !== undefined ? String(column.accessorKey) : "";
-        const isGroupedByThis =
-          Boolean(this.activeGroupBy) &&
-          (this.activeGroupBy!.toLowerCase() === id.toLowerCase() ||
-            (colAccessKey !== "" && this.activeGroupBy!.toLowerCase() === colAccessKey.toLowerCase()));
+        const matchesCol = (g: string) =>
+          g.toLowerCase() === id.toLowerCase() ||
+          (colAccessKey !== "" && g.toLowerCase() === colAccessKey.toLowerCase());
+        const isGroupedByThis = this.activeGroupBy.some(matchesCol);
         if (isGroupedByThis) {
           makeMenuBtn("ungroup", this.locale.ungroupColumn ?? "Ungroup", null, true, () => {
-            this.activeGroupBy = undefined;
+            this.activeGroupBy = this.activeGroupBy.filter((g) => !matchesCol(g));
             this.collapsedGroups.clear();
             this.openFilterColumn = null;
-            this.options.onGroupByChange?.(undefined);
+            this.options.onGroupByChange?.(this.activeGroupBy[0], [...this.activeGroupBy]);
             this.saveState();
             this.render();
           });
@@ -3003,14 +3540,30 @@ class NexGridController<TData> implements TableXHandle<TData> {
             null,
             false,
             () => {
-              this.activeGroupBy = id;
+              this.activeGroupBy = [id];
               this.collapsedGroups.clear();
               this.openFilterColumn = null;
-              this.options.onGroupByChange?.(id);
+              this.options.onGroupByChange?.(id, [id]);
               this.saveState();
               this.render();
             },
           );
+          if (this.activeGroupBy.length > 0) {
+            makeMenuBtn(
+              "add-group-by",
+              this.locale.addGroupByColumn ?? "Add to grouping",
+              null,
+              false,
+              () => {
+                this.activeGroupBy = [...this.activeGroupBy, id];
+                this.collapsedGroups.clear();
+                this.openFilterColumn = null;
+                this.options.onGroupByChange?.(this.activeGroupBy[0], [...this.activeGroupBy]);
+                this.saveState();
+                this.render();
+              },
+            );
+          }
         }
       }
 
@@ -3483,7 +4036,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
     popover.style.zIndex = "1000";
   }
 
-  private buildRowCheckbox(id: string, selected: boolean, focusKey: string): HTMLInputElement {
+  private buildRowCheckbox(
+    id: string,
+    selected: boolean,
+    focusKey: string,
+    rowIndex?: number,
+  ): HTMLInputElement {
     const isSingle = this.isSingleSelection();
     const checkbox = el("input", {
       class: "tbx-checkbox",
@@ -3495,77 +4053,329 @@ class NexGridController<TData> implements TableXHandle<TData> {
       },
     });
     checkbox.checked = selected;
-    checkbox.addEventListener("click", (event) => event.stopPropagation());
-    checkbox.addEventListener("change", () => this.toggleSelectRow(id));
+    let shiftOnLastClick = false;
+    checkbox.addEventListener("click", (event: MouseEvent) => {
+      event.stopPropagation();
+      shiftOnLastClick = Boolean(event.shiftKey);
+    });
+    checkbox.addEventListener("change", (event: Event) => {
+      const shiftHeld =
+        shiftOnLastClick || Boolean((event as unknown as { shiftKey?: boolean }).shiftKey);
+      shiftOnLastClick = false;
+      if (
+        shiftHeld &&
+        !isSingle &&
+        rowIndex !== undefined &&
+        this.lastSelectedRowIndex !== null
+      ) {
+        const ids = this.pageRowIds();
+        const nextSet = selectContiguousRowIds(
+          ids,
+          this.lastSelectedRowIndex,
+          rowIndex,
+          this.selected,
+          checkbox.checked,
+        );
+        this.selected.clear();
+        for (const rId of nextSet) {
+          this.selected.add(rId);
+        }
+        this.lastSelectedRowIndex = rowIndex;
+        this.emitSelection();
+        this.render();
+        return;
+      }
+      if (rowIndex !== undefined) {
+        this.lastSelectedRowIndex = rowIndex;
+      }
+      this.toggleSelectRow(id);
+    });
     return checkbox;
   }
 
+  private writeMutatedRowValue(
+    row: TData,
+    column: TableXVanillaColumn<TData>,
+    colId: string,
+    nextVal: unknown,
+  ): void {
+    const propKey =
+      column.accessorKey !== undefined && String(column.accessorKey) !== ""
+        ? String(column.accessorKey)
+        : colId;
+    if (
+      row !== null &&
+      typeof row === "object" &&
+      !Object.isFrozen(row) &&
+      !propKey.includes(".") &&
+      propKey !== "__proto__" &&
+      propKey !== "constructor" &&
+      propKey !== "prototype"
+    ) {
+      try {
+        (row as Record<string, unknown>)[propKey] = nextVal;
+      } catch {
+        // Read-only row property; host receives newValue via callback
+      }
+    }
+  }
+
+  private startEditingRow(row: TData, rowId: string): void {
+    this.editingCell = null;
+    this.editingRowId = rowId;
+    this.cellValidationError = null;
+    const draft: Record<string, unknown> = {};
+    for (const col of this.visibleCols()) {
+      if (isEditable(col)) {
+        const cid = getColumnId(col);
+        draft[cid] = getCellValue(col, row);
+      }
+    }
+    this.rowEditDraft = draft;
+    this.render();
+  }
+
+  private commitRowEdit(
+    row: TData,
+    rowId: string,
+    cols: readonly TableXVanillaColumn<TData>[],
+  ): void {
+    const changes: Record<string, { oldValue: unknown; newValue: unknown }> = {};
+    for (const col of cols) {
+      if (!isEditable(col)) continue;
+      const cid = getColumnId(col);
+      const oldVal = getCellValue(col, row);
+      const rawDraft = cid in this.rowEditDraft ? this.rowEditDraft[cid] : oldVal;
+      const coerced = coerceEditedValue(rawDraft, col.meta?.editType);
+      const validationErr = validateEditedCell(col, coerced, row);
+      if (validationErr) {
+        this.cellValidationError = validationErr;
+        this.render();
+        return;
+      }
+      changes[cid] = { oldValue: oldVal, newValue: coerced };
+    }
+
+    const updatedRow =
+      row !== null && typeof row === "object"
+        ? ({ ...(row as Record<string, unknown>) } as TData)
+        : row;
+
+    for (const col of cols) {
+      if (!isEditable(col)) continue;
+      const cid = getColumnId(col);
+      const change = changes[cid];
+      if (!change) continue;
+      this.writeMutatedRowValue(row, col, cid, change.newValue);
+      this.writeMutatedRowValue(updatedRow, col, cid, change.newValue);
+      if (change.oldValue !== change.newValue) {
+        this.dirtyCells.add(`${rowId}::${cid}`);
+        this.options.onCellEdit?.({
+          row,
+          columnId: cid,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+        });
+      }
+    }
+
+    this.editingRowId = null;
+    this.rowEditDraft = {};
+    this.cellValidationError = null;
+    this.options.onRowEdit?.({
+      row,
+      updatedRow,
+      changes,
+    });
+    this.render();
+  }
+
+  private createEditorControl(
+    column: TableXVanillaColumn<TData>,
+    initialValue: unknown,
+  ): HTMLInputElement | HTMLSelectElement {
+    const editType = column.meta?.editType || "text";
+    if (editType === "select" && column.meta?.editOptions) {
+      const select = el("select", {
+        class: "tbx-cell-edit-select tbx-cell-edit-input",
+      }) as HTMLSelectElement;
+      for (const opt of column.meta.editOptions) {
+        const optEl = el("option", { attrs: { value: opt }, text: opt }) as HTMLOptionElement;
+        if (String(initialValue) === opt) optEl.selected = true;
+        select.appendChild(optEl);
+      }
+      select.value = initialValue !== null && initialValue !== undefined ? String(initialValue) : "";
+      return select;
+    }
+    if (editType === "boolean") {
+      const cb = el("input", {
+        class: "tbx-checkbox tbx-cell-edit-checkbox",
+        attrs: { type: "checkbox" },
+      }) as HTMLInputElement;
+      cb.checked = Boolean(initialValue);
+      return cb;
+    }
+    const strVal =
+      initialValue !== null && initialValue !== undefined
+        ? editType === "date" && initialValue instanceof Date
+          ? initialValue.toISOString().slice(0, 10)
+          : String(initialValue)
+        : "";
+    const inputType =
+      editType === "number" ? "number" : editType === "date" ? "date" : "text";
+    const input = el("input", {
+      class: "tbx-cell-edit-input",
+      attrs: {
+        type: inputType,
+        value: strVal,
+      },
+    }) as HTMLInputElement;
+    input.value = strVal;
+    return input;
+  }
+
+  private readEditorRawValue(
+    column: TableXVanillaColumn<TData>,
+    control: HTMLInputElement | HTMLSelectElement,
+  ): unknown {
+    if (column.meta?.editType === "boolean" && "checked" in control) {
+      return control.checked;
+    }
+    return control.value;
+  }
+
   /**
-   * Write one cell's content with inline editing support.
+   * Write one cell's content with inline / full-row editing and tree chevron support.
    */
   private renderCellInto(
     host: HTMLElement,
     column: TableXVanillaColumn<TData>,
     row: TData,
     rowId?: string,
+    extraOpts?: {
+      treeNode?: TreeRowNode<TData>;
+      isRowEditing?: boolean;
+      showRowEditActions?: boolean;
+      cols?: readonly TableXVanillaColumn<TData>[];
+    },
   ): void {
     const colId = getColumnId(column);
     const value = getCellValue(column, row);
+    const isRowEditCell =
+      Boolean(extraOpts?.isRowEditing) && isEditable(column) && rowId !== undefined;
     const isCurrentlyEditing =
+      !isRowEditCell &&
       rowId !== undefined &&
       this.editingCell?.rowId === rowId &&
       this.editingCell?.columnId === colId;
+
+    if (isRowEditCell && rowId !== undefined) {
+      const editWrap = el("div", { class: "tbx-cell-edit-wrap" });
+      editWrap.addEventListener("click", (e) => e.stopPropagation());
+      const draftVal = colId in this.rowEditDraft ? this.rowEditDraft[colId] : value;
+      const editInput = this.createEditorControl(column, draftVal);
+      if (this.cellValidationError) {
+        editInput.classList.add("tbx-cell-edit-input--invalid");
+      }
+
+      const syncDraft = () => {
+        this.rowEditDraft[colId] = this.readEditorRawValue(column, editInput);
+      };
+      editInput.addEventListener("input", syncDraft);
+      editInput.addEventListener("change", syncDraft);
+      editInput.addEventListener("keydown", ((e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          syncDraft();
+          this.commitRowEdit(row, rowId, extraOpts?.cols ?? this.visibleCols());
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          this.editingRowId = null;
+          this.rowEditDraft = {};
+          this.cellValidationError = null;
+          this.render();
+        }
+      }) as EventListener);
+
+      editWrap.appendChild(editInput);
+
+      if (extraOpts?.showRowEditActions) {
+        const actions = el("div", { class: "tbx-cell-edit-actions" });
+        const saveBtn = el(
+          "button",
+          {
+            class: "tbx-cell-edit-btn tbx-cell-edit-btn--save",
+            attrs: { type: "button", "aria-label": this.locale.saveRow ?? "Save row" },
+          },
+          [checkIcon("tbx-icon")],
+        );
+        saveBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.commitRowEdit(row, rowId, extraOpts?.cols ?? this.visibleCols());
+        });
+
+        const cancelBtn = el(
+          "button",
+          {
+            class: "tbx-cell-edit-btn tbx-cell-edit-btn--cancel",
+            attrs: { type: "button", "aria-label": this.locale.cancelRowEdit ?? "Cancel" },
+          },
+          [xIcon("tbx-icon")],
+        );
+        cancelBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.editingRowId = null;
+          this.rowEditDraft = {};
+          this.cellValidationError = null;
+          this.render();
+        });
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+        editWrap.appendChild(actions);
+
+        if (this.cellValidationError) {
+          editWrap.appendChild(
+            el("span", { class: "tbx-cell-edit-error", text: this.cellValidationError }),
+          );
+        }
+        setTimeout(() => editInput.focus?.(), 10);
+      }
+
+      replaceChildren(host, [editWrap]);
+      return;
+    }
 
     if (isCurrentlyEditing) {
       const editWrap = el("div", { class: "tbx-cell-edit-wrap" });
       editWrap.addEventListener("click", (e) => e.stopPropagation());
 
-      const editType = column.meta?.editType || "text";
-      let editInput: HTMLInputElement | HTMLSelectElement;
-
-      if (editType === "select" && column.meta?.editOptions) {
-        const select = el("select", { class: "tbx-cell-edit-select tbx-cell-edit-input" }) as HTMLSelectElement;
-        for (const opt of column.meta.editOptions) {
-          const optEl = el("option", { attrs: { value: opt }, text: opt }) as HTMLOptionElement;
-          if (String(value) === opt) optEl.selected = true;
-          select.appendChild(optEl);
-        }
-        select.value = value !== null && value !== undefined ? String(value) : "";
-        editInput = select;
-      } else {
-        const initialText = value !== null && value !== undefined ? String(value) : "";
-        editInput = el("input", {
-          class: "tbx-cell-edit-input",
-          attrs: {
-            type: editType === "number" ? "number" : "text",
-            value: initialText,
-          },
-        }) as HTMLInputElement;
-        editInput.value = initialText;
+      const editInput = this.createEditorControl(column, value);
+      if (this.cellValidationError) {
+        editInput.classList.add("tbx-cell-edit-input--invalid");
       }
 
       const save = () => {
-        const nextVal = editType === "number" ? Number(editInput.value) : editInput.value;
+        const rawVal = this.readEditorRawValue(column, editInput);
+        const nextVal = coerceEditedValue(rawVal, column.meta?.editType);
+        const validationErr = validateEditedCell(column, nextVal, row);
+        if (validationErr) {
+          this.cellValidationError = validationErr;
+          editInput.classList.add("tbx-cell-edit-input--invalid");
+          let errNode = editWrap.querySelector(".tbx-cell-edit-error");
+          if (!errNode) {
+            errNode = el("span", { class: "tbx-cell-edit-error", text: validationErr });
+            editWrap.appendChild(errNode);
+          } else {
+            errNode.textContent = validationErr;
+          }
+          return;
+        }
+        this.cellValidationError = null;
         this.editingCell = null;
         if (rowId !== undefined) {
-          const propKey =
-            column.accessorKey !== undefined && String(column.accessorKey) !== ""
-              ? String(column.accessorKey)
-              : colId;
-          if (
-            row !== null &&
-            typeof row === "object" &&
-            !Object.isFrozen(row) &&
-            !propKey.includes(".") &&
-            propKey !== "__proto__" &&
-            propKey !== "constructor" &&
-            propKey !== "prototype"
-          ) {
-            try {
-              (row as Record<string, unknown>)[propKey] = nextVal;
-            } catch {
-              // Read-only row property; host receives newValue via onCellEdit
-            }
+          this.writeMutatedRowValue(row, column, colId, nextVal);
+          if (value !== nextVal) {
+            this.dirtyCells.add(`${rowId}::${colId}`);
           }
           this.options.onCellEdit?.({
             row,
@@ -3578,6 +4388,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       };
 
       const cancel = () => {
+        this.cellValidationError = null;
         this.editingCell = null;
         this.render();
       };
@@ -3624,6 +4435,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
       editWrap.appendChild(editInput);
       editWrap.appendChild(actions);
+      if (this.cellValidationError) {
+        editWrap.appendChild(
+          el("span", { class: "tbx-cell-edit-error", text: this.cellValidationError }),
+        );
+      }
       replaceChildren(host, [editWrap]);
 
       setTimeout(() => editInput.focus?.(), 10);
@@ -3633,10 +4449,17 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (isEditable(column) && rowId !== undefined) {
       host.addEventListener("dblclick", (e) => {
         e.stopPropagation();
-        this.editingCell = { rowId, columnId: colId };
-        this.render();
+        if (this.options.editMode === "row") {
+          this.startEditingRow(row, rowId);
+        } else {
+          this.cellValidationError = null;
+          this.editingCell = { rowId, columnId: colId };
+          this.render();
+        }
       });
     }
+
+    const contentTarget = extraOpts?.treeNode ? el("span", { class: "tbx-tree-label" }) : host;
 
     const custom = column.cell;
     if (custom) {
@@ -3644,16 +4467,435 @@ class NexGridController<TData> implements TableXHandle<TData> {
         row: { original: row },
         getValue: () => value,
       });
-      if (rendered === null || rendered === undefined) return;
-      if (typeof rendered === "string") host.textContent = rendered;
-      else host.appendChild(rendered);
+      if (rendered !== null && rendered !== undefined) {
+        if (typeof rendered === "string") contentTarget.textContent = rendered;
+        else contentTarget.appendChild(rendered);
+      }
+    } else {
+      contentTarget.textContent = getCellText(value, {
+        yes: this.locale.booleanYes,
+        no: this.locale.booleanNo,
+      });
+    }
+
+    if (extraOpts?.treeNode) {
+      const tNode = extraOpts.treeNode;
+      const treeWrap = el("div", {
+        class: "tbx-tree-cell-wrap",
+        style: tNode.depth > 0 ? { paddingInlineStart: `${tNode.depth * 18}px` } : undefined,
+      });
+      if (tNode.hasChildren) {
+        const toggleBtn = el(
+          "button",
+          {
+            class: tNode.isExpanded ? "tbx-tree-toggle tbx-tree-toggle--open" : "tbx-tree-toggle",
+            attrs: {
+              type: "button",
+              "aria-expanded": String(tNode.isExpanded),
+              "aria-label": tNode.isExpanded ? "Collapse children" : "Expand children",
+            },
+          },
+          [chevronRightIcon("tbx-icon")],
+        );
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (this.treeExpandedIds.has(tNode.id)) {
+            this.treeExpandedIds.delete(tNode.id);
+          } else {
+            this.treeExpandedIds.add(tNode.id);
+          }
+          this.render();
+        });
+        treeWrap.appendChild(toggleBtn);
+      } else {
+        treeWrap.appendChild(el("span", { class: "tbx-tree-spacer", attrs: { "aria-hidden": "true" } }));
+      }
+      treeWrap.appendChild(contentTarget);
+      host.appendChild(treeWrap);
+    }
+  }
+
+  // ---- Infinite Footer, Context Menu, Keyboard Nav & Range Clipboard -------
+
+  private renderInfiniteFooter(): void {
+    if (!this.isInfiniteMode() || (!this.hasMore && !this.isLoadingMore)) {
+      this.infiniteFooter.style.display = "none";
+      replaceChildren(this.infiniteFooter, []);
       return;
     }
 
-    host.textContent = getCellText(value, {
+    this.infiniteFooter.style.display = "flex";
+    const btn = el("button", {
+      class: "tbx-load-more-btn",
+      attrs: {
+        type: "button",
+        disabled: this.isLoadingMore,
+      },
+      text: this.isLoadingMore
+        ? (this.locale.loadingMoreText ?? "Loading more…")
+        : (this.locale.loadMoreButton ?? "Load more"),
+    });
+    btn.addEventListener("click", () => {
+      if (!this.isLoadingMore && this.hasMore) {
+        this.options.onLoadMore?.(this.nextCursor);
+      }
+    });
+    replaceChildren(this.infiniteFooter, [btn]);
+  }
+
+  private closeContextMenu(): void {
+    if (this.activeContextMenuEl) {
+      this.activeContextMenuEl.remove();
+      this.activeContextMenuEl = null;
+    }
+  }
+
+  private openCellContextMenu(
+    e: MouseEvent,
+    row: TData,
+    column: TableXVanillaColumn<TData>,
+    colId: string,
+  ): void {
+    this.closeContextMenu();
+    const rawVal = getCellValue(column, row);
+    const cellText = getCellText(rawVal, {
       yes: this.locale.booleanYes,
       no: this.locale.booleanNo,
     });
+
+    const menu = el("div", {
+      class: "tbx-context-menu",
+      attrs: { role: "menu" },
+    });
+
+    const addItem = (
+      label: string,
+      onClick: () => void,
+      opts?: { danger?: boolean; disabled?: boolean; actionKey?: string },
+    ) => {
+      const classes = ["tbx-context-menu-item"];
+      if (opts?.danger) classes.push("tbx-context-menu-item--danger");
+      const itemBtn = el("button", {
+        class: classes.join(" "),
+        attrs: {
+          type: "button",
+          role: "menuitem",
+          disabled: opts?.disabled ?? false,
+          "data-ctx-action": opts?.actionKey,
+        },
+        text: label,
+      });
+      itemBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.closeContextMenu();
+        onClick();
+      });
+      menu.appendChild(itemBtn);
+    };
+
+    addItem(
+      this.locale.copyCell ?? "Copy cell",
+      () => {
+        void navigator.clipboard?.writeText?.(cellText);
+      },
+      { actionKey: "copy-cell" },
+    );
+
+    addItem(
+      this.locale.copyRow ?? "Copy row",
+      () => {
+        const line = this.visibleCols()
+          .map((c) =>
+            getCellText(getCellValue(c, row), {
+              yes: this.locale.booleanYes,
+              no: this.locale.booleanNo,
+            }).replace(/\t|\r|\n/g, " "),
+          )
+          .join("\t");
+        void navigator.clipboard?.writeText?.(line);
+      },
+      { actionKey: "copy-row" },
+    );
+
+    if (
+      cellText !== "" &&
+      isFilterable(column, this.options.enableColumnFilters !== false)
+    ) {
+      addItem(
+        formatMessage(this.locale.filterByValue ?? 'Filter by "{value}"', {
+          value: cellText.length > 24 ? `${cellText.slice(0, 24)}…` : cellText,
+        }),
+        () => {
+          const filterField = getFilterField(column);
+          this.applyQuery(withFilter(this.query, filterField, cellText));
+        },
+        { actionKey: "filter-by-value" },
+      );
+    }
+
+    if (!isStructuralColumn(column) && colId !== "") {
+      menu.appendChild(el("div", { class: "tbx-context-menu-sep" }));
+      const pin = isPinned(column, this.pinnedColumns);
+      if (pin === "left" || pin === "right") {
+        addItem(
+          this.locale.unpinColumn ?? "Unpin column",
+          () => {
+            this.pinnedColumns = { ...this.pinnedColumns, [colId]: "none" };
+            this.saveState();
+            this.render();
+          },
+          { actionKey: "unpin" },
+        );
+      } else {
+        addItem(
+          this.locale.pinLeft ?? "Pin left",
+          () => {
+            this.pinnedColumns = { ...this.pinnedColumns, [colId]: "left" };
+            this.saveState();
+            this.render();
+          },
+          { actionKey: "pin-left" },
+        );
+      }
+
+      if (isHideable(column) && this.visibleCols().length > 1) {
+        addItem(
+          this.locale.hideColumn ?? "Hide column",
+          () => {
+            this.hidden = { ...this.hidden, [colId]: true };
+            this.saveState();
+            this.render();
+          },
+          { actionKey: "hide" },
+        );
+      }
+    }
+
+    const customItems: readonly ContextMenuItem[] =
+      this.options.contextMenuItems?.({ row, columnId: colId, value: rawVal }) ?? [];
+    if (customItems.length > 0) {
+      menu.appendChild(el("div", { class: "tbx-context-menu-sep" }));
+      for (const item of customItems) {
+        if (item.separatorBefore) {
+          menu.appendChild(el("div", { class: "tbx-context-menu-sep" }));
+        }
+        addItem(item.label, item.onSelect, {
+          danger: item.danger,
+          disabled: item.disabled,
+          actionKey: item.id,
+        });
+      }
+    }
+
+    const winW = typeof window !== "undefined" ? (window.innerWidth || 1024) : 1024;
+    const winH = typeof window !== "undefined" ? (window.innerHeight || 800) : 800;
+    const x = Math.min(Math.max(8, e.clientX || 0), Math.max(8, winW - 210));
+    const y = Math.min(Math.max(8, e.clientY || 0), Math.max(8, winH - 240));
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    this.activeContextMenuEl = menu;
+    document.body.appendChild(menu);
+  }
+
+  private applyFillHandleToRow(
+    targetRowIdx: number,
+    cols: readonly TableXVanillaColumn<TData>[],
+  ): void {
+    if (!this.cellRange) return;
+    const rows = this.displayedDataList();
+    const startRow = this.cellRange.minRow;
+    const endRow = Math.max(startRow, Math.min(rows.length - 1, targetRowIdx));
+    const sourceRow = rows[startRow];
+    if (!sourceRow) return;
+
+    for (let c = this.cellRange.minCol; c <= this.cellRange.maxCol; c++) {
+      const col = cols[c];
+      if (!col || !isEditable(col)) continue;
+      const cid = getColumnId(col);
+      const sourceVal = getCellValue(col, sourceRow);
+
+      for (let r = startRow + 1; r <= endRow; r++) {
+        const targetRow = rows[r];
+        if (!targetRow) continue;
+        const oldVal = getCellValue(col, targetRow);
+        const coerced = coerceEditedValue(sourceVal, col.meta?.editType);
+        if (validateEditedCell(col, coerced, targetRow) !== null) continue;
+        this.writeMutatedRowValue(targetRow, col, cid, coerced);
+        const rid = this.rowId(targetRow);
+        if (oldVal !== coerced) {
+          this.dirtyCells.add(`${rid}::${cid}`);
+          this.options.onCellEdit?.({
+            row: targetRow,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
+        }
+      }
+    }
+
+    this.cellRange = {
+      ...this.cellRange,
+      maxRow: endRow,
+    };
+    this.renderBody();
+    this.renderFooter();
+  }
+
+  private handleGridKeyDown(e: KeyboardEvent): void {
+    if (this.options.enableKeyboardNavigation === false) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.nodeName === "INPUT" ||
+        target.nodeName === "SELECT" ||
+        target.nodeName === "TEXTAREA")
+    ) {
+      if ((target as HTMLInputElement).type !== "checkbox" && (target as HTMLInputElement).type !== "radio") {
+        return;
+      }
+    }
+    if (this.editingCell || this.editingRowId) return;
+
+    const rows = this.displayedDataList();
+    const cols = this.visibleCols();
+    if (rows.length === 0 || cols.length === 0) return;
+
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      e.key.toLowerCase() === "c" &&
+      this.options.enableRangeSelection &&
+      this.cellRange
+    ) {
+      const tsv = formatRangeTsv(rows, cols, this.cellRange, {
+        yes: this.locale.booleanYes,
+        no: this.locale.booleanNo,
+      });
+      if (tsv) {
+        e.preventDefault();
+        void navigator.clipboard?.writeText?.(tsv);
+      }
+      return;
+    }
+
+    const navKeys = [
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+    ];
+    if (navKeys.includes(e.key)) {
+      const base = this.focusedCell ?? { rowIndex: 0, colIndex: 0 };
+      const next = moveFocusCoord(base, e.key, rows.length, cols.length);
+      if (!next) return;
+      e.preventDefault();
+      this.focusedCell = next;
+      if (this.options.enableRangeSelection) {
+        if (e.shiftKey) {
+          const anchor = this.rangeAnchor ?? base;
+          this.rangeAnchor = anchor;
+          this.cellRange = normalizeCellRange(anchor, next);
+        } else {
+          this.rangeAnchor = next;
+          this.cellRange = normalizeCellRange(next, next);
+        }
+      }
+      this.renderBody();
+      this.renderFooter();
+      this.restoreFocus(`cell:${next.rowIndex}:${next.colIndex}`);
+      return;
+    }
+
+    if ((e.key === "Enter" || e.key === "F2") && this.focusedCell) {
+      const row = rows[this.focusedCell.rowIndex];
+      const col = cols[this.focusedCell.colIndex];
+      if (row && col && isEditable(col)) {
+        e.preventDefault();
+        const rid = this.rowId(row);
+        if (this.options.editMode === "row") {
+          this.startEditingRow(row, rid);
+        } else {
+          this.cellValidationError = null;
+          this.editingCell = { rowId: rid, columnId: getColumnId(col) };
+          this.render();
+        }
+      }
+      return;
+    }
+
+    if (e.key === " " && this.focusedCell && this.selectionEnabled()) {
+      if (target && (target.nodeName === "BUTTON" || target.nodeName === "INPUT")) return;
+      const row = rows[this.focusedCell.rowIndex];
+      if (row) {
+        e.preventDefault();
+        this.lastSelectedRowIndex = this.focusedCell.rowIndex;
+        this.toggleSelectRow(this.rowId(row));
+      }
+    }
+  }
+
+  private handleGridPaste(e: ClipboardEvent): void {
+    if (!this.options.enableRangeSelection || !this.focusedCell) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.nodeName === "INPUT" ||
+        target.nodeName === "SELECT" ||
+        target.nodeName === "TEXTAREA")
+    ) {
+      return;
+    }
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    const matrix = parseClipboardTsv(text);
+    if (matrix.length === 0) return;
+
+    e.preventDefault();
+    const rows = this.displayedDataList();
+    const cols = this.visibleCols();
+    const startR = this.focusedCell.rowIndex;
+    const startC = this.focusedCell.colIndex;
+
+    let maxR = startR;
+    let maxC = startC;
+    for (let rOff = 0; rOff < matrix.length; rOff++) {
+      const targetRow = rows[startR + rOff];
+      if (!targetRow) break;
+      maxR = startR + rOff;
+      const cells = matrix[rOff]!;
+      for (let cOff = 0; cOff < cells.length; cOff++) {
+        const col = cols[startC + cOff];
+        if (!col) break;
+        maxC = Math.max(maxC, startC + cOff);
+        if (!isEditable(col)) continue;
+        const cid = getColumnId(col);
+        const oldVal = getCellValue(col, targetRow);
+        const coerced = coerceEditedValue(cells[cOff], col.meta?.editType);
+        if (validateEditedCell(col, coerced, targetRow) !== null) continue;
+        this.writeMutatedRowValue(targetRow, col, cid, coerced);
+        const rid = this.rowId(targetRow);
+        if (oldVal !== coerced) {
+          this.dirtyCells.add(`${rid}::${cid}`);
+          this.options.onCellEdit?.({
+            row: targetRow,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
+        }
+      }
+    }
+
+    this.cellRange = normalizeCellRange(
+      { rowIndex: startR, colIndex: startC },
+      { rowIndex: maxR, colIndex: maxC },
+    );
+    this.renderBody();
+    this.renderFooter();
   }
 
   // ---- Mobile cards --------------------------------------------------------
@@ -3793,6 +5035,22 @@ class NexGridController<TData> implements TableXHandle<TData> {
           text: formatMessage(this.locale.selectedBadge, { count: selectedTotal.toLocaleString() }),
         }),
       );
+    }
+    if (this.options.enableRangeSelection && this.cellRange) {
+      const stats = computeRangeStats(this.displayedDataList(), this.visibleCols(), this.cellRange);
+      if (stats && stats.cellCount > 1) {
+        const parts = [`Count: ${stats.cellCount}`];
+        if (stats.numericCount > 0 && stats.sum !== null && stats.avg !== null) {
+          parts.push(`Sum: ${Number(stats.sum.toFixed(2)).toLocaleString()}`);
+          parts.push(`Avg: ${Number(stats.avg.toFixed(2)).toLocaleString()}`);
+        }
+        rangeChildren.push(
+          el("span", {
+            class: "tbx-range-stats-badge",
+            text: parts.join(" · "),
+          }),
+        );
+      }
     }
     replaceChildren(this.range, rangeChildren);
 

@@ -24,10 +24,20 @@ public class TableXTagHelperTests
             EnableColumnMenu = true,
             EnableVirtualization = true,
             VirtualHeight = 600,
-            GroupBy = "department",
+            GroupBy = "region,department",
             EnableSummaryRow = true,
             EnableBulkActions = true,
             ShowFilterPills = true,
+            EnableKeyboardNavigation = true,
+            EnableContextMenu = true,
+            EnableTreeData = true,
+            ChildrenKey = "subRows",
+            DefaultExpandedDepth = 2,
+            EditMode = "Row",
+            EnableSavedViews = true,
+            EnableRowReorder = true,
+            EnableInfiniteScroll = true,
+            EnableRangeSelection = true,
             AutoInit = false,
         };
 
@@ -89,8 +99,18 @@ public class TableXTagHelperTests
         Assert.True(root.GetProperty("enableColumnMenu").GetBoolean());
         Assert.True(root.GetProperty("enableVirtualization").GetBoolean());
         Assert.Equal(600, root.GetProperty("virtualHeight").GetInt32());
-        Assert.Equal("department", root.GetProperty("groupBy").GetString());
+        Assert.Equal("region,department", root.GetProperty("groupBy").GetString());
         Assert.True(root.GetProperty("enableSummaryRow").GetBoolean());
+        Assert.True(root.GetProperty("enableKeyboardNavigation").GetBoolean());
+        Assert.True(root.GetProperty("enableContextMenu").GetBoolean());
+        Assert.True(root.GetProperty("enableTreeData").GetBoolean());
+        Assert.Equal("subRows", root.GetProperty("childrenKey").GetString());
+        Assert.Equal(2, root.GetProperty("defaultExpandedDepth").GetInt32());
+        Assert.Equal("row", root.GetProperty("editMode").GetString());
+        Assert.True(root.GetProperty("enableSavedViews").GetBoolean());
+        Assert.True(root.GetProperty("enableRowReorder").GetBoolean());
+        Assert.True(root.GetProperty("enableInfiniteScroll").GetBoolean());
+        Assert.True(root.GetProperty("enableRangeSelection").GetBoolean());
 
         var cols = root.GetProperty("columns");
         Assert.Equal(3, cols.GetArrayLength());
@@ -196,12 +216,50 @@ public class TableXTagHelperTests
     }
 
     [Fact]
+    public async Task ProcessAsync_PdfExportAndDateBooleanEditors_SerializeCleanly()
+    {
+        var grid = new TableXTagHelper
+        {
+            Id = "pdf-grid",
+            Caption = "Invoices",
+            ExportMode = "Pdf",
+            AutoInit = false,
+        };
+
+        var html = await RenderGridAsync(grid, async ctx =>
+        {
+            var dueCol = new TableXColumnTagHelper
+            {
+                Field = "dueDate",
+                Editable = true,
+                EditType = "Date",
+            };
+            await dueCol.ProcessAsync(ctx, CreateEmptyOutput(TableXColumnTagHelper.TagName));
+
+            var paidCol = new TableXColumnTagHelper
+            {
+                Field = "paid",
+                Editable = true,
+                EditType = "Boolean",
+            };
+            await paidCol.ProcessAsync(ctx, CreateEmptyOutput(TableXColumnTagHelper.TagName));
+        });
+
+        var json = ExtractConfigJson(html);
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal("pdf", doc.RootElement.GetProperty("exportMode").GetString());
+        var cols = doc.RootElement.GetProperty("columns");
+        Assert.Equal("date", cols[0].GetProperty("meta").GetProperty("editType").GetString());
+        Assert.Equal("boolean", cols[1].GetProperty("meta").GetProperty("editType").GetString());
+    }
+
+    [Fact]
     public async Task ProcessAsync_InvalidEnumAttribute_ThrowsHelpfulMessage()
     {
         var grid = new TableXTagHelper
         {
             Caption = "Users",
-            ExportMode = "Pdf",
+            ExportMode = "Xml",
         };
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -209,6 +267,7 @@ public class TableXTagHelperTests
 
         Assert.Contains("export-mode", ex.Message);
         Assert.Contains("Split", ex.Message);
+        Assert.Contains("Pdf", ex.Message);
     }
 
     private static async Task<string> RenderGridAsync(
