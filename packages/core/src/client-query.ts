@@ -575,10 +575,24 @@ export function computeFilterOptionCounts<TData>(
     const row = rows[i]!;
     const val = getCellValue(col, row);
     if (val === null || val === undefined) continue;
-    const str = String(val).trim().toLowerCase();
+    const str = (
+      val instanceof Date
+        ? Number.isNaN(val.getTime())
+          ? ""
+          : val.toISOString().slice(0, 10)
+        : String(val)
+    )
+      .trim()
+      .toLowerCase();
 
     for (const opt of options) {
-      if (opt.trim().toLowerCase() === str) {
+      const optLower = opt.trim().toLowerCase();
+      if (
+        optLower === str ||
+        (typeof val === "boolean" &&
+          ((val === true && (optLower === "yes" || optLower === "1" || optLower === "true")) ||
+            (val === false && (optLower === "no" || optLower === "0" || optLower === "false"))))
+      ) {
         counts[opt] = (counts[opt] ?? 0) + 1;
       }
     }

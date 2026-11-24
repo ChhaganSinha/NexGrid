@@ -946,7 +946,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     virtualHeight = DEFAULT_VIRTUAL_HEIGHT,
     virtualOverscan,
     enableColumnVirtualization = false,
-    virtualColumnOverscan = 2,
+    virtualColumnOverscan = DEFAULT_COLUMN_OVERSCAN,
     fitContainer = false,
     enableHistory = true,
     loadChildren,
@@ -1062,7 +1062,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     setCollapsedGroups(new Set());
   }, [groupByProp]);
 
-  const isTreeEnabled = enableTreeData === true || typeof getSubRows === "function";
+  const isTreeEnabled =
+    enableTreeData === true ||
+    typeof getSubRows === "function" ||
+    typeof loadChildren === "function" ||
+    typeof hasChildren === "function";
   const isInfiniteMode = enableInfiniteScroll === true || paginationMode === "infinite";
   const [treeExpandedIds, setTreeExpandedIds] = React.useState<ReadonlySet<string>>(() =>
     isTreeEnabled && defaultExpandedDepth !== 0
@@ -1149,6 +1153,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
   const [openFilterCol, setOpenFilterCol] = React.useState<string | null>(null);
   const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+  const [containerWidth, setContainerWidth] = React.useState(0);
   const [pinnedCols, setPinnedCols] = React.useState<Record<string, "left" | "right" | "none">>({});
   const resizeCleanupRef = React.useRef<(() => void) | null>(null);
   const editInputRef = React.useRef<HTMLInputElement | HTMLSelectElement | null>(null);
@@ -1349,25 +1354,17 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   const autoFitColumn = React.useCallback((id: string) => {
     const col = leafCols.find((c) => getColumnId(c) === id);
     if (!col) return;
-    const meta = col.meta ?? {};
-    let maxContentWidth = 0;
-    const headerTitle = getColumnTitle(col) || id;
-    maxContentWidth = Math.max(maxContentWidth, headerTitle.length * 8.5 + 50);
-
-    for (const row of rows) {
-      const rawVal = getCellValue(col, row);
-      const val = getCellText(rawVal);
-      if (val) {
-        maxContentWidth = Math.max(maxContentWidth, String(val).length * 8 + 26);
-      }
+    const computed = computeAutosizeWidths([col], rows.slice(0, 200), {
+      getColumnId,
+      getColumnTitle,
+      getCellValue: (c, r) => getCellValue(c, r),
+      getCellText: (val) => getCellText(val, boolLabels),
+    });
+    const finalWidth = computed[id];
+    if (finalWidth !== undefined) {
+      setColWidths((prev) => ({ ...prev, [id]: finalWidth }));
     }
-
-    const minW = meta.minWidth ?? 60;
-    const maxW = 550;
-    const finalWidth = Math.min(maxW, Math.max(minW, Math.round(maxContentWidth)));
-
-    setColWidths((prev) => ({ ...prev, [id]: finalWidth }));
-  }, [leafCols, rows]);
+  }, [leafCols, rows, boolLabels]);
 
   const instanceId = React.useId();
   const viewsButtonId = `${instanceId}-views`;
@@ -1423,19 +1420,31 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     () => visibleColumns(leafCols, hiddenCols),
     [leafCols, hiddenCols],
   );
+  const visibleIndexMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    visible.forEach((col, i) => map.set(getColumnId(col), i));
+    return map;
+  }, [visible]);
+  const reservedStructuralWidth =
+    (enableRowReorder ? 36 : 0) +
+    (renderExpandedRow ? 40 : 0) +
+    (enableSelection ? 44 : 0) +
+    (showSerialNumber ? 56 : 0);
+  const effectiveColWidths = React.useMemo(() => {
+    if (!fitContainer || containerWidth <= 0) return colWidths;
+    return distributeContainerWidth(visible, containerWidth, colWidths, {
+      getColumnId,
+      isPinned: (c) => isPinned(c, pinnedCols) !== false,
+      defaultWidth: DEFAULT_COLUMN_WIDTH,
+      reservedWidth: reservedStructuralWidth,
+    });
+  }, [fitContainer, containerWidth, colWidths, visible, pinnedCols, reservedStructuralWidth]);
   const hideable = React.useMemo(() => leafCols.filter(isHideable), [leafCols]);
   const pageItems = React.useMemo(
     () => getPageNumbers(currentPage, totalPages),
     [currentPage, totalPages],
   );
   const pageRowIds = React.useMemo(() => rows.map((row) => getRowId(row)), [rows, getRowId]);
-
-  const columnCount =
-    visible.length +
-    (enableRowReorder ? 1 : 0) +
-    (renderExpandedRow ? 1 : 0) +
-    (showSerialNumber ? 1 : 0) +
-    (enableSelection ? 1 : 0);
 
   const nestedGroupItems = React.useMemo(
     () =>
@@ -1456,10 +1465,11 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     });
   };
   const toggleTreeExpand = (nodeId: string): void => {
+    if (loadingTreeNodes.has(nodeId)) return;
     const isExpanded = treeExpandedIds.has(nodeId);
     if (!isExpanded && loadChildren) {
       const node = treeNodes?.find((n) => n.id === nodeId);
-      if (node && !lazyTreeChildren.has(nodeId)) {
+      if (node && node.childCount === 0 && !lazyTreeChildren.has(nodeId)) {
         const canLoad = hasChildren ? hasChildren(node.row) : true;
         if (canLoad) {
           setLoadingTreeNodes((prev) => new Set(prev).add(nodeId));
@@ -1508,16 +1518,32 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   const colWin = React.useMemo(() => {
     if (!enableColumnVirtualization || headerRows.hasGroups) return null;
+    const viewportWidth =
+      containerWidth > 0 ? containerWidth : (tableWrapRef.current?.clientWidth || 1024);
     return computeVirtualColumnsWindow({
       columns: visible,
       scrollLeft: virtualScrollLeft,
-      viewportWidth: tableWrapRef.current?.clientWidth ?? 1024,
-      columnWidths: colWidths,
+      viewportWidth,
+      columnWidths: effectiveColWidths,
       getColumnId,
       isPinned: (c) => isPinned(c, pinnedCols) || "none",
       overscan: virtualColumnOverscan,
     });
-  }, [enableColumnVirtualization, headerRows.hasGroups, visible, virtualScrollLeft, colWidths, pinnedCols, virtualColumnOverscan]);
+  }, [enableColumnVirtualization, headerRows.hasGroups, containerWidth, visible, virtualScrollLeft, effectiveColWidths, pinnedCols, virtualColumnOverscan]);
+
+  const renderedColCount = colWin
+    ? colWin.leftPinned.length +
+      (colWin.leftSpacerWidth > 0 ? 1 : 0) +
+      colWin.virtualColumns.length +
+      (colWin.rightSpacerWidth > 0 ? 1 : 0) +
+      colWin.rightPinned.length
+    : visible.length;
+  const columnCount =
+    renderedColCount +
+    (enableRowReorder ? 1 : 0) +
+    (renderExpandedRow ? 1 : 0) +
+    (showSerialNumber ? 1 : 0) +
+    (enableSelection ? 1 : 0);
   const renderedRows = React.useMemo(
     () => (virtualWin ? rows.slice(virtualWin.startIndex, virtualWin.endIndex) : rows),
     [rows, virtualWin],
@@ -1566,7 +1592,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       for (const col of visibleCols) {
         const id = getColumnId(col);
         const pin = isPinned(col, pinnedCols);
-        const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+        const width = effectiveColWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
         if (pin === "left") {
           leftOffsets.set(id, currentLeft);
           currentLeft += width;
@@ -1582,7 +1608,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       if (!col) continue;
       const id = getColumnId(col);
       const pin = isPinned(col, pinnedCols);
-      const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+      const width = effectiveColWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
         currentRight += width;
@@ -1984,7 +2010,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     const isFilterActive = activeFilter !== undefined && activeFilter.trim() !== "";
     const isFilterOpen = openFilterCol === id;
 
-    const customWidth = colWidths[id];
+    const customWidth = effectiveColWidths[id];
     const baseStyle = headerCellStyle(col);
     const thStyle: React.CSSProperties = {
       ...baseStyle,
@@ -2396,49 +2422,60 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     setCellRange({ ...cellRange, maxRow: endRow });
   };
 
+  const applyHistoryMutations = React.useCallback(
+    (mutations: readonly CellMutation[], direction: "undo" | "redo"): void => {
+      for (const m of mutations) {
+        const col = leafCols.find((c) => getColumnId(c) === m.columnId);
+        const targetRow =
+          rows.find((r) => getRowId(r) === m.rowId) ??
+          (isClientSide ? data.find((r) => getRowId(r) === m.rowId) : undefined);
+        if (col && targetRow) {
+          const fromValue = direction === "undo" ? m.newValue : m.oldValue;
+          const toValue = direction === "undo" ? m.oldValue : m.newValue;
+          writeMutatedRowValue(targetRow, col, m.columnId, toValue);
+          if (isClientSide) {
+            const rawRow = data.find((r) => getRowId(r) === m.rowId);
+            if (rawRow && rawRow !== targetRow) {
+              writeMutatedRowValue(rawRow, col, m.columnId, toValue);
+            }
+          }
+          onCellEdit?.({
+            row: targetRow,
+            columnId: m.columnId,
+            oldValue: fromValue,
+            newValue: toValue,
+          });
+        }
+      }
+      setDirtyCells((prev) => {
+        const next = new Set(prev);
+        for (const m of mutations) {
+          const key = `${m.rowId}::${m.columnId}`;
+          if (direction === "undo") next.delete(key);
+          else next.add(key);
+        }
+        return next;
+      });
+      setHistoryTick((t) => t + 1);
+    },
+    [leafCols, rows, data, isClientSide, getRowId, onCellEdit],
+  );
+
   const undo = React.useCallback((): boolean => {
     if (enableHistory === false) return false;
     const action = historyManagerRef.current?.undo();
-    if (!action) return false;
-    const pool = isClientSide ? data : rows;
-    for (const m of action.mutations) {
-      const col = visible.find((c) => getColumnId(c) === m.columnId);
-      const targetRow = pool.find((r) => getRowId(r) === m.rowId);
-      if (col && targetRow) {
-        writeMutatedRowValue(targetRow, col, m.columnId, m.oldValue);
-        onCellEdit?.({
-          row: targetRow,
-          columnId: m.columnId,
-          oldValue: m.newValue,
-          newValue: m.oldValue,
-        });
-      }
-    }
-    setHistoryTick((t) => t + 1);
+    if (!action || action.mutations.length === 0) return false;
+    applyHistoryMutations(action.mutations, "undo");
     return true;
-  }, [enableHistory, isClientSide, data, rows, visible, getRowId, onCellEdit]);
+  }, [enableHistory, applyHistoryMutations]);
 
   const redo = React.useCallback((): boolean => {
     if (enableHistory === false) return false;
     const action = historyManagerRef.current?.redo();
-    if (!action) return false;
-    const pool = isClientSide ? data : rows;
-    for (const m of action.mutations) {
-      const col = visible.find((c) => getColumnId(c) === m.columnId);
-      const targetRow = pool.find((r) => getRowId(r) === m.rowId);
-      if (col && targetRow) {
-        writeMutatedRowValue(targetRow, col, m.columnId, m.newValue);
-        onCellEdit?.({
-          row: targetRow,
-          columnId: m.columnId,
-          oldValue: m.oldValue,
-          newValue: m.newValue,
-        });
-      }
-    }
-    setHistoryTick((t) => t + 1);
+    if (!action || action.mutations.length === 0) return false;
+    applyHistoryMutations(action.mutations, "redo");
     return true;
-  }, [enableHistory, isClientSide, data, rows, visible, getRowId, onCellEdit]);
+  }, [enableHistory, applyHistoryMutations]);
 
   const autoFitAllColumns = React.useCallback(
     (sampleRows = 50) => {
@@ -2454,26 +2491,19 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
   );
 
   React.useEffect(() => {
-    if (!fitContainer || typeof window === "undefined") return;
+    if ((!fitContainer && !enableColumnVirtualization) || typeof window === "undefined") return;
     const wrap = tableWrapRef.current;
     if (!wrap) return;
     const handleResize = () => {
       const w = wrap.clientWidth;
-      if (w > 0) {
-        setColWidths((prev) =>
-          distributeContainerWidth(visible, w, prev, {
-            getColumnId,
-            isPinned: (c) => isPinned(c, pinnedCols) !== false,
-            defaultWidth: DEFAULT_COLUMN_WIDTH,
-          }),
-        );
-      }
+      if (w > 0) setContainerWidth(w);
     };
     handleResize();
+    if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(handleResize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [fitContainer, visible, pinnedCols]);
+  }, [fitContainer, enableColumnVirtualization]);
 
   React.useImperativeHandle(
     tableRef as React.Ref<TableXHandle<TData>>,
@@ -2483,12 +2513,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       canUndo: () => Boolean(enableHistory !== false && historyManagerRef.current?.canUndo()),
       canRedo: () => Boolean(enableHistory !== false && historyManagerRef.current?.canRedo()),
       autoFitAllColumns,
+      autoFitColumn,
     }),
-    [undo, redo, autoFitAllColumns, enableHistory],
+    [undo, redo, autoFitAllColumns, autoFitColumn, enableHistory],
   );
 
   const handleRootKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
-    if (enableKeyboardNavigation === false) return;
     const target = e.target as HTMLElement | null;
     if (
       target &&
@@ -2500,24 +2530,29 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       if (inputType !== "checkbox" && inputType !== "radio") return;
     }
     if (editingCell || editingRowId) return;
+
+    if (enableHistory !== false && (e.ctrlKey || e.metaKey) && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+      if (key === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+    }
+
+    if (enableKeyboardNavigation === false) return;
     if (rows.length === 0 || visible.length === 0) return;
 
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-      e.preventDefault();
-      if (e.shiftKey) {
-        redo();
-      } else {
-        undo();
-      }
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-      e.preventDefault();
-      redo();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && enableRangeSelection && cellRange) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "c" && enableRangeSelection && cellRange) {
       const tsv = formatRangeTsv(rows, visible, cellRange, boolLabels);
       if (tsv) {
         e.preventDefault();
@@ -3277,7 +3312,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
           return colWin ? (
             <>
-              {colWin.leftPinned.map((col, idx) => renderBodyCell(col, idx))}
+              {colWin.leftPinned.map((col) => renderBodyCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
               {colWin.leftSpacerWidth > 0 ? (
                 <td
                   className="tbx-td--col-spacer"
@@ -3285,7 +3320,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   aria-hidden="true"
                 />
               ) : null}
-              {colWin.virtualColumns.map((col, idx) => renderBodyCell(col, colWin.startIndex + idx))}
+              {colWin.virtualColumns.map((col) => renderBodyCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
               {colWin.rightSpacerWidth > 0 ? (
                 <td
                   className="tbx-td--col-spacer"
@@ -3293,7 +3328,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   aria-hidden="true"
                 />
               ) : null}
-              {colWin.rightPinned.map((col, idx) => renderBodyCell(col, visible.length - colWin.rightPinned.length + idx))}
+              {colWin.rightPinned.map((col) => renderBodyCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
             </>
           ) : (
             visible.map((col, colIndex) => renderBodyCell(col, colIndex))
@@ -3824,7 +3859,10 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             meta={activeFilterPopoverCol.meta ?? {}}
             title={getColumnTitle(activeFilterPopoverCol) || popId}
             activeFilter={activeFilterPopoverVal}
-            optionCounts={computeFilterOptionCounts(activeFilterPopoverCol, rows)}
+            optionCounts={computeFilterOptionCounts(
+              activeFilterPopoverCol,
+              isClientSide ? (allData ?? data) : (allData ?? rows),
+            )}
             filterable={popFilterable}
             enableColumnMenu={enableColumnMenu !== false}
             sortable={popSortable}
@@ -4293,7 +4331,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
                   return colWin ? (
                     <>
-                      {colWin.leftPinned.map((col, idx) => renderSummaryCell(col, idx))}
+                      {colWin.leftPinned.map((col) => renderSummaryCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
                       {colWin.leftSpacerWidth > 0 ? (
                         <td
                           className="tbx-td--col-spacer"
@@ -4301,7 +4339,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                           aria-hidden="true"
                         />
                       ) : null}
-                      {colWin.virtualColumns.map((col, idx) => renderSummaryCell(col, colWin.startIndex + idx))}
+                      {colWin.virtualColumns.map((col) => renderSummaryCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
                       {colWin.rightSpacerWidth > 0 ? (
                         <td
                           className="tbx-td--col-spacer"
@@ -4309,7 +4347,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                           aria-hidden="true"
                         />
                       ) : null}
-                      {colWin.rightPinned.map((col, idx) => renderSummaryCell(col, visible.length - colWin.rightPinned.length + idx))}
+                      {colWin.rightPinned.map((col) => renderSummaryCell(col, visibleIndexMap.get(getColumnId(col)) ?? 0))}
                     </>
                   ) : (
                     visible.map((col, colIndex) => renderSummaryCell(col, colIndex))

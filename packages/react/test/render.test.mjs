@@ -247,3 +247,33 @@ test("React TableX SSR renders column virtualization and tree hasChildren predic
   assert.ok(html.includes("tbx-tree-toggle"), "Tree toggle button renders when hasChildren returns true");
 });
 
+test("React TableX avoids colIndex collision with pinned columns under column virtualization and auto-enables tree for loadChildren", async () => {
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const cols = Array.from({ length: 12 }, (_, i) => ({
+    id: `col_${i}`,
+    accessorKey: `field_${i}`,
+    header: `Col ${i}`,
+    meta: i === 0 ? { pinned: "left", width: 140 } : { width: 180 },
+  }));
+  const rows = [
+    { id: "r1", field_0: "Root 1", field_1: 100, hasSub: true },
+  ];
+
+  const html = renderToStaticMarkup(
+    React.createElement(TableX, {
+      caption: "Pinned Virtual Cols",
+      columns: cols,
+      data: rows,
+      enableColumnVirtualization: true,
+      enableSummaryRow: true,
+      hasChildren: (r) => Boolean(r.hasSub),
+      loadChildren: async () => [],
+    }),
+  );
+
+  const toggleMatches = html.match(/class="tbx-tree-toggle"/g) ?? [];
+  assert.equal(toggleMatches.length, 1, "Only the true colIndex 0 cell renders tree toggle");
+  const totalMatches = html.match(/<strong>Total<\/strong>/g) ?? [];
+  assert.equal(totalMatches.length, 1, "Summary Total renders once at colIndex 0");
+});
+

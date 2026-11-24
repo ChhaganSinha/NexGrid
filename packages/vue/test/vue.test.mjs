@@ -185,3 +185,36 @@ test("Vue TableX renders enterprise features: column virtualization, history man
   assert.ok(html.includes("tbx-root"), "Renders virtualized grid root");
   assert.ok(html.includes("Engineering"), "Renders data rows");
 });
+
+test("Vue TableX avoids colIndex collision under column virtualization and auto-enables tree for loadChildren", async () => {
+  const cols = Array.from({ length: 12 }, (_, i) => ({
+    id: `col_${i}`,
+    accessorKey: `field_${i}`,
+    header: `Col ${i}`,
+    meta: i === 0 ? { pinned: "left", width: 140 } : { width: 180 },
+  }));
+  const rows = [
+    { id: "r1", field_0: "Root 1", field_1: 100, hasSub: true },
+  ];
+
+  const app = createSSRApp({
+    setup() {
+      return () =>
+        h(TableX, {
+          caption: "Pinned Virtual Cols Vue",
+          columns: cols,
+          data: rows,
+          enableColumnVirtualization: true,
+          enableSummaryRow: true,
+          hasChildren: (r) => Boolean(r.hasSub),
+          loadChildren: async () => [],
+        });
+    },
+  });
+
+  const html = await renderToString(app);
+  const toggleMatches = html.match(/class="tbx-tree-toggle"/g) ?? [];
+  assert.equal(toggleMatches.length, 1, "Only true colIndex 0 renders tree toggle");
+  const totalMatches = html.match(/<strong>Total<\/strong>/g) ?? [];
+  assert.equal(totalMatches.length, 1, "Summary Total renders once at colIndex 0");
+});

@@ -218,8 +218,9 @@ export function computeAutosizeWidths<TData, TCol>(
       }
     }
 
+    const colMinW = (col as { meta?: { minWidth?: number } }).meta?.minWidth ?? 0;
     const calculated = Math.round(maxChars * charWidthPx + paddingPx);
-    result[cid] = Math.max(minWidth, Math.min(maxWidth, calculated));
+    result[cid] = Math.max(minWidth, colMinW, Math.min(maxWidth, calculated));
   }
 
   return result;
@@ -237,25 +238,27 @@ export function distributeContainerWidth<TCol>(
     getColumnId: (col: TCol) => string;
     isPinned: (col: TCol) => boolean;
     defaultWidth?: number;
+    reservedWidth?: number;
   },
 ): Record<string, number> {
-  if (containerWidth <= 0 || columns.length === 0) return { ...currentWidths };
-
-  const { getColumnId, isPinned, defaultWidth = DEFAULT_COLUMN_WIDTH } = options;
+  const { getColumnId, isPinned, defaultWidth = DEFAULT_COLUMN_WIDTH, reservedWidth = 0 } = options;
+  const availableWidth = containerWidth - Math.max(0, reservedWidth);
+  if (availableWidth <= 0 || columns.length === 0) return { ...currentWidths };
 
   let totalAllocated = 0;
-  const unpinned: string[] = [];
+  const unpinned: { cid: string; base: number }[] = [];
 
   for (const col of columns) {
     const cid = getColumnId(col);
-    const w = currentWidths[cid] ?? (col as { meta?: { width?: number } }).meta?.width ?? defaultWidth;
-    totalAllocated += w;
+    const meta = (col as { meta?: { width?: number; minWidth?: number } }).meta;
+    const base = currentWidths[cid] ?? meta?.width ?? meta?.minWidth ?? defaultWidth;
+    totalAllocated += base;
     if (!isPinned(col)) {
-      unpinned.push(cid);
+      unpinned.push({ cid, base });
     }
   }
 
-  const surplus = containerWidth - totalAllocated;
+  const surplus = Math.floor(availableWidth - totalAllocated);
   if (surplus <= 0 || unpinned.length === 0) return { ...currentWidths };
 
   const extraPerCol = Math.floor(surplus / unpinned.length);
@@ -263,9 +266,8 @@ export function distributeContainerWidth<TCol>(
 
   const nextWidths = { ...currentWidths };
   for (let i = 0; i < unpinned.length; i++) {
-    const cid = unpinned[i]!;
-    const cur = nextWidths[cid] ?? defaultWidth;
-    nextWidths[cid] = cur + extraPerCol + (i === 0 ? remainder : 0);
+    const item = unpinned[i]!;
+    nextWidths[item.cid] = item.base + extraPerCol + (i === 0 ? remainder : 0);
   }
 
   return nextWidths;

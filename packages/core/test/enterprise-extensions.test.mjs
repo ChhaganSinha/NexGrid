@@ -220,3 +220,40 @@ test("computeFilterOptionCounts aggregates matching option frequencies accuratel
   assert.equal(counts.HR, 1);
   assert.equal(counts.Marketing, 0);
 });
+
+test("distributeContainerWidth preserves column meta.width and subtracts reservedWidth cleanly", () => {
+  const cols = [
+    { id: "a", meta: { width: 200 } },
+    { id: "b", meta: {} },
+  ];
+  const distributed = distributeContainerWidth(cols, 1000, {}, {
+    getColumnId: (c) => c.id,
+    isPinned: () => false,
+    reservedWidth: 100, // e.g., selection (44) + serial (56)
+  });
+  // Total available = 900. Allocated = 200 + 140 = 340. Surplus = 560 -> 280 extra per column
+  assert.equal(distributed.a, 200 + 280);
+  assert.equal(distributed.b, 140 + 280);
+  assert.equal(distributed.a + distributed.b, 900);
+
+  // Respects meta.minWidth during computeAutosizeWidths
+  const auto = computeAutosizeWidths(
+    [{ id: "a", header: "A", meta: { minWidth: 150 } }],
+    [{ a: "x" }],
+    {
+      getColumnId: (c) => c.id,
+      getColumnTitle: (c) => c.header,
+      getCellValue: (c, r) => r[c.id],
+      getCellText: (v) => String(v ?? ""),
+    },
+  );
+  assert.equal(auto.a, 150);
+
+  // Supports boolean and Date values in computeFilterOptionCounts
+  const boolCounts = computeFilterOptionCounts(
+    { id: "active", meta: { filterOptions: ["Yes", "No"] } },
+    [{ active: true }, { active: false }, { active: true }],
+  );
+  assert.equal(boolCounts.Yes, 2);
+  assert.equal(boolCounts.No, 1);
+});

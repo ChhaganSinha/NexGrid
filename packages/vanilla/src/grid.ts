@@ -99,6 +99,7 @@ import {
   computeAutosizeWidths,
   distributeContainerWidth,
   DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
   computeFilterOptionCounts,
   type CellCoord,
   type CellMutation,
@@ -285,6 +286,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private draggedColumnId: string | null = null;
   private virtualScrollTop = 0;
   private virtualScrollLeft = 0;
+  private fitContainerWidth = 0;
+  private fitObserver: ResizeObserver | null = null;
   private readonly historyManager = new GridHistoryManager();
   private readonly lazyTreeChildren = new Map<string, readonly TData[]>();
   private readonly loadingTreeNodes = new Set<string>();
@@ -646,7 +649,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.virtualScrollLeft = nextLeft;
           this.renderHead();
           this.renderBody();
-          this.renderFooter();
+          this.renderSummary();
         }
       }
       if (
@@ -674,9 +677,28 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.repositionActiveFilterPopover();
         }
         if (this.options.fitContainer || this.options.enableColumnVirtualization) {
+          const w = this.tableWrap.clientWidth ?? 0;
+          if (w > 0) this.fitContainerWidth = w;
           this.render();
         }
       });
+    }
+    if (
+      (options.fitContainer || options.enableColumnVirtualization) &&
+      typeof ResizeObserver !== "undefined"
+    ) {
+      this.fitObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const nextW = Math.round(entry.contentRect.width);
+          if (nextW > 0 && nextW !== this.fitContainerWidth) {
+            this.fitContainerWidth = nextW;
+            this.renderHead();
+            this.renderBody();
+            this.renderSummary();
+          }
+        }
+      });
+      this.fitObserver.observe(this.tableWrap);
     }
 
     container.appendChild(this.root);
@@ -791,18 +813,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
     return this.allAcrossSelected;
   }
 
-  undo(): void {
-    if (this.options.enableHistory === false) return;
+  undo(): boolean {
+    if (this.options.enableHistory === false) return false;
     const action = this.historyManager.undo();
-    if (!action) return;
+    if (!action || action.mutations.length === 0) return false;
     this.applyHistoryMutations(action.mutations, "undo");
+    return true;
   }
 
-  redo(): void {
-    if (this.options.enableHistory === false) return;
+  redo(): boolean {
+    if (this.options.enableHistory === false) return false;
     const action = this.historyManager.redo();
-    if (!action) return;
+    if (!action || action.mutations.length === 0) return false;
     this.applyHistoryMutations(action.mutations, "redo");
+    return true;
   }
 
   canUndo(): boolean {
@@ -829,22 +853,6 @@ class NexGridController<TData> implements TableXHandle<TData> {
     for (const [colId, width] of Object.entries(widths)) {
       this.columnWidths[colId] = width;
     }
-    if (this.options.fitContainer && this.tableWrap) {
-      const containerW = this.tableWrap.clientWidth || 1024;
-      const distributed = distributeContainerWidth(
-        visibleCols,
-        containerW,
-        this.columnWidths,
-        {
-          getColumnId,
-          isPinned: (col) => isPinned(col, this.pinnedColumns) !== false,
-          defaultWidth: DEFAULT_COLUMN_WIDTH,
-        },
-      );
-      for (const [colId, width] of Object.entries(distributed)) {
-        this.columnWidths[colId] = width;
-      }
-    }
     this.saveState();
     this.render();
   }
@@ -853,13 +861,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
     mutations: readonly CellMutation[],
     direction: "undo" | "redo",
   ): void {
-    const pool = this.isClientSide ? this.rawClientData : this.data;
-    const visibleCols = this.visibleCols();
-    const colMap = new Map(visibleCols.map((c) => [getColumnId(c), c]));
+    const displayRows = this.displayedDataList();
+    const fallbackPool = this.isClientSide ? this.rawClientData : this.data;
+    const leafCols = this.leafCols();
+    const colMap = new Map(leafCols.map((c) => [getColumnId(c), c]));
 
     for (const m of mutations) {
       const val = direction === "undo" ? m.oldValue : m.newValue;
-      const targetRow = pool.find((r) => this.rowId(r) === m.rowId);
+      const targetRow =
+        displayRows.find((r) => this.rowId(r) === m.rowId) ??
+        fallbackPool.find((r) => this.rowId(r) === m.rowId);
       const col = colMap.get(m.columnId);
       if (targetRow && col) {
         this.writeMutatedRowValue(targetRow, col, m.columnId, val);
@@ -881,27 +892,54 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.render();
   }
 
+  private effectiveColumnWidths(
+    cols: readonly TableXVanillaColumn<TData>[],
+  ): Record<string, number> {
+    if (!this.options.fitContainer) return this.columnWidths;
+    const cw =
+      this.fitContainerWidth > 0 ? this.fitContainerWidth : (this.tableWrap?.clientWidth ?? 0);
+    if (cw <= 0) return this.columnWidths;
+    const reservedWidth =
+      (this.options.enableRowReorder ? 36 : 0) +
+      (this.options.renderExpandedRow ? 40 : 0) +
+      (this.selectionEnabled() ? 44 : 0) +
+      (this.showSerial() ? 56 : 0);
+    return distributeContainerWidth(cols, cw, this.columnWidths, {
+      getColumnId,
+      isPinned: (col) => isPinned(col, this.pinnedColumns) !== false,
+      defaultWidth: DEFAULT_COLUMN_WIDTH,
+      reservedWidth,
+    });
+  }
+
   private getVirtualColumnsWindow(
     cols: readonly TableXVanillaColumn<TData>[],
+    widths?: Record<string, number>,
   ): VirtualColumnsWindow<TableXVanillaColumn<TData>> {
     const viewportWidth =
-      this.tableWrap && this.tableWrap.clientWidth > 0
-        ? this.tableWrap.clientWidth
-        : 1024;
+      this.fitContainerWidth > 0
+        ? this.fitContainerWidth
+        : this.tableWrap && this.tableWrap.clientWidth > 0
+          ? this.tableWrap.clientWidth
+          : 1024;
     return computeVirtualColumnsWindow({
       columns: cols,
+      pinnedCols: this.pinnedColumns,
       scrollLeft: this.virtualScrollLeft,
       viewportWidth,
-      columnWidths: this.columnWidths,
+      columnWidths: widths ?? this.effectiveColumnWidths(cols),
       getColumnId,
-      isPinned: (col) => isPinned(col, this.pinnedColumns) || "none",
-      overscan: 2,
+      isPinned: (col) => isPinned(col, this.pinnedColumns),
+      overscan: this.options.virtualColumnOverscan ?? DEFAULT_COLUMN_OVERSCAN,
     });
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+
+    this.fitObserver?.disconnect();
+    this.fitObserver = null;
 
     if (this.searchTimer !== null) {
       clearTimeout(this.searchTimer);
@@ -1637,30 +1675,25 @@ class NexGridController<TData> implements TableXHandle<TData> {
     this.render();
   }
 
-  private autoFitColumn(id: string): void {
+  autoFitColumn(id: string): void {
     const col = this.leafCols().find((c) => getColumnId(c) === id);
     if (!col) return;
-    const meta = col.meta ?? {};
-
-    let maxContentWidth = 0;
-    const headerTitle = getColumnTitle(col) || id;
-    maxContentWidth = Math.max(maxContentWidth, headerTitle.length * 8.5 + 50);
-
-    for (const row of this.data) {
-      const rawVal = getCellValue(col, row);
-      const val = getCellText(rawVal);
-      if (val) {
-        maxContentWidth = Math.max(maxContentWidth, String(val).length * 8 + 26);
-      }
+    const rows = this.displayedDataList();
+    const computed = computeAutosizeWidths([col], rows.slice(0, 200), {
+      getColumnId,
+      getColumnTitle,
+      getCellValue: (c, row) => getCellValue(c, row),
+      getCellText: (val) =>
+        getCellText(val, {
+          yes: this.locale.booleanYes,
+          no: this.locale.booleanNo,
+        }),
+    });
+    if (computed[id] !== undefined) {
+      this.columnWidths[id] = computed[id];
+      this.saveState();
+      this.render();
     }
-
-    const minW = meta.minWidth ?? 60;
-    const maxW = 550;
-    const finalWidth = Math.min(maxW, Math.max(minW, Math.round(maxContentWidth)));
-
-    this.columnWidths[id] = finalWidth;
-    this.saveState();
-    this.render();
   }
 
   private renderFilterPills(): void {
@@ -2173,12 +2206,16 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   // ---- Pinned offsets helper -----------------------------------------------
 
-  private getPinnedOffsets(visibleCols: readonly TableXVanillaColumn<TData>[]): {
+  private getPinnedOffsets(
+    visibleCols: readonly TableXVanillaColumn<TData>[],
+    widths?: Record<string, number>,
+  ): {
     leftOffsets: Map<string, number>;
     rightOffsets: Map<string, number>;
     lastLeftPinnedId: string | null;
     firstRightPinnedId: string | null;
   } {
+    const colWidths = widths ?? this.effectiveColumnWidths(visibleCols);
     const leftOffsets = new Map<string, number>();
     const rightOffsets = new Map<string, number>();
     let currentLeft = 0;
@@ -2213,7 +2250,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       for (const col of visibleCols) {
         const id = getColumnId(col);
         const pin = isPinned(col, this.pinnedColumns);
-        const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+        const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
         if (pin === "left") {
           leftOffsets.set(id, currentLeft);
           currentLeft += width;
@@ -2229,7 +2266,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       if (!col) continue;
       const id = getColumnId(col);
       const pin = isPinned(col, this.pinnedColumns);
-      const width = this.columnWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+      const width = colWidths[id] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
       if (pin === "right") {
         rightOffsets.set(id, currentRight);
         currentRight += width;
@@ -2244,26 +2281,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private renderHead(): void {
     const visibleCols = this.visibleCols();
-    if (this.options.fitContainer && this.tableWrap) {
-      const containerW = this.tableWrap.clientWidth;
-      if (containerW > 0) {
-        const distributed = distributeContainerWidth(
-          visibleCols,
-          containerW,
-          this.columnWidths,
-          {
-            getColumnId,
-            isPinned: (col) => isPinned(col, this.pinnedColumns) !== false,
-            defaultWidth: DEFAULT_COLUMN_WIDTH,
-          },
-        );
-        for (const [cid, w] of Object.entries(distributed)) {
-          this.columnWidths[cid] = w;
-        }
-      }
-    }
+    const effectiveWidths = this.effectiveColumnWidths(visibleCols);
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
-      this.getPinnedOffsets(visibleCols);
+      this.getPinnedOffsets(visibleCols, effectiveWidths);
     const headerRows = buildHeaderRows(this.columns, this.hidden);
     const rowSpan = headerRows.hasGroups ? 2 : 1;
 
@@ -2346,10 +2366,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     if (!headerRows.hasGroups) {
       if (this.options.enableColumnVirtualization) {
-        const colWin = this.getVirtualColumnsWindow(visibleCols);
+        const colWin = this.getVirtualColumnsWindow(visibleCols, effectiveWidths);
         for (const col of colWin.leftPinned) {
           row1Cells.push(
-            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
           );
         }
         if (colWin.leftSpacerWidth > 0) {
@@ -2368,7 +2388,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         }
         for (const col of colWin.virtualColumns) {
           row1Cells.push(
-            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
           );
         }
         if (colWin.rightSpacerWidth > 0) {
@@ -2387,7 +2407,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         }
         for (const col of colWin.rightPinned) {
           row1Cells.push(
-            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
           );
         }
         replaceChildren(this.thead, [el("tr", {}, row1Cells)]);
@@ -2396,7 +2416,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
       for (const col of visibleCols) {
         row1Cells.push(
-          this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
         );
       }
       replaceChildren(this.thead, [el("tr", {}, row1Cells)]);
@@ -2416,7 +2436,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         row1Cells.push(th);
       } else if (cell.leafColumn) {
         row1Cells.push(
-          this.buildLeafTh(cell.leafColumn, cell.rowSpan, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          this.buildLeafTh(cell.leafColumn, cell.rowSpan, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
         );
       }
     }
@@ -2425,7 +2445,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     for (const cell of headerRows.bottomRow) {
       if (cell.leafColumn) {
         row2Cells.push(
-          this.buildLeafTh(cell.leafColumn, 1, true, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          this.buildLeafTh(cell.leafColumn, 1, true, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId, effectiveWidths),
         );
       }
     }
@@ -2457,6 +2477,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     rightOffsets: Map<string, number>,
     lastLeftPinnedId: string | null,
     firstRightPinnedId: string | null,
+    effectiveWidths?: Record<string, number>,
   ): HTMLElement {
     const id = getColumnId(column);
     const sortField = getSortField(column);
@@ -2541,7 +2562,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const ariaSort =
       sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
 
-    const customWidth = this.columnWidths[id];
+    const customWidth = effectiveWidths?.[id] ?? this.columnWidths[id];
     const effectiveWidth =
       customWidth !== undefined
         ? customWidth
@@ -2755,8 +2776,22 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private renderBody(): void {
     const cols = this.visibleCols();
+    const effectiveWidths = this.effectiveColumnWidths(cols);
+    const headerRows = buildHeaderRows(this.columns, this.hidden);
+    const colWin =
+      this.options.enableColumnVirtualization && !headerRows.hasGroups
+        ? this.getVirtualColumnsWindow(cols, effectiveWidths)
+        : null;
+    const pinnedOffsets = this.getPinnedOffsets(cols, effectiveWidths);
+    const renderedColCount = colWin
+      ? colWin.leftPinned.length +
+        (colWin.leftSpacerWidth > 0 ? 1 : 0) +
+        colWin.virtualColumns.length +
+        (colWin.rightSpacerWidth > 0 ? 1 : 0) +
+        colWin.rightPinned.length
+      : cols.length;
     const colSpan =
-      cols.length +
+      renderedColCount +
       (this.options.enableRowReorder ? 1 : 0) +
       (this.options.renderExpandedRow ? 1 : 0) +
       (this.showSerial() ? 1 : 0) +
@@ -2802,10 +2837,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
       else rows.push(built);
     };
 
+    const rowContext = {
+      pinnedOffsets,
+      colWin,
+    };
+
     for (let i = 0; i < pinnedTop.length; i++) {
       const topRow = pinnedTop[i];
       if (topRow !== undefined) {
-        pushBuilt(this.buildRow(topRow, i, cols, colSpan, { pinnedVariant: "top" }));
+        pushBuilt(this.buildRow(topRow, i, cols, colSpan, { ...rowContext, pinnedVariant: "top" }));
       }
     }
 
@@ -2821,7 +2861,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       });
       for (let idx = 0; idx < treeNodes.length; idx++) {
         const node = treeNodes[idx]!;
-        pushBuilt(this.buildRow(node.row, idx, cols, colSpan, { treeNode: node }));
+        pushBuilt(this.buildRow(node.row, idx, cols, colSpan, { ...rowContext, treeNode: node }));
       }
     } else if (this.activeGroupBy.length > 0) {
       const nestedItems = buildNestedGroupItems(
@@ -2836,7 +2876,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       );
       for (const item of nestedItems) {
         if (item.kind === "row") {
-          pushBuilt(this.buildRow(item.row, item.originalIndex, cols, colSpan));
+          pushBuilt(this.buildRow(item.row, item.originalIndex, cols, colSpan, rowContext));
           continue;
         }
         const isCollapsed = item.collapsed;
@@ -2926,7 +2966,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
       for (let index = win.startIndex; index < win.endIndex; index++) {
         const row = this.data[index];
-        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan));
+        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan, rowContext));
       }
       if (win.bottomSpacerHeight > 0) {
         rows.push(
@@ -2941,14 +2981,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     } else {
       for (let index = 0; index < this.data.length; index++) {
         const row = this.data[index];
-        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan));
+        if (row !== undefined) pushBuilt(this.buildRow(row, index, cols, colSpan, rowContext));
       }
     }
 
     for (let i = 0; i < pinnedBottom.length; i++) {
       const botRow = pinnedBottom[i];
       if (botRow !== undefined) {
-        pushBuilt(this.buildRow(botRow, i, cols, colSpan, { pinnedVariant: "bottom" }));
+        pushBuilt(this.buildRow(botRow, i, cols, colSpan, { ...rowContext, pinnedVariant: "bottom" }));
       }
     }
 
@@ -2963,6 +3003,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
     rowOpts?: {
       pinnedVariant?: "top" | "bottom";
       treeNode?: TreeRowNode<TData>;
+      pinnedOffsets?: {
+        leftOffsets: Map<string, number>;
+        rightOffsets: Map<string, number>;
+        lastLeftPinnedId: string | null;
+        firstRightPinnedId: string | null;
+      };
+      colWin?: VirtualColumnsWindow<TableXVanillaColumn<TData>> | null;
     },
   ): HTMLTableRowElement | HTMLTableRowElement[] {
     const pinnedVariant = rowOpts?.pinnedVariant;
@@ -2973,7 +3020,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const isRowEditing = !pinnedVariant && this.editingRowId === id;
     const clickable = this.options.onRowClick !== undefined;
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
-      this.getPinnedOffsets(cols);
+      rowOpts?.pinnedOffsets ?? this.getPinnedOffsets(cols);
 
     const classes = ["tbx-row"];
     if (selected) classes.push("tbx-row--selected");
@@ -3210,8 +3257,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
       cells.push(td);
     };
 
-    if (this.options.enableColumnVirtualization) {
-      const colWin = this.getVirtualColumnsWindow(cols);
+    const colWin =
+      rowOpts?.colWin !== undefined
+        ? rowOpts.colWin
+        : this.options.enableColumnVirtualization && !buildHeaderRows(this.columns, this.hidden).hasGroups
+          ? this.getVirtualColumnsWindow(cols)
+          : null;
+    if (colWin) {
       for (const column of colWin.leftPinned) {
         renderColCell(column, cols.indexOf(column));
       }
@@ -3340,8 +3392,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const cells: HTMLElement[] = [];
+    const effectiveWidths = this.effectiveColumnWidths(visibleCols);
+    const headerRows = buildHeaderRows(this.columns, this.hidden);
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
-      this.getPinnedOffsets(visibleCols);
+      this.getPinnedOffsets(visibleCols, effectiveWidths);
 
     if (this.options.enableRowReorder) {
       const td = el("td", { class: "tbx-summary-cell" });
@@ -3414,8 +3468,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return td;
     };
 
-    if (this.options.enableColumnVirtualization) {
-      const colWin = this.getVirtualColumnsWindow(visibleCols);
+    if (this.options.enableColumnVirtualization && !headerRows.hasGroups) {
+      const colWin = this.getVirtualColumnsWindow(visibleCols, effectiveWidths);
       for (const col of colWin.leftPinned) {
         cells.push(buildSummaryCell(col, visibleCols.indexOf(col)));
       }
@@ -4843,6 +4897,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
               .join(" "),
             attrs: {
               type: "button",
+              disabled: isNodeLoading ? true : undefined,
               "aria-expanded": String(tNode.isExpanded),
               "aria-label": isNodeLoading
                 ? (this.locale.loadingNodeText ?? "Loading...")
@@ -4851,21 +4906,23 @@ class NexGridController<TData> implements TableXHandle<TData> {
                   : "Expand children",
             },
           },
-          [chevronRightIcon("tbx-icon")],
+          [
+            isNodeLoading
+              ? el("span", { class: "tbx-tree-spinner", attrs: { "aria-hidden": "true" } })
+              : chevronRightIcon("tbx-icon"),
+          ],
         );
         toggleBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
+          if (this.loadingTreeNodes.has(tNode.id)) return;
           if (this.treeExpandedIds.has(tNode.id)) {
             this.treeExpandedIds.delete(tNode.id);
             this.render();
           } else {
             const hasLazy = this.lazyTreeChildren.has(tNode.id);
-            const rowChildren = this.options.childrenKey
-              ? (tNode.row as Record<string, unknown>)[this.options.childrenKey]
-              : (tNode.row as { children?: unknown }).children;
             const needsLoad =
               !hasLazy &&
-              (!Array.isArray(rowChildren) || rowChildren.length === 0) &&
+              tNode.childCount === 0 &&
               typeof this.options.loadChildren === "function";
 
             if (needsLoad) {
@@ -5139,7 +5196,6 @@ class NexGridController<TData> implements TableXHandle<TData> {
   }
 
   private handleGridKeyDown(e: KeyboardEvent): void {
-    if (this.options.enableKeyboardNavigation === false) return;
     const target = e.target as HTMLElement | null;
     if (
       target &&
@@ -5153,11 +5209,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
     if (this.editingCell || this.editingRowId) return;
 
-    const rows = this.displayedDataList();
-    const cols = this.visibleCols();
-    if (rows.length === 0 || cols.length === 0) return;
-
-    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    if (
+      this.options.enableHistory !== false &&
+      (e.ctrlKey || e.metaKey) &&
+      !e.altKey
+    ) {
       const key = e.key.toLowerCase();
       if (key === "z") {
         e.preventDefault();
@@ -5175,8 +5231,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
     }
 
+    if (this.options.enableKeyboardNavigation === false) return;
+
+    const rows = this.displayedDataList();
+    const cols = this.visibleCols();
+    if (rows.length === 0 || cols.length === 0) return;
+
     if (
       (e.ctrlKey || e.metaKey) &&
+      !e.altKey &&
       e.key.toLowerCase() === "c" &&
       this.options.enableRangeSelection &&
       this.cellRange

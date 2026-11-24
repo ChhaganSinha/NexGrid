@@ -89,3 +89,32 @@ test("computeFilterOptionCounts in Angular bundle computes option frequencies", 
   assert.equal(counts["Sales"], 1);
   assert.equal(counts["HR"], 0);
 });
+
+test("Angular bundle re-exports fixed distributeContainerWidth and computeAutosizeWidths", () => {
+  const cols = [
+    { id: "id", header: "ID", meta: { width: 80, pinned: "left" } },
+    { id: "name", header: "Name", meta: { minWidth: 160 } },
+    { id: "role", header: "Role" },
+  ];
+  const dist = distributeContainerWidth(cols, 700, {}, {
+    getColumnId: (c) => c.id,
+    isPinned: (c) => Boolean(c.meta?.pinned),
+    defaultWidth: DEFAULT_COLUMN_WIDTH,
+    reservedWidth: 44,
+  });
+  assert.equal(dist.id, undefined, "Pinned column without override stays untouched (uses meta.width)");
+  assert.ok(dist.name >= 160);
+  assert.equal(80 + dist.name + dist.role, 700 - 44);
+
+  const autosized = computeAutosizeWidths(
+    cols,
+    [{ id: 1, name: "A", role: "B" }],
+    {
+      getColumnId: (c) => c.id,
+      getColumnTitle: (c) => c.header,
+      getCellValue: (c, r) => r[c.id],
+      getCellText: (val) => String(val ?? ""),
+    },
+  );
+  assert.ok(autosized.name >= 160, "Honors column meta.minWidth");
+});

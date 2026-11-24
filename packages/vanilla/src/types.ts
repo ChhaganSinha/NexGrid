@@ -179,6 +179,8 @@ export interface TableXOptions<TData> {
   enableVirtualization?: boolean;
   /** Enable horizontal column virtualization for tables with many columns. Default `false`. */
   enableColumnVirtualization?: boolean;
+  /** Number of unpinned buffer columns rendered beyond viewport edges. Default `2`. */
+  virtualColumnOverscan?: number;
   /** Automatically distribute surplus container width across unpinned columns so the table fills 100% of the viewport. Default `false`. */
   fitContainer?: boolean;
   /** Scroll viewport max-height in pixels when `enableVirtualization` is `true`. Default `520`. */
@@ -337,15 +339,17 @@ export interface TableXHandle<TData> {
   /** Set the dataset (updates in-memory data in client mode, or current page in server mode). */
   setData(data: TData[]): void;
   /** Undo the latest cell mutation or batch edit. */
-  undo(): void;
+  undo(): boolean;
   /** Redo the latest reverted cell mutation or batch edit. */
-  redo(): void;
+  redo(): boolean;
   /** True when mutations exist in the undo stack. */
   canUndo(): boolean;
   /** True when mutations exist in the redo stack. */
   canRedo(): boolean;
   /** Automatically resize all visible columns to fit their longest text content. */
-  autoFitAllColumns(): void;
+  autoFitAllColumns(sampleRows?: number): void;
+  /** Automatically resize a single column to fit its longest text content. */
+  autoFitColumn(id: string): void;
   /** Tear down: detach the grid and remove every listener it registered. */
   destroy(): void;
 }

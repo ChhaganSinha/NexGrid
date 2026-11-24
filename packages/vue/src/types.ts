@@ -147,5 +147,7 @@ export interface TableXHandle<TData = unknown> {
   canRedo(): boolean;
   /** Automatically resize all visible columns to fit their longest text content. */
   autoFitAllColumns(sampleRows?: number): void;
+  /** Automatically resize a single column to fit its content. */
+  autoFitColumn(colId: string): void;
 }
 export type NexGridHandle<TData = unknown> = TableXHandle<TData>;

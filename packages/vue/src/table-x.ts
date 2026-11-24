@@ -358,6 +358,7 @@ export const TableX = defineComponent({
     const lazyTreeChildren = ref<Map<string, readonly unknown[]>>(new Map());
     const loadingTreeNodes = ref<Set<string>>(new Set());
     const virtualScrollLeft = ref(0);
+    const containerWidth = ref(0);
 
     const locale = computed(() => resolveLocale(props.locale));
     const boolLabels = computed(() => ({
@@ -373,7 +374,11 @@ export const TableX = defineComponent({
         (props.onQueryChange === undefined && props.query === undefined),
     );
     const isTreeEnabled = computed(
-      () => props.enableTreeData === true || typeof props.getSubRows === "function",
+      () =>
+        props.enableTreeData === true ||
+        typeof props.getSubRows === "function" ||
+        typeof props.loadChildren === "function" ||
+        typeof props.hasChildren === "function",
     );
     const isInfiniteMode = computed(
       () => props.enableInfiniteScroll === true || props.paginationMode === "infinite",
@@ -607,6 +612,31 @@ export const TableX = defineComponent({
     };
 
     let fitObserver: ResizeObserver | null = null;
+    const syncFitObserver = (): void => {
+      if (fitObserver) {
+        fitObserver.disconnect();
+        fitObserver = null;
+      }
+      const wrap = tableWrapRef.value;
+      if (!wrap || (!props.fitContainer && !props.enableColumnVirtualization)) return;
+      if (wrap.clientWidth > 0) containerWidth.value = wrap.clientWidth;
+      if (typeof ResizeObserver !== "undefined") {
+        fitObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const width = entry.contentRect.width;
+            if (width > 0) {
+              containerWidth.value = width;
+            }
+          }
+        });
+        fitObserver.observe(wrap);
+      }
+    };
+
+    watch(
+      () => [props.fitContainer, props.enableColumnVirtualization, tableWrapRef.value],
+      () => syncFitObserver(),
+    );
 
     onMounted(() => {
       if (props.storageKey) {
@@ -634,27 +664,7 @@ export const TableX = defineComponent({
       if (typeof window !== "undefined") {
         window.addEventListener("resize", onWindowResize);
       }
-      if (props.fitContainer && tableWrapRef.value && typeof ResizeObserver !== "undefined") {
-        fitObserver = new ResizeObserver((entries) => {
-          for (const entry of entries) {
-            const width = entry.contentRect.width;
-            if (width > 0) {
-              const distributed = distributeContainerWidth(
-                visible.value,
-                width,
-                colWidths.value,
-                {
-                  getColumnId,
-                  isPinned: (c) => isPinned(c, pinnedCols.value) !== false,
-                  defaultWidth: DEFAULT_COLUMN_WIDTH,
-                },
-              );
-              colWidths.value = distributed;
-            }
-          }
-        });
-        fitObserver.observe(tableWrapRef.value);
-      }
+      syncFitObserver();
     });
 
     onBeforeUnmount(() => {
@@ -710,16 +720,46 @@ export const TableX = defineComponent({
         : null,
     );
 
+    const visibleIndexMap = computed(() => {
+      const map = new Map<string, number>();
+      visible.value.forEach((col, i) => map.set(getColumnId(col), i));
+      return map;
+    });
+
+    const hasExpandCol = computed(
+      () => Boolean(props.renderExpandedRow || slots["expanded-row"]),
+    );
+    const reservedStructuralWidth = computed(
+      () =>
+        (props.enableRowReorder ? 36 : 0) +
+        (hasExpandCol.value ? 40 : 0) +
+        (props.enableSelection ? 44 : 0) +
+        (props.showSerialNumber ? 56 : 0),
+    );
+    const effectiveColWidths = computed<Record<string, number>>(() => {
+      if (!props.fitContainer || containerWidth.value <= 0) return colWidths.value;
+      return distributeContainerWidth(visible.value, containerWidth.value, colWidths.value, {
+        getColumnId,
+        isPinned: (c) => isPinned(c, pinnedCols.value) !== false,
+        defaultWidth: DEFAULT_COLUMN_WIDTH,
+        reservedWidth: reservedStructuralWidth.value,
+      });
+    });
+
     const colWin = computed(() => {
       if (!props.enableColumnVirtualization || headerRows.value.hasGroups) return null;
+      const viewportWidth =
+        containerWidth.value > 0
+          ? containerWidth.value
+          : (tableWrapRef.value?.clientWidth || 1024);
       return computeVirtualColumnsWindow({
         columns: visible.value,
         scrollLeft: virtualScrollLeft.value,
-        viewportWidth: tableWrapRef.value?.clientWidth ?? 1024,
-        columnWidths: colWidths.value,
+        viewportWidth,
+        columnWidths: effectiveColWidths.value,
         getColumnId,
         isPinned: (c) => isPinned(c, pinnedCols.value) || "none",
-        overscan: props.virtualColumnOverscan ?? 2,
+        overscan: props.virtualColumnOverscan ?? DEFAULT_COLUMN_OVERSCAN,
       });
     });
     const rows = computed(() =>
@@ -740,17 +780,22 @@ export const TableX = defineComponent({
       }
     });
 
-    const hasExpandCol = computed(
-      () => Boolean(props.renderExpandedRow || slots["expanded-row"]),
-    );
-    const columnCount = computed(
-      () =>
-        visible.value.length +
+    const columnCount = computed(() => {
+      const dataCols = colWin.value
+        ? colWin.value.leftPinned.length +
+          (colWin.value.leftSpacerWidth > 0 ? 1 : 0) +
+          colWin.value.virtualColumns.length +
+          (colWin.value.rightSpacerWidth > 0 ? 1 : 0) +
+          colWin.value.rightPinned.length
+        : visible.value.length;
+      return (
+        dataCols +
         (props.enableRowReorder ? 1 : 0) +
         (hasExpandCol.value ? 1 : 0) +
         (props.showSerialNumber ? 1 : 0) +
-        (props.enableSelection ? 1 : 0),
-    );
+        (props.enableSelection ? 1 : 0)
+      );
+    });
 
     const pinnedMeta = computed(() => {
       const leftOffsets = new Map<string, number>();
@@ -782,7 +827,7 @@ export const TableX = defineComponent({
         for (const col of visible.value) {
           const cid = getColumnId(col);
           if (isPinned(col, pinnedCols.value) === "left") {
-            const w = colWidths.value[cid] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+            const w = effectiveColWidths.value[cid] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
             leftOffsets.set(cid, currentLeft);
             currentLeft += w;
             lastLeftPinnedId = cid;
@@ -796,7 +841,7 @@ export const TableX = defineComponent({
         if (!col) continue;
         const cid = getColumnId(col);
         if (isPinned(col, pinnedCols.value) === "right") {
-          const w = colWidths.value[cid] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
+          const w = effectiveColWidths.value[cid] ?? col.meta?.width ?? col.meta?.minWidth ?? 140;
           rightOffsets.set(cid, currentRight);
           currentRight += w;
           firstRightPinnedId = cid;
@@ -1004,35 +1049,35 @@ export const TableX = defineComponent({
 
     const autoFitColumn = (colId: string): void => {
       const col = leafCols.value.find((c) => getColumnId(c) === colId);
-      const minW = col?.meta?.minWidth ?? 60;
+      if (!col) return;
+      const computedWidths = computeAutosizeWidths([col], rows.value.slice(0, 200), {
+        getColumnId,
+        getColumnTitle,
+        getCellValue: (c, r) => getCellValue(c, r),
+        getCellText: (val) => getCellText(val, boolLabels.value),
+      });
+      let best = computedWidths[colId] ?? (col.meta?.minWidth ?? 60);
       const rootEl = rootRef.value;
-      if (!rootEl || typeof rootEl.querySelectorAll !== "function") {
-        const titleLen = (col ? getColumnTitle(col) || colId : colId).length;
-        const maxChars = rows.value.reduce<number>((acc, r) => {
-          if (!col) return acc;
-          return Math.max(acc, getCellText(getCellValue(col, r), boolLabels.value).length);
-        }, titleLen);
-        colWidths.value = { ...colWidths.value, [colId]: Math.min(520, Math.max(minW, maxChars * 8 + 44)) };
-        savePersisted();
-        return;
-      }
-      let best = minW;
-      const ths = rootEl.querySelectorAll("[data-column-id]");
-      for (let i = 0; i < ths.length; i++) {
-        const th = ths[i] as HTMLElement;
-        if (th.getAttribute("data-column-id") === colId) {
-          const inner = th.querySelector(".tbx-th-inner") as HTMLElement | null;
-          best = Math.max(best, (inner?.scrollWidth ?? th.scrollWidth) + 28);
+      if (rootEl && typeof rootEl.querySelectorAll === "function") {
+        const ths = rootEl.querySelectorAll("[data-column-id]");
+        for (let i = 0; i < ths.length; i++) {
+          const th = ths[i] as HTMLElement;
+          if (th.getAttribute("data-column-id") === colId) {
+            const inner = th.querySelector(".tbx-th-inner") as HTMLElement | null;
+            if ((inner?.scrollWidth ?? th.scrollWidth) > 0) {
+              best = Math.max(best, (inner?.scrollWidth ?? th.scrollWidth) + 28);
+            }
+          }
+        }
+        const tds = rootEl.querySelectorAll("[data-col-id]");
+        for (let i = 0; i < tds.length; i++) {
+          const td = tds[i] as HTMLElement;
+          if (td.getAttribute("data-col-id") === colId && td.scrollWidth > 0) {
+            best = Math.max(best, td.scrollWidth + 24);
+          }
         }
       }
-      const tds = rootEl.querySelectorAll("[data-col-id]");
-      for (let i = 0; i < tds.length; i++) {
-        const td = tds[i] as HTMLElement;
-        if (td.getAttribute("data-col-id") === colId) {
-          best = Math.max(best, td.scrollWidth + 24);
-        }
-      }
-      colWidths.value = { ...colWidths.value, [colId]: Math.min(520, Math.round(best)) };
+      colWidths.value = { ...colWidths.value, [colId]: Math.min(550, Math.round(best)) };
       savePersisted();
     };
 
@@ -1051,66 +1096,70 @@ export const TableX = defineComponent({
       savePersisted();
     };
 
-    const undo = (): boolean => {
-      if (!historyManager.value.canUndo()) return false;
-      const action = historyManager.value.undo();
-      if (action && action.mutations.length > 0) {
-        const nextDirty = new Set(dirtyCells.value);
-        for (const mut of action.mutations) {
-          const targetRow = rows.value.find((r) => rowIdFn.value(r) === mut.rowId);
-          const col = visible.value.find((c) => getColumnId(c) === mut.columnId);
-          if (targetRow && col) {
-            writeMutatedRow(targetRow, col, mut.columnId, mut.oldValue);
-            nextDirty.add(`${mut.rowId}::${mut.columnId}`);
-            const payload = {
-              row: targetRow,
-              columnId: mut.columnId,
-              oldValue: mut.newValue,
-              newValue: mut.oldValue,
-            };
-            emit("cellEdit", payload);
-            props.onCellEdit?.(payload);
+    const applyHistoryMutations = (
+      mutations: readonly CellMutation[],
+      direction: "undo" | "redo",
+    ): void => {
+      const nextDirty = new Set(dirtyCells.value);
+      for (const mut of mutations) {
+        const targetRow =
+          rows.value.find((r) => rowIdFn.value(r) === mut.rowId) ??
+          props.data.find((r) => rowIdFn.value(r) === mut.rowId);
+        const col = leafCols.value.find((c) => getColumnId(c) === mut.columnId);
+        if (targetRow && col) {
+          const fromValue = direction === "undo" ? mut.newValue : mut.oldValue;
+          const toValue = direction === "undo" ? mut.oldValue : mut.newValue;
+          writeMutatedRow(targetRow, col, mut.columnId, toValue);
+          const dataRow = props.data.find((r) => rowIdFn.value(r) === mut.rowId);
+          if (dataRow && dataRow !== targetRow) {
+            writeMutatedRow(dataRow, col, mut.columnId, toValue);
           }
+          const key = `${mut.rowId}::${mut.columnId}`;
+          if (direction === "undo") nextDirty.delete(key);
+          else nextDirty.add(key);
+          const payload = {
+            row: targetRow,
+            columnId: mut.columnId,
+            oldValue: fromValue,
+            newValue: toValue,
+          };
+          emit("cellEdit", payload);
+          props.onCellEdit?.(payload);
         }
-        dirtyCells.value = nextDirty;
-        return true;
       }
-      return false;
+      dirtyCells.value = nextDirty;
+    };
+
+    const undo = (): boolean => {
+      if (props.enableHistory === false || !historyManager.value.canUndo()) return false;
+      const action = historyManager.value.undo();
+      if (!action || action.mutations.length === 0) return false;
+      applyHistoryMutations(action.mutations, "undo");
+      return true;
     };
 
     const redo = (): boolean => {
-      if (!historyManager.value.canRedo()) return false;
+      if (props.enableHistory === false || !historyManager.value.canRedo()) return false;
       const action = historyManager.value.redo();
-      if (action && action.mutations.length > 0) {
-        const nextDirty = new Set(dirtyCells.value);
-        for (const mut of action.mutations) {
-          const targetRow = rows.value.find((r) => rowIdFn.value(r) === mut.rowId);
-          const col = visible.value.find((c) => getColumnId(c) === mut.columnId);
-          if (targetRow && col) {
-            writeMutatedRow(targetRow, col, mut.columnId, mut.newValue);
-            nextDirty.add(`${mut.rowId}::${mut.columnId}`);
-            const payload = {
-              row: targetRow,
-              columnId: mut.columnId,
-              oldValue: mut.oldValue,
-              newValue: mut.newValue,
-            };
-            emit("cellEdit", payload);
-            props.onCellEdit?.(payload);
-          }
-        }
-        dirtyCells.value = nextDirty;
-        return true;
-      }
-      return false;
+      if (!action || action.mutations.length === 0) return false;
+      applyHistoryMutations(action.mutations, "redo");
+      return true;
     };
 
-    const canUndo = (): boolean => historyManager.value.canUndo();
-    const canRedo = (): boolean => historyManager.value.canRedo();
+    const canUndo = (): boolean =>
+      props.enableHistory !== false && historyManager.value.canUndo();
+    const canRedo = (): boolean =>
+      props.enableHistory !== false && historyManager.value.canRedo();
 
     const toggleTreeExpand = async (tNode: TreeRowNode<unknown>): Promise<void> => {
+      if (loadingTreeNodes.value.has(tNode.id)) return;
       const willExpand = !treeExpandedIds.value.has(tNode.id);
-      if (willExpand && props.loadChildren && !lazyTreeChildren.value.has(tNode.id)) {
+      if (
+        willExpand &&
+        props.loadChildren &&
+        tNode.childCount === 0 &&
+        !lazyTreeChildren.value.has(tNode.id)
+      ) {
         const nextLoading = new Set(loadingTreeNodes.value);
         nextLoading.add(tNode.id);
         loadingTreeNodes.value = nextLoading;
@@ -1119,11 +1168,15 @@ export const TableX = defineComponent({
           const nextLazy = new Map(lazyTreeChildren.value);
           nextLazy.set(tNode.id, children ?? []);
           lazyTreeChildren.value = nextLazy;
+          const nextExp = new Set(treeExpandedIds.value);
+          nextExp.add(tNode.id);
+          treeExpandedIds.value = nextExp;
         } finally {
           const nextL = new Set(loadingTreeNodes.value);
           nextL.delete(tNode.id);
           loadingTreeNodes.value = nextL;
         }
+        return;
       }
       const nextExp = new Set(treeExpandedIds.value);
       if (willExpand) nextExp.add(tNode.id);
@@ -1257,7 +1310,7 @@ export const TableX = defineComponent({
     };
 
     const onRootKeydown = (ev: KeyboardEvent): void => {
-      if (!props.enableKeyboardNavigation || editingCell.value || editingRowId.value) return;
+      if (editingCell.value || editingRowId.value) return;
       const target = ev.target as HTMLElement | null;
       if (
         target &&
@@ -1266,27 +1319,26 @@ export const TableX = defineComponent({
         const inpType = (target as { type?: string }).type;
         if (inpType !== "checkbox" && inpType !== "radio") return;
       }
-      if (rows.value.length === 0 || visible.value.length === 0) return;
 
-      if ((ev.ctrlKey || ev.metaKey) && !ev.altKey) {
+      if (props.enableHistory !== false && (ev.ctrlKey || ev.metaKey) && !ev.altKey) {
         const key = ev.key.toLowerCase();
         if (key === "z" && !ev.shiftKey) {
-          if (props.enableHistory !== false && canUndo()) {
-            ev.preventDefault();
-            undo();
-            return;
-          }
+          ev.preventDefault();
+          undo();
+          return;
         } else if ((key === "z" && ev.shiftKey) || key === "y") {
-          if (props.enableHistory !== false && canRedo()) {
-            ev.preventDefault();
-            redo();
-            return;
-          }
+          ev.preventDefault();
+          redo();
+          return;
         }
       }
 
+      if (!props.enableKeyboardNavigation) return;
+      if (rows.value.length === 0 || visible.value.length === 0) return;
+
       if (
         (ev.ctrlKey || ev.metaKey) &&
+        !ev.altKey &&
         ev.key.toLowerCase() === "c" &&
         props.enableRangeSelection &&
         cellRange.value
@@ -1503,7 +1555,7 @@ export const TableX = defineComponent({
         const sorted = sortable && sortItem !== undefined;
         const title = getColumnTitle(col) || cid;
         const activeFilter = getColActiveFilter(col);
-        const customW = colWidths.value[cid];
+        const customW = effectiveColWidths.value[cid];
         const w = customW ?? col.meta?.width;
 
         const startResize = (ev: PointerEvent): void => {
@@ -2062,6 +2114,7 @@ export const TableX = defineComponent({
                             "button",
                             {
                               type: "button",
+                              disabled: tNode.isLoading ? true : undefined,
                               class: [
                                 "tbx-tree-toggle",
                                 tNode.isExpanded ? "tbx-tree-toggle--open" : undefined,
@@ -2070,14 +2123,20 @@ export const TableX = defineComponent({
                                 .filter(Boolean)
                                 .join(" "),
                               "aria-expanded": String(tNode.isExpanded),
+                              "aria-label": tNode.isLoading
+                                ? (locale.value.loadingNodeText ?? "Loading...")
+                                : tNode.isExpanded
+                                  ? "Collapse children"
+                                  : "Expand children",
                               onClick: (ev: MouseEvent) => {
                                 ev.stopPropagation();
+                                if (tNode.isLoading) return;
                                 void toggleTreeExpand(tNode);
                               },
                             },
                             [
                               tNode.isLoading
-                                ? h("span", { class: "tbx-tree-spinner" })
+                                ? h("span", { class: "tbx-tree-spinner", "aria-hidden": "true" })
                                 : chevronRightIcon(),
                             ],
                           )
@@ -2189,7 +2248,9 @@ export const TableX = defineComponent({
         };
 
         if (colWin.value) {
-          colWin.value.leftPinned.forEach((col, idx) => cells.push(renderBodyCell(col, idx)));
+          colWin.value.leftPinned.forEach((col) =>
+            cells.push(renderBodyCell(col, visibleIndexMap.value.get(getColumnId(col)) ?? 0)),
+          );
           if (colWin.value.leftSpacerWidth > 0) {
             cells.push(
               h("td", {
@@ -2203,8 +2264,8 @@ export const TableX = defineComponent({
               }),
             );
           }
-          colWin.value.virtualColumns.forEach((col, idx) =>
-            cells.push(renderBodyCell(col, colWin.value!.startIndex + idx)),
+          colWin.value.virtualColumns.forEach((col) =>
+            cells.push(renderBodyCell(col, visibleIndexMap.value.get(getColumnId(col)) ?? 0)),
           );
           if (colWin.value.rightSpacerWidth > 0) {
             cells.push(
@@ -2219,9 +2280,9 @@ export const TableX = defineComponent({
               }),
             );
           }
-          colWin.value.rightPinned.forEach((col, idx) =>
+          colWin.value.rightPinned.forEach((col) =>
             cells.push(
-              renderBodyCell(col, visible.value.length - colWin.value!.rightPinned.length + idx),
+              renderBodyCell(col, visibleIndexMap.value.get(getColumnId(col)) ?? 0),
             ),
           );
         } else {
@@ -3262,7 +3323,9 @@ export const TableX = defineComponent({
 
                           return colWin.value
                             ? [
-                                ...colWin.value.leftPinned.map((col, idx) => renderSummaryCell(col, idx)),
+                                ...colWin.value.leftPinned.map((col) =>
+                                  renderSummaryCell(col, visibleIndexMap.value.get(getColumnId(col)) ?? 0),
+                                ),
                                 ...(colWin.value.leftSpacerWidth > 0
                                   ? [
                                       h("td", {
@@ -3276,8 +3339,8 @@ export const TableX = defineComponent({
                                       }),
                                     ]
                                   : []),
-                                ...colWin.value.virtualColumns.map((col, idx) =>
-                                  renderSummaryCell(col, colWin.value!.startIndex + idx),
+                                ...colWin.value.virtualColumns.map((col) =>
+                                  renderSummaryCell(col, visibleIndexMap.value.get(getColumnId(col)) ?? 0),
                                 ),
                                 ...(colWin.value.rightSpacerWidth > 0
                                   ? [
@@ -3292,10 +3355,10 @@ export const TableX = defineComponent({
                                       }),
                                     ]
                                   : []),
-                                ...colWin.value.rightPinned.map((col, idx) =>
+                                ...colWin.value.rightPinned.map((col) =>
                                   renderSummaryCell(
                                     col,
-                                    visible.value.length - colWin.value!.rightPinned.length + idx,
+                                    visibleIndexMap.value.get(getColumnId(col)) ?? 0,
                                   ),
                                 ),
                               ]
@@ -3313,7 +3376,10 @@ export const TableX = defineComponent({
             ? (() => {
                 const col = leafCols.value.find((c) => getColumnId(c) === openFilterCol.value);
                 if (!col) return null;
-                const optionCounts = computeFilterOptionCounts(col, rows.value);
+                const optionCounts = computeFilterOptionCounts(
+                  col,
+                  isClientSide.value ? (props.allData ?? props.data) : (props.allData ?? rows.value),
+                );
                 const cid = getColumnId(col);
                 const fField = getFilterField(col);
                 const sField = getSortField(col);

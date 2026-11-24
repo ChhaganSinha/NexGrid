@@ -2979,7 +2979,7 @@
   margin-inline-start: auto;
   font-size: 11px;
   font-weight: 500;
-  color: var(--tbx-text-muted);
+  color: var(--tbx-muted-fg);
   padding: 1px 6px;
   background: color-mix(in srgb, var(--tbx-primary) 8%, var(--tbx-card));
   border-radius: 999px;
@@ -2989,9 +2989,19 @@
 
 /* ---- Tree Loading Spinner ---- */
 .tbx-tree-toggle--loading {
-  animation: tbx-spin 0.8s linear infinite !important;
   pointer-events: none;
-  opacity: 0.7;
+  opacity: 0.75;
+  transform: none;
+}
+
+.tbx-tree-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--tbx-primary) 25%, transparent);
+  border-top-color: var(--tbx-primary);
+  border-radius: 50%;
+  animation: tbx-spin 0.75s linear infinite;
 }
 
 @keyframes tbx-spin {
