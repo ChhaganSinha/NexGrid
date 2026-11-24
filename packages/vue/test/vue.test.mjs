@@ -11,6 +11,11 @@ import {
   toPdfBytes,
   flattenTreeRows,
   buildNestedGroupItems,
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
 } from "../dist/index.js";
 
 test("Vue package exports TableX, NexGrid, useClientTableX, and core helpers", () => {
@@ -133,4 +138,50 @@ test("Vue TableX renders split export mode, sticky pinned header/summary offsets
   assert.ok(html.includes('data-group-depth="1"'), "Renders multi-level nested group depth 1");
   assert.ok(html.includes("tbx-th--select tbx-th--pinned-left"), "Pins structural select header cell");
   assert.ok(html.includes("tbx-summary-cell tbx-td--pinned-left"), "Pins summary footer cell");
+});
+
+test("Vue TableX renders enterprise features: column virtualization, history manager, and filter counts", async () => {
+  const history = new GridHistoryManager();
+  history.push({
+    description: "test edit",
+    mutations: [{ rowId: "1", columnId: "name", oldValue: "Alice", newValue: "Alicia" }],
+  });
+  assert.equal(history.canUndo(), true);
+  assert.equal(history.canRedo(), false);
+  const undone = history.undo();
+  assert.deepEqual(undone.mutations, [{ rowId: "1", columnId: "name", oldValue: "Alice", newValue: "Alicia" }]);
+  assert.equal(history.canRedo(), true);
+
+  const columns = [
+    { accessorKey: "id", header: "ID", meta: { width: 100 } },
+    { accessorKey: "name", header: "Name", meta: { width: 200 } },
+    { accessorKey: "dept", header: "Department", meta: { width: 250, filterOptions: ["Engineering", "Sales"] } },
+  ];
+  const data = [
+    { id: "1", name: "Alice", dept: "Engineering" },
+    { id: "2", name: "Bob", dept: "Engineering" },
+    { id: "3", name: "Charlie", dept: "Sales" },
+  ];
+
+  const counts = computeFilterOptionCounts(columns[2], data);
+  assert.equal(counts["Engineering"], 2);
+  assert.equal(counts["Sales"], 1);
+
+  const app = createSSRApp({
+    setup() {
+      return () =>
+        h(TableX, {
+          caption: "Virtual Wide Grid",
+          columns,
+          data,
+          enableColumnVirtualization: true,
+          virtualColumnOverscan: 1,
+          enableHistory: true,
+        });
+    },
+  });
+
+  const html = await renderToString(app);
+  assert.ok(html.includes("tbx-root"), "Renders virtualized grid root");
+  assert.ok(html.includes("Engineering"), "Renders data rows");
 });

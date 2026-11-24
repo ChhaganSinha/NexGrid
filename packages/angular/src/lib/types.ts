@@ -65,6 +65,19 @@ export interface TableXSelectionChange {
 /** Theme mode: fixed light, fixed dark, or follow the OS preference. */
 export type TableXTheme = "light" | "dark" | "auto";
 
+/** Imperative handle exposed on TableXComponent / NexGridComponent. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface TableXHandle<TData = any> {
+  undo: () => boolean;
+  redo: () => boolean;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  autoFitAllColumns: (sampleRows?: number) => void;
+  autoFitColumn: (colId: string) => void;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NexGridHandle<TData = any> = TableXHandle<TData>;
+
 /** Payload of the `cellEdit` output when an inline cell edit is committed. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface TableXCellEditEvent<TData = any> {

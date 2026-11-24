@@ -348,6 +348,22 @@
     [Parameter]
     public bool? EnableRangeSelection { get; set; }
 
+    /// <summary>Enable horizontal column virtualization.</summary>
+    [Parameter]
+    public bool? EnableColumnVirtualization { get; set; }
+
+    /// <summary>Buffer columns in horizontal column virtualization.</summary>
+    [Parameter]
+    public int? VirtualColumnOverscan { get; set; }
+
+    /// <summary>Distribute surplus container width to eliminate trailing gaps.</summary>
+    [Parameter]
+    public bool? FitContainer { get; set; }
+
+    /// <summary>Enable undo / redo history stack (Ctrl+Z / Ctrl+Y).</summary>
+    [Parameter]
+    public bool? EnableHistory { get; set; }
+
     /// <summary>
     /// Optional in-memory dataset for client-side mode.
     /// </summary>
@@ -457,6 +473,10 @@
         EnableRowReorder = EnableRowReorder,
         EnableInfiniteScroll = EnableInfiniteScroll,
         EnableRangeSelection = EnableRangeSelection,
+        EnableColumnVirtualization = EnableColumnVirtualization,
+        VirtualColumnOverscan = VirtualColumnOverscan,
+        FitContainer = FitContainer,
+        EnableHistory = EnableHistory,
         Query = BuildQueryConfig(),
     });
 

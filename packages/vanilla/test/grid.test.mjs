@@ -1768,6 +1768,145 @@ test("saved views menu, row drag-reorder, infinite scroll Load More, nested grou
   handle.destroy();
 });
 
+test("Enterprise features: Undo / Redo history, Column Virtualization, Lazy Tree, and Filter Counts", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const initialData = [
+    { id: "1", name: "Alpha", city: "London", score: 100 },
+    { id: "2", name: "Beta", city: "Paris", score: 200 },
+    { id: "3", name: "Gamma", city: "London", score: 300 },
+  ];
+
+  let cellEditEvents = [];
+  const handle = createTableX(container, {
+    caption: "Enterprise Test",
+    data: initialData,
+    columns: [
+      { accessorKey: "id", header: "ID" },
+      { accessorKey: "name", header: "Name", meta: { editable: true } },
+      {
+        accessorKey: "city",
+        header: "City",
+        meta: { filterType: "dropdown", filterOptions: ["London", "Paris", "Berlin"] },
+      },
+      { accessorKey: "score", header: "Score", meta: { editable: true, editType: "number" } },
+    ],
+    enableHistory: true,
+    enableColumnVirtualization: true,
+    fitContainer: true,
+    onCellEdit: (ev) => {
+      cellEditEvents.push(ev);
+    },
+  });
+
+  // 1. Initial history state
+  assert.equal(handle.canUndo(), false);
+  assert.equal(handle.canRedo(), false);
+
+  // 2. autoFitAllColumns
+  handle.autoFitAllColumns();
+
+  // 3. Inline cell edit on row 0, Name -> "Alpha Updated"
+  const editableCell = container.querySelector(".tbx-cell--editable");
+  assert.ok(editableCell, "Found editable cell");
+  editableCell.dispatchEvent(new MockMouseEvent("dblclick"));
+
+  const editInput = container.querySelector(".tbx-cell-edit-input");
+  assert.ok(editInput, "Cell edit input is mounted on dblclick");
+  editInput.value = "Alpha Updated";
+  const saveBtn = container.querySelector(".tbx-cell-edit-btn--save");
+  assert.ok(saveBtn, "Save button is present");
+  saveBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  assert.equal(handle.canUndo(), true, "canUndo is true after mutation");
+  assert.equal(handle.canRedo(), false, "canRedo is false before undo");
+  assert.equal(cellEditEvents.length, 1);
+  assert.equal(cellEditEvents[0].newValue, "Alpha Updated");
+
+  // 4. Undo the edit
+  handle.undo();
+  assert.equal(handle.canUndo(), false);
+  assert.equal(handle.canRedo(), true);
+  assert.equal(cellEditEvents.length, 2);
+  assert.equal(cellEditEvents[1].newValue, "Alpha");
+
+  // 5. Redo the edit
+  handle.redo();
+  assert.equal(handle.canUndo(), true);
+  assert.equal(handle.canRedo(), false);
+  assert.equal(cellEditEvents.length, 3);
+  assert.equal(cellEditEvents[2].newValue, "Alpha Updated");
+
+  // 6. Filter option counts badge in filter popover
+  const cityTh = Array.from(container.querySelectorAll(".tbx-th")).find((th) =>
+    th.textContent.includes("City"),
+  );
+  assert.ok(cityTh, "City header found");
+  const filterBtn = cityTh.querySelector(".tbx-col-filter-btn");
+  assert.ok(filterBtn, "Filter trigger button found");
+  filterBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  const popover = container.querySelector(".tbx-filter-popover");
+  assert.ok(popover, "Filter popover opens");
+  const countBadges = popover.querySelectorAll(".tbx-filter-option-count");
+  assert.ok(countBadges.length >= 2, "Option count badges render in filter popover");
+  // London appears 2 times
+  const londonOpt = Array.from(popover.querySelectorAll(".tbx-filter-option")).find((el) =>
+    el.textContent.includes("London"),
+  );
+  assert.ok(londonOpt.textContent.includes("2"), `Expected London count of 2, found "${londonOpt.textContent}"`);
+
+  // Close filter popover
+  filterBtn.dispatchEvent(new MockMouseEvent("click"));
+
+  handle.destroy();
+});
+
+test("Enterprise features: Async tree loading with loadChildren", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
+  const treeRoots = [
+    { id: "dept_1", name: "Engineering", isParent: true },
+    { id: "dept_2", name: "Sales", isParent: true },
+  ];
+
+  let loadChildrenCalled = 0;
+  const handle = createTableX(container, {
+    caption: "Async Tree Test",
+    data: treeRoots,
+    columns: [
+      { accessorKey: "name", header: "Department" },
+    ],
+    enableTreeData: true,
+    hasChildren: (row) => Boolean(row.isParent),
+    loadChildren: async (row) => {
+      loadChildrenCalled++;
+      return [
+        { id: `${row.id}_team_1`, name: `${row.name} Team 1` },
+        { id: `${row.id}_team_2`, name: `${row.name} Team 2` },
+      ];
+    },
+  });
+
+  const rootRows = container.querySelectorAll(".tbx-row");
+  assert.equal(rootRows.length, 2, "Renders 2 root nodes initially");
+
+  const toggle0 = rootRows[0].querySelector(".tbx-tree-toggle");
+  assert.ok(toggle0, "Renders expand toggle on row with hasChildren=true");
+
+  // Click toggle to trigger async loadChildren
+  await toggle0.dispatchEvent(new MockMouseEvent("click"));
+
+  assert.equal(loadChildrenCalled, 1, "loadChildren was invoked");
+  const expandedRows = container.querySelectorAll(".tbx-row");
+  assert.equal(expandedRows.length, 4, "Renders root + 2 lazy children + second root (4 rows total)");
+  assert.ok(expandedRows[1].textContent.includes("Engineering Team 1"));
+
+  handle.destroy();
+});
+
 
 
 

@@ -94,7 +94,15 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  DEFAULT_COLUMN_WIDTH,
+  computeFilterOptionCounts,
   type CellCoord,
+  type CellMutation,
+  type VirtualColumnsWindow,
   type ClientQueryOptions,
   type ContextMenuItem,
   type Density,
@@ -276,6 +284,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private editingCell: { rowId: string; columnId: string } | null = null;
   private draggedColumnId: string | null = null;
   private virtualScrollTop = 0;
+  private virtualScrollLeft = 0;
+  private readonly historyManager = new GridHistoryManager();
+  private readonly lazyTreeChildren = new Map<string, readonly TData[]>();
+  private readonly loadingTreeNodes = new Set<string>();
 
   constructor(container: HTMLElement, options: TableXOptions<TData>) {
     this.options = options;
@@ -628,6 +640,15 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.renderBody();
         }
       }
+      if (this.options.enableColumnVirtualization) {
+        const nextLeft = this.tableWrap.scrollLeft ?? 0;
+        if (Math.abs(nextLeft - this.virtualScrollLeft) >= 1) {
+          this.virtualScrollLeft = nextLeft;
+          this.renderHead();
+          this.renderBody();
+          this.renderFooter();
+        }
+      }
       if (
         this.isInfiniteMode() &&
         this.hasMore &&
@@ -651,6 +672,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
       this.addGlobalListener(window, "resize", () => {
         if (this.openFilterColumn !== null) {
           this.repositionActiveFilterPopover();
+        }
+        if (this.options.fitContainer || this.options.enableColumnVirtualization) {
+          this.render();
         }
       });
     }
@@ -765,6 +789,114 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   isAllAcrossSelected(): boolean {
     return this.allAcrossSelected;
+  }
+
+  undo(): void {
+    if (this.options.enableHistory === false) return;
+    const action = this.historyManager.undo();
+    if (!action) return;
+    this.applyHistoryMutations(action.mutations, "undo");
+  }
+
+  redo(): void {
+    if (this.options.enableHistory === false) return;
+    const action = this.historyManager.redo();
+    if (!action) return;
+    this.applyHistoryMutations(action.mutations, "redo");
+  }
+
+  canUndo(): boolean {
+    return this.options.enableHistory !== false && this.historyManager.canUndo();
+  }
+
+  canRedo(): boolean {
+    return this.options.enableHistory !== false && this.historyManager.canRedo();
+  }
+
+  autoFitAllColumns(sampleRows = 50): void {
+    const visibleCols = this.visibleCols();
+    const rows = this.displayedDataList();
+    const widths = computeAutosizeWidths(visibleCols, rows.slice(0, sampleRows), {
+      getColumnId,
+      getColumnTitle,
+      getCellValue: (col, row) => getCellValue(col, row),
+      getCellText: (val) =>
+        getCellText(val, {
+          yes: this.locale.booleanYes,
+          no: this.locale.booleanNo,
+        }),
+    });
+    for (const [colId, width] of Object.entries(widths)) {
+      this.columnWidths[colId] = width;
+    }
+    if (this.options.fitContainer && this.tableWrap) {
+      const containerW = this.tableWrap.clientWidth || 1024;
+      const distributed = distributeContainerWidth(
+        visibleCols,
+        containerW,
+        this.columnWidths,
+        {
+          getColumnId,
+          isPinned: (col) => isPinned(col, this.pinnedColumns) !== false,
+          defaultWidth: DEFAULT_COLUMN_WIDTH,
+        },
+      );
+      for (const [colId, width] of Object.entries(distributed)) {
+        this.columnWidths[colId] = width;
+      }
+    }
+    this.saveState();
+    this.render();
+  }
+
+  private applyHistoryMutations(
+    mutations: readonly CellMutation[],
+    direction: "undo" | "redo",
+  ): void {
+    const pool = this.isClientSide ? this.rawClientData : this.data;
+    const visibleCols = this.visibleCols();
+    const colMap = new Map(visibleCols.map((c) => [getColumnId(c), c]));
+
+    for (const m of mutations) {
+      const val = direction === "undo" ? m.oldValue : m.newValue;
+      const targetRow = pool.find((r) => this.rowId(r) === m.rowId);
+      const col = colMap.get(m.columnId);
+      if (targetRow && col) {
+        this.writeMutatedRowValue(targetRow, col, m.columnId, val);
+        this.dirtyCells.add(`${m.rowId}::${m.columnId}`);
+        this.options.onCellEdit?.({
+          row: targetRow,
+          columnId: m.columnId,
+          oldValue: direction === "undo" ? m.newValue : m.oldValue,
+          newValue: val,
+        });
+      }
+    }
+
+    if (this.isClientSide) {
+      const paged = queryClientData(this.rawClientData, this.query, this.clientQueryOptions());
+      this.data = paged.items;
+      this.total = paged.total;
+    }
+    this.render();
+  }
+
+  private getVirtualColumnsWindow(
+    cols: readonly TableXVanillaColumn<TData>[],
+  ): VirtualColumnsWindow<TableXVanillaColumn<TData>> {
+    const viewportWidth =
+      this.tableWrap && this.tableWrap.clientWidth > 0
+        ? this.tableWrap.clientWidth
+        : 1024;
+    return computeVirtualColumnsWindow({
+      columns: cols,
+      scrollLeft: this.virtualScrollLeft,
+      viewportWidth,
+      columnWidths: this.columnWidths,
+      getColumnId,
+      isPinned: (col) => isPinned(col, this.pinnedColumns) || "none",
+      overscan: 2,
+    });
   }
 
   destroy(): void {
@@ -1262,7 +1394,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
   }
 
   private isTreeEnabled(): boolean {
-    return this.options.enableTreeData === true || typeof this.options.getSubRows === "function";
+    return (
+      this.options.enableTreeData === true ||
+      typeof this.options.getSubRows === "function" ||
+      typeof this.options.loadChildren === "function"
+    );
   }
 
   private isInfiniteMode(): boolean {
@@ -1276,6 +1412,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
         getSubRows: this.options.getSubRows,
         getRowId: this.rowId,
         expandedIds: this.treeExpandedIds,
+        lazyChildren: this.lazyTreeChildren,
+        loadingNodeIds: this.loadingTreeNodes,
+        hasChildren: this.options.hasChildren,
       }).map((n) => n.row);
     }
     return this.data;
@@ -2105,6 +2244,24 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
   private renderHead(): void {
     const visibleCols = this.visibleCols();
+    if (this.options.fitContainer && this.tableWrap) {
+      const containerW = this.tableWrap.clientWidth;
+      if (containerW > 0) {
+        const distributed = distributeContainerWidth(
+          visibleCols,
+          containerW,
+          this.columnWidths,
+          {
+            getColumnId,
+            isPinned: (col) => isPinned(col, this.pinnedColumns) !== false,
+            defaultWidth: DEFAULT_COLUMN_WIDTH,
+          },
+        );
+        for (const [cid, w] of Object.entries(distributed)) {
+          this.columnWidths[cid] = w;
+        }
+      }
+    }
     const { leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId } =
       this.getPinnedOffsets(visibleCols);
     const headerRows = buildHeaderRows(this.columns, this.hidden);
@@ -2188,6 +2345,55 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     if (!headerRows.hasGroups) {
+      if (this.options.enableColumnVirtualization) {
+        const colWin = this.getVirtualColumnsWindow(visibleCols);
+        for (const col of colWin.leftPinned) {
+          row1Cells.push(
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          );
+        }
+        if (colWin.leftSpacerWidth > 0) {
+          row1Cells.push(
+            el("th", {
+              class: "tbx-th--col-spacer",
+              attrs: { "aria-hidden": "true" },
+              style: {
+                width: `${colWin.leftSpacerWidth}px`,
+                minWidth: `${colWin.leftSpacerWidth}px`,
+                padding: "0",
+                border: "none",
+              },
+            }),
+          );
+        }
+        for (const col of colWin.virtualColumns) {
+          row1Cells.push(
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          );
+        }
+        if (colWin.rightSpacerWidth > 0) {
+          row1Cells.push(
+            el("th", {
+              class: "tbx-th--col-spacer",
+              attrs: { "aria-hidden": "true" },
+              style: {
+                width: `${colWin.rightSpacerWidth}px`,
+                minWidth: `${colWin.rightSpacerWidth}px`,
+                padding: "0",
+                border: "none",
+              },
+            }),
+          );
+        }
+        for (const col of colWin.rightPinned) {
+          row1Cells.push(
+            this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
+          );
+        }
+        replaceChildren(this.thead, [el("tr", {}, row1Cells)]);
+        return;
+      }
+
       for (const col of visibleCols) {
         row1Cells.push(
           this.buildLeafTh(col, 1, false, leftOffsets, rightOffsets, lastLeftPinnedId, firstRightPinnedId),
@@ -2609,6 +2815,9 @@ class NexGridController<TData> implements TableXHandle<TData> {
         getSubRows: this.options.getSubRows,
         getRowId: this.rowId,
         expandedIds: this.treeExpandedIds,
+        lazyChildren: this.lazyTreeChildren,
+        loadingNodeIds: this.loadingTreeNodes,
+        hasChildren: this.options.hasChildren,
       });
       for (let idx = 0; idx < treeNodes.length; idx++) {
         const node = treeNodes[idx]!;
@@ -2787,10 +2996,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const grip = pinnedVariant
         ? null
         : el("span", {
-            class: "tbx-row-drag-handle",
-            attrs: { "aria-label": "Drag to reorder row", title: "Drag to reorder" },
-            text: "⋮⋮",
-          });
+          class: "tbx-row-drag-handle",
+          attrs: { "aria-label": "Drag to reorder row", title: "Drag to reorder" },
+          text: "⋮⋮",
+        });
       cells.push(el("td", { class: tdClasses.join(" "), style: tdStyle }, grip ? [grip] : []));
     }
 
@@ -2799,13 +3008,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
       const expandBtn = pinnedVariant
         ? null
         : el(
-            "button",
-            {
-              class: isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn",
-              attrs: { type: "button", "aria-label": isExpanded ? "Collapse row" : "Expand row" },
-            },
-            [chevronRightIcon("tbx-icon")],
-          );
+          "button",
+          {
+            class: isExpanded ? "tbx-expand-btn tbx-expand-btn--open" : "tbx-expand-btn",
+            attrs: { type: "button", "aria-label": isExpanded ? "Collapse row" : "Expand row" },
+          },
+          [chevronRightIcon("tbx-icon")],
+        );
       expandBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
         if (this.expandedRows.has(id)) {
@@ -2866,8 +3075,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     let firstEditableRendered = false;
-    for (let colIdx = 0; colIdx < cols.length; colIdx++) {
-      const column = cols[colIdx]!;
+    const renderColCell = (column: TableXVanillaColumn<TData>, colIdx: number) => {
       const colId = getColumnId(column);
       const meta = column.meta ?? {};
       const tdClasses = ["tbx-td"];
@@ -3000,6 +3208,51 @@ class NexGridController<TData> implements TableXHandle<TData> {
       }
 
       cells.push(td);
+    };
+
+    if (this.options.enableColumnVirtualization) {
+      const colWin = this.getVirtualColumnsWindow(cols);
+      for (const column of colWin.leftPinned) {
+        renderColCell(column, cols.indexOf(column));
+      }
+      if (colWin.leftSpacerWidth > 0) {
+        cells.push(
+          el("td", {
+            class: "tbx-td--col-spacer",
+            attrs: { "aria-hidden": "true" },
+            style: {
+              width: `${colWin.leftSpacerWidth}px`,
+              minWidth: `${colWin.leftSpacerWidth}px`,
+              padding: "0",
+              border: "none",
+            },
+          }),
+        );
+      }
+      for (const column of colWin.virtualColumns) {
+        renderColCell(column, cols.indexOf(column));
+      }
+      if (colWin.rightSpacerWidth > 0) {
+        cells.push(
+          el("td", {
+            class: "tbx-td--col-spacer",
+            attrs: { "aria-hidden": "true" },
+            style: {
+              width: `${colWin.rightSpacerWidth}px`,
+              minWidth: `${colWin.rightSpacerWidth}px`,
+              padding: "0",
+              border: "none",
+            },
+          }),
+        );
+      }
+      for (const column of colWin.rightPinned) {
+        renderColCell(column, cols.indexOf(column));
+      }
+    } else {
+      for (let colIdx = 0; colIdx < cols.length; colIdx++) {
+        renderColCell(cols[colIdx]!, colIdx);
+      }
     }
 
     const trAttrs: Record<string, string | number | boolean | null | undefined> = {};
@@ -3130,9 +3383,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       cells.push(td);
     }
 
-    for (let i = 0; i < visibleCols.length; i++) {
-      const col = visibleCols[i];
-      if (!col) continue;
+    const buildSummaryCell = (col: TableXVanillaColumn<TData>, i: number) => {
       const id = getColumnId(col);
       const aggVal = computeAggregation(col, this.data);
       const label = col.meta?.aggregationLabel || (col.meta?.aggregation ? `${col.meta.aggregation}:` : "");
@@ -3160,7 +3411,54 @@ class NexGridController<TData> implements TableXHandle<TData> {
         td.appendChild(el("strong", { text: "Total" }));
       }
 
-      cells.push(td);
+      return td;
+    };
+
+    if (this.options.enableColumnVirtualization) {
+      const colWin = this.getVirtualColumnsWindow(visibleCols);
+      for (const col of colWin.leftPinned) {
+        cells.push(buildSummaryCell(col, visibleCols.indexOf(col)));
+      }
+      if (colWin.leftSpacerWidth > 0) {
+        cells.push(
+          el("td", {
+            class: "tbx-td--col-spacer",
+            attrs: { "aria-hidden": "true" },
+            style: {
+              width: `${colWin.leftSpacerWidth}px`,
+              minWidth: `${colWin.leftSpacerWidth}px`,
+              padding: "0",
+              border: "none",
+            },
+          }),
+        );
+      }
+      for (const col of colWin.virtualColumns) {
+        cells.push(buildSummaryCell(col, visibleCols.indexOf(col)));
+      }
+      if (colWin.rightSpacerWidth > 0) {
+        cells.push(
+          el("td", {
+            class: "tbx-td--col-spacer",
+            attrs: { "aria-hidden": "true" },
+            style: {
+              width: `${colWin.rightSpacerWidth}px`,
+              minWidth: `${colWin.rightSpacerWidth}px`,
+              padding: "0",
+              border: "none",
+            },
+          }),
+        );
+      }
+      for (const col of colWin.rightPinned) {
+        cells.push(buildSummaryCell(col, visibleCols.indexOf(col)));
+      }
+    } else {
+      for (let i = 0; i < visibleCols.length; i++) {
+        const col = visibleCols[i];
+        if (!col) continue;
+        cells.push(buildSummaryCell(col, i));
+      }
     }
 
     replaceChildren(this.tfoot, [el("tr", { class: "tbx-summary-row" }, cells)]);
@@ -3391,6 +3689,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     const title = getColumnTitle(column) || id;
     const filterField = getFilterField(column);
+    const optionCounts = computeFilterOptionCounts(
+      column,
+      this.isClientSide ? this.rawClientData : this.data,
+    );
     const apply = (valToApply?: string) => {
       const val = (valToApply !== undefined ? valToApply : "").trim();
       this.openFilterColumn = null;
@@ -3676,13 +3978,20 @@ class NexGridController<TData> implements TableXHandle<TData> {
             else selectedSet.delete(opt);
             renderMultiOptions(searchInput.value);
           });
+          const optCount = optionCounts[opt] ?? optionCounts[opt.trim().toLowerCase()];
+          const countBadge =
+            optCount !== undefined
+              ? el("span", { class: "tbx-filter-option-count", text: String(optCount) })
+              : null;
           const optEl = el(
             "div",
             {
               class: isChecked ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
               attrs: { role: "option", "aria-selected": String(isChecked) },
             },
-            [cb, el("span", { text: opt })],
+            countBadge
+              ? [cb, el("span", { text: opt }), countBadge]
+              : [cb, el("span", { text: opt })],
           );
           optEl.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -3931,10 +4240,19 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
         for (const opt of filtered) {
           const isSelected = selectedVal.trim().toLowerCase() === opt.trim().toLowerCase();
-          const optEl = el("div", {
-            class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
-            text: opt,
-          });
+          const optCount = optionCounts[opt] ?? optionCounts[opt.trim().toLowerCase()];
+          const countBadge =
+            optCount !== undefined
+              ? el("span", { class: "tbx-filter-option-count", text: String(optCount) })
+              : null;
+          const optEl = el(
+            "div",
+            {
+              class: isSelected ? "tbx-filter-option tbx-filter-option--selected" : "tbx-filter-option",
+              attrs: { role: "option", "aria-selected": String(isSelected) },
+            },
+            countBadge ? [el("span", { text: opt }), countBadge] : [el("span", { text: opt })],
+          );
           optEl.addEventListener("click", (e) => {
             e.stopPropagation();
             selectedVal = opt;
@@ -4161,6 +4479,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
         ? ({ ...(row as Record<string, unknown>) } as TData)
         : row;
 
+    const rowMutations: CellMutation[] = [];
     for (const col of cols) {
       if (!isEditable(col)) continue;
       const cid = getColumnId(col);
@@ -4170,6 +4489,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
       this.writeMutatedRowValue(updatedRow, col, cid, change.newValue);
       if (change.oldValue !== change.newValue) {
         this.dirtyCells.add(`${rowId}::${cid}`);
+        rowMutations.push({
+          rowId,
+          columnId: cid,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+        });
         this.options.onCellEdit?.({
           row,
           columnId: cid,
@@ -4177,6 +4502,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
           newValue: change.newValue,
         });
       }
+    }
+
+    if (rowMutations.length > 0 && this.options.enableHistory !== false) {
+      this.historyManager.push({
+        description: "Row edit",
+        mutations: rowMutations,
+      });
     }
 
     this.editingRowId = null;
@@ -4376,6 +4708,19 @@ class NexGridController<TData> implements TableXHandle<TData> {
           this.writeMutatedRowValue(row, column, colId, nextVal);
           if (value !== nextVal) {
             this.dirtyCells.add(`${rowId}::${colId}`);
+            if (this.options.enableHistory !== false) {
+              this.historyManager.push({
+                description: "Cell edit",
+                mutations: [
+                  {
+                    rowId,
+                    columnId: colId,
+                    oldValue: value,
+                    newValue: nextVal,
+                  },
+                ],
+              });
+            }
           }
           this.options.onCellEdit?.({
             row,
@@ -4485,26 +4830,62 @@ class NexGridController<TData> implements TableXHandle<TData> {
         style: tNode.depth > 0 ? { paddingInlineStart: `${tNode.depth * 18}px` } : undefined,
       });
       if (tNode.hasChildren) {
+        const isNodeLoading = Boolean(tNode.isLoading);
         const toggleBtn = el(
           "button",
           {
-            class: tNode.isExpanded ? "tbx-tree-toggle tbx-tree-toggle--open" : "tbx-tree-toggle",
+            class: [
+              "tbx-tree-toggle",
+              tNode.isExpanded ? "tbx-tree-toggle--open" : "",
+              isNodeLoading ? "tbx-tree-toggle--loading" : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
             attrs: {
               type: "button",
               "aria-expanded": String(tNode.isExpanded),
-              "aria-label": tNode.isExpanded ? "Collapse children" : "Expand children",
+              "aria-label": isNodeLoading
+                ? (this.locale.loadingNodeText ?? "Loading...")
+                : tNode.isExpanded
+                  ? "Collapse children"
+                  : "Expand children",
             },
           },
           [chevronRightIcon("tbx-icon")],
         );
-        toggleBtn.addEventListener("click", (e) => {
+        toggleBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           if (this.treeExpandedIds.has(tNode.id)) {
             this.treeExpandedIds.delete(tNode.id);
+            this.render();
           } else {
-            this.treeExpandedIds.add(tNode.id);
+            const hasLazy = this.lazyTreeChildren.has(tNode.id);
+            const rowChildren = this.options.childrenKey
+              ? (tNode.row as Record<string, unknown>)[this.options.childrenKey]
+              : (tNode.row as { children?: unknown }).children;
+            const needsLoad =
+              !hasLazy &&
+              (!Array.isArray(rowChildren) || rowChildren.length === 0) &&
+              typeof this.options.loadChildren === "function";
+
+            if (needsLoad) {
+              this.loadingTreeNodes.add(tNode.id);
+              this.render();
+              try {
+                const loaded = await this.options.loadChildren!(tNode.row);
+                this.lazyTreeChildren.set(tNode.id, loaded ?? []);
+                this.treeExpandedIds.add(tNode.id);
+              } catch {
+                // If loading fails, keep collapsed
+              } finally {
+                this.loadingTreeNodes.delete(tNode.id);
+                this.render();
+              }
+            } else {
+              this.treeExpandedIds.add(tNode.id);
+              this.render();
+            }
           }
-          this.render();
         });
         treeWrap.appendChild(toggleBtn);
       } else {
@@ -4709,6 +5090,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const sourceRow = rows[startRow];
     if (!sourceRow) return;
 
+    const fillMutations: CellMutation[] = [];
     for (let c = this.cellRange.minCol; c <= this.cellRange.maxCol; c++) {
       const col = cols[c];
       if (!col || !isEditable(col)) continue;
@@ -4725,6 +5107,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
         const rid = this.rowId(targetRow);
         if (oldVal !== coerced) {
           this.dirtyCells.add(`${rid}::${cid}`);
+          fillMutations.push({
+            rowId: rid,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           this.options.onCellEdit?.({
             row: targetRow,
             columnId: cid,
@@ -4733,6 +5121,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
           });
         }
       }
+    }
+
+    if (fillMutations.length > 0 && this.options.enableHistory !== false) {
+      this.historyManager.push({
+        description: "Fill range",
+        mutations: fillMutations,
+      });
     }
 
     this.cellRange = {
@@ -4761,6 +5156,24 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const rows = this.displayedDataList();
     const cols = this.visibleCols();
     if (rows.length === 0 || cols.length === 0) return;
+
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+        return;
+      }
+      if (key === "y") {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+    }
 
     if (
       (e.ctrlKey || e.metaKey) &&
@@ -4862,6 +5275,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
     let maxR = startR;
     let maxC = startC;
+    const pasteMutations: CellMutation[] = [];
     for (let rOff = 0; rOff < matrix.length; rOff++) {
       const targetRow = rows[startR + rOff];
       if (!targetRow) break;
@@ -4880,6 +5294,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
         const rid = this.rowId(targetRow);
         if (oldVal !== coerced) {
           this.dirtyCells.add(`${rid}::${cid}`);
+          pasteMutations.push({
+            rowId: rid,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           this.options.onCellEdit?.({
             row: targetRow,
             columnId: cid,
@@ -4888,6 +5308,13 @@ class NexGridController<TData> implements TableXHandle<TData> {
           });
         }
       }
+    }
+
+    if (pasteMutations.length > 0 && this.options.enableHistory !== false) {
+      this.historyManager.push({
+        description: "Clipboard paste",
+        mutations: pasteMutations,
+      });
     }
 
     this.cellRange = normalizeCellRange(

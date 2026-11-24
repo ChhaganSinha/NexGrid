@@ -275,6 +275,22 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("enable-range-selection")]
     public bool? EnableRangeSelection { get; set; }
 
+    /// <summary>Enable horizontal column virtualization for grids with wide column sets. Defaults to <see langword="false"/>.</summary>
+    [HtmlAttributeName("enable-column-virtualization")]
+    public bool? EnableColumnVirtualization { get; set; }
+
+    /// <summary>Buffer columns rendered beyond viewport edges in column virtualization.</summary>
+    [HtmlAttributeName("virtual-column-overscan")]
+    public int? VirtualColumnOverscan { get; set; }
+
+    /// <summary>Distribute surplus width to fill container width without whitespace gaps.</summary>
+    [HtmlAttributeName("fit-container")]
+    public bool? FitContainer { get; set; }
+
+    /// <summary>Enable undo / redo history stack (Ctrl+Z / Ctrl+Y). Defaults to <see langword="true"/>.</summary>
+    [HtmlAttributeName("enable-history")]
+    public bool? EnableHistory { get; set; }
+
     /// <summary>Optional in-memory dataset serialized into JSON for client-side mode.</summary>
     [HtmlAttributeName("data")]
     public object? Data { get; set; }
@@ -444,6 +460,10 @@ public class TableXTagHelper : TagHelper
         EnableRowReorder = EnableRowReorder,
         EnableInfiniteScroll = EnableInfiniteScroll,
         EnableRangeSelection = EnableRangeSelection,
+        EnableColumnVirtualization = EnableColumnVirtualization,
+        VirtualColumnOverscan = VirtualColumnOverscan,
+        FitContainer = FitContainer,
+        EnableHistory = EnableHistory,
         Query = BuildQueryConfig(),
     };
 

@@ -38,6 +38,10 @@ public class TableXTagHelperTests
             EnableRowReorder = true,
             EnableInfiniteScroll = true,
             EnableRangeSelection = true,
+            EnableColumnVirtualization = true,
+            VirtualColumnOverscan = 5,
+            FitContainer = true,
+            EnableHistory = true,
             AutoInit = false,
         };
 
@@ -111,6 +115,10 @@ public class TableXTagHelperTests
         Assert.True(root.GetProperty("enableRowReorder").GetBoolean());
         Assert.True(root.GetProperty("enableInfiniteScroll").GetBoolean());
         Assert.True(root.GetProperty("enableRangeSelection").GetBoolean());
+        Assert.True(root.GetProperty("enableColumnVirtualization").GetBoolean());
+        Assert.Equal(5, root.GetProperty("virtualColumnOverscan").GetInt32());
+        Assert.True(root.GetProperty("fitContainer").GetBoolean());
+        Assert.True(root.GetProperty("enableHistory").GetBoolean());
 
         var cols = root.GetProperty("columns");
         Assert.Equal(3, cols.GetArrayLength());

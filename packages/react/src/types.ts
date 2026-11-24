@@ -162,6 +162,14 @@ export interface TableXProps<TData> {
   virtualHeight?: number;
   /** Extra buffer rows rendered above and below the virtual viewport. Default `6`. */
   virtualOverscan?: number;
+  /** Enable horizontal (column) DOM virtualization for wide datasets (50-500+ columns). Default `false`. */
+  enableColumnVirtualization?: boolean;
+  /** Extra buffer columns rendered to the left and right of the visible horizontal window. Default `2`. */
+  virtualColumnOverscan?: number;
+  /** Dynamically distribute surplus container width across columns to eliminate blank right gutter space. Default `false`. */
+  fitContainer?: boolean;
+  /** Enable Undo / Redo history stack (Ctrl+Z / Ctrl+Y) for cell edits, row edits, fill handle, and paste. Default `true`. */
+  enableHistory?: boolean;
   /** Group displayed rows by one or more column ids/fields (`"dept"` or `["region", "dept"]`). */
   groupBy?: string | readonly string[];
   /** Called when the active `groupBy` column(s) change via the column quick-action menu. */
@@ -180,6 +188,10 @@ export interface TableXProps<TData> {
   getSubRows?: (row: TData) => readonly TData[] | undefined;
   /** Initial expanded tree depth (`0` = collapsed, `1` = root expanded, `-1` = expand all). Default `0`. */
   defaultExpandedDepth?: number;
+  /** Asynchronously fetch child records for a tree node when expanded for the first time. */
+  loadChildren?: (row: TData) => Promise<readonly TData[] | TData[]>;
+  /** Custom predicate determining whether a tree node has expandable children (useful for async trees before fetch). */
+  hasChildren?: (row: TData) => boolean;
   /** Rows frozen at the top of `<tbody>`. */
   pinnedTopRows?: readonly TData[];
   /** Rows frozen at the bottom of `<tbody>`. */
@@ -268,5 +280,22 @@ export interface TableXProps<TData> {
   theme?: TableXTheme;
   /** Receives notices (export progress, failures). Default: no-op. */
   onNotify?: (notice: TableXNotice) => void;
+  /** Imperative handle ref for grid methods like undo/redo and column auto-fitting. */
+  tableRef?: React.Ref<TableXHandle<TData>>;
 }
 export type NexGridProps<TData> = TableXProps<TData>;
+
+/** Imperative handle exposed via `tableRef` on `<TableX />` and `<NexGrid />`. */
+export interface TableXHandle<TData = unknown> {
+  /** Undo the latest cell mutation or batch edit. Returns true if an action was undone. */
+  undo(): boolean;
+  /** Redo the latest reverted cell mutation or batch edit. Returns true if an action was redone. */
+  redo(): boolean;
+  /** True when mutations exist in the undo stack. */
+  canUndo(): boolean;
+  /** True when mutations exist in the redo stack. */
+  canRedo(): boolean;
+  /** Automatically resize all visible columns to fit their longest text content. */
+  autoFitAllColumns(sampleRows?: number): void;
+}
+export type NexGridHandle<TData = unknown> = TableXHandle<TData>;

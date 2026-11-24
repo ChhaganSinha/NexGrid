@@ -115,6 +115,16 @@ export interface TableXLocale {
   saveRow?: string;
   /** Row editing: Cancel row edit action. */
   cancelRowEdit?: string;
+  /** History: Undo action. */
+  undoAction?: string;
+  /** History: Redo action. */
+  redoAction?: string;
+  /** Column resizing: Autosize all columns. */
+  autosizeAllColumns?: string;
+  /** Tree: Async loading child rows indicator. */
+  loadingNodeText?: string;
+  /** Filter popover: No matching options message. */
+  noMatchingOptions?: string;
 }
 export type NexGridLocale = TableXLocale;
 
@@ -195,6 +205,11 @@ export const DEFAULT_LOCALE: Required<TableXLocale> = {
   editRow: "Edit row",
   saveRow: "Save row",
   cancelRowEdit: "Cancel edit",
+  undoAction: "Undo",
+  redoAction: "Redo",
+  autosizeAllColumns: "Autosize all columns",
+  loadingNodeText: "Loading…",
+  noMatchingOptions: "No matching options",
 };
 
 /**
@@ -238,6 +253,11 @@ export function resolveLocale(partial?: Partial<TableXLocale>): Required<TableXL
     editRow: partial.editRow ?? DEFAULT_LOCALE.editRow,
     saveRow: partial.saveRow ?? DEFAULT_LOCALE.saveRow,
     cancelRowEdit: partial.cancelRowEdit ?? DEFAULT_LOCALE.cancelRowEdit,
+    undoAction: partial.undoAction ?? DEFAULT_LOCALE.undoAction,
+    redoAction: partial.redoAction ?? DEFAULT_LOCALE.redoAction,
+    autosizeAllColumns: partial.autosizeAllColumns ?? DEFAULT_LOCALE.autosizeAllColumns,
+    loadingNodeText: partial.loadingNodeText ?? DEFAULT_LOCALE.loadingNodeText,
+    noMatchingOptions: partial.noMatchingOptions ?? DEFAULT_LOCALE.noMatchingOptions,
   };
 }
 

@@ -14,10 +14,12 @@ export interface TreeRowNode<TData> {
   id: string;
   /** 0-based nesting depth (`0` for root rows). */
   depth: number;
-  /** True when this node has 1+ child rows. */
+  /** True when this node has 1+ child rows or is marked as expandable parent. */
   hasChildren: boolean;
   /** True when this node is currently expanded. */
   isExpanded: boolean;
+  /** True when this node is actively loading async child rows. */
+  isLoading?: boolean;
   /** Parent node id, or `null` for root rows. */
   parentId: string | null;
   /** Direct child count. */
@@ -29,6 +31,12 @@ export interface FlattenTreeOptions<TData> {
   childrenKey?: string;
   /** Custom child accessor overriding `childrenKey`. */
   getSubRows?: (row: TData) => readonly TData[] | undefined;
+  /** Dynamically loaded children map for async lazy-loaded nodes. */
+  lazyChildren?: ReadonlyMap<string, readonly TData[]> | Record<string, readonly TData[]>;
+  /** Set of node IDs currently fetching async children. */
+  loadingNodeIds?: ReadonlySet<string>;
+  /** Optional custom predicate to determine if a node has children (e.g. `row.hasChildren === true`). */
+  hasChildren?: (row: TData) => boolean;
   /** Row identity extractor. */
   getRowId?: (row: TData) => string;
   /** Set of currently expanded node IDs. */
@@ -47,7 +55,16 @@ function extractChildren<TData>(
   row: TData,
   childrenKey: string,
   getSubRows?: (row: TData) => readonly TData[] | undefined,
+  lazyChildrenMap?: ReadonlyMap<string, readonly TData[]> | Record<string, readonly TData[]>,
+  rowId?: string,
 ): readonly TData[] {
+  if (rowId && lazyChildrenMap) {
+    const lazy =
+      lazyChildrenMap instanceof Map
+        ? lazyChildrenMap.get(rowId)
+        : (lazyChildrenMap as Record<string, readonly TData[]>)[rowId];
+    if (Array.isArray(lazy)) return lazy;
+  }
   if (getSubRows) {
     const custom = getSubRows(row);
     return Array.isArray(custom) ? custom : [];
@@ -118,9 +135,11 @@ export function flattenTreeRows<TData>(
       const id = visited.has(rawId) ? `${rawId}__${path}` : rawId;
       visited.add(id);
 
-      const children = extractChildren(row, childrenKey, options?.getSubRows);
-      const hasChildren = children.length > 0;
+      const children = extractChildren(row, childrenKey, options?.getSubRows, options?.lazyChildren, id);
+      const isParentDeclared = options?.hasChildren ? options.hasChildren(row) : false;
+      const hasChildren = children.length > 0 || isParentDeclared;
       const isExpanded = hasChildren && expandedIds.has(id);
+      const isLoading = Boolean(options?.loadingNodeIds?.has(id));
 
       out.push({
         row,
@@ -128,11 +147,12 @@ export function flattenTreeRows<TData>(
         depth,
         hasChildren,
         isExpanded,
+        isLoading,
         parentId,
         childCount: children.length,
       });
 
-      if (isExpanded) {
+      if (isExpanded && children.length > 0) {
         walk(children, depth + 1, id, path);
       }
     }

@@ -25,6 +25,7 @@
 import { DOCUMENT, NgTemplateOutlet } from "@angular/common";
 import {
   AfterContentInit,
+  AfterViewInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
@@ -49,6 +50,8 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged } from "rxjs"
 import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_VIRTUAL_HEIGHT,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
   DENSITIES,
   DEFAULT_ROW_CAP,
   PAGE_SIZES,
@@ -59,6 +62,10 @@ import {
   computeAggregation,
   computeRangeStats,
   computeVirtualWindow,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
   defaultQuery,
   downloadCsv,
   downloadExcel,
@@ -123,7 +130,9 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  GridHistoryManager,
   type CellCoord,
+  type CellMutation,
   type ContextMenuItem,
   type Density,
   type EditMode,
@@ -136,6 +145,7 @@ import {
   type PagedResponse,
   type QueryState,
   type RecordRange,
+  type VirtualColumnsWindow,
 } from "@nexgrid/core";
 
 import { TableXBulkActionsDirective } from "./table-x-bulk-actions.directive";
@@ -1043,6 +1053,39 @@ const SEARCH_DEBOUNCE_MS = 350;
               }
             </ng-template>
 
+            <ng-template #thCell let-header>
+              <th
+                class="tbx-th"
+                scope="col"
+                [attr.rowspan]="header.rowSpan && header.rowSpan > 1 ? header.rowSpan : null"
+                [attr.draggable]="header.draggable ? 'true' : null"
+                [class.tbx-th--sortable]="header.sortable"
+                [class.tbx-th--draggable]="header.draggable"
+                [class.tbx-th--dragging]="draggedColumnId === header.id"
+                [class.tbx-th--pinned-left]="header.pinnedLeft !== null && header.pinnedLeft !== undefined"
+                [class.tbx-th--pinned-right]="header.pinnedRight !== null && header.pinnedRight !== undefined"
+                [class.tbx-pinned-border-left]="header.isLastLeftPinned"
+                [class.tbx-pinned-border-right]="header.isFirstRightPinned"
+                [attr.tabindex]="header.sortable ? 0 : null"
+                [attr.aria-sort]="header.ariaSort"
+                [style.width.px]="header.width"
+                [style.minWidth.px]="header.minWidth"
+                [style.textAlign]="header.align"
+                [style.left.px]="header.pinnedLeft"
+                [style.right.px]="header.pinnedRight"
+                (pointerdown)="onHeaderPointerDown(header, $event)"
+                (dragstart)="onHeaderDragStart(header, $event)"
+                (dragover)="onHeaderDragOver(header, $event)"
+                (drop)="onHeaderDrop(header, $event)"
+                (dragend)="onHeaderDragEnd(header, $event)"
+                (click)="onHeaderActivate(header, $event)"
+                (keydown.enter)="onHeaderKeydown($event, header)"
+                (keydown.space)="onHeaderKeydown($event, header)"
+              >
+                <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
+              </th>
+            </ng-template>
+
             <tr>
               @if (enableRowReorder) {
                 <th
@@ -1100,46 +1143,35 @@ const SEARCH_DEBOUNCE_MS = 350;
                   {{ strings.serialHeader }}
                 </th>
               }
-              @for (header of topHeaderCells; track header.key) {
-                @if (header.isGroup) {
-                  <th
-                    class="tbx-th tbx-th--group"
-                    scope="colgroup"
-                    [attr.colspan]="header.colSpan"
-                  >
-                    <span class="tbx-th-group-title">{{ header.title }}</span>
-                  </th>
-                } @else {
-                  <th
-                    class="tbx-th"
-                    scope="col"
-                    [attr.rowspan]="header.rowSpan && header.rowSpan > 1 ? header.rowSpan : null"
-                    [attr.draggable]="header.draggable ? 'true' : null"
-                    [class.tbx-th--sortable]="header.sortable"
-                    [class.tbx-th--draggable]="header.draggable"
-                    [class.tbx-th--dragging]="draggedColumnId === header.id"
-                    [class.tbx-th--pinned-left]="header.pinnedLeft !== null && header.pinnedLeft !== undefined"
-                    [class.tbx-th--pinned-right]="header.pinnedRight !== null && header.pinnedRight !== undefined"
-                    [class.tbx-pinned-border-left]="header.isLastLeftPinned"
-                    [class.tbx-pinned-border-right]="header.isFirstRightPinned"
-                    [attr.tabindex]="header.sortable ? 0 : null"
-                    [attr.aria-sort]="header.ariaSort"
-                    [style.width.px]="header.width"
-                    [style.minWidth.px]="header.minWidth"
-                    [style.textAlign]="header.align"
-                    [style.left.px]="header.pinnedLeft"
-                    [style.right.px]="header.pinnedRight"
-                    (pointerdown)="onHeaderPointerDown(header, $event)"
-                    (dragstart)="onHeaderDragStart(header, $event)"
-                    (dragover)="onHeaderDragOver(header, $event)"
-                    (drop)="onHeaderDrop(header, $event)"
-                    (dragend)="onHeaderDragEnd(header, $event)"
-                    (click)="onHeaderActivate(header, $event)"
-                    (keydown.enter)="onHeaderKeydown($event, header)"
-                    (keydown.space)="onHeaderKeydown($event, header)"
-                  >
-                    <ng-container *ngTemplateOutlet="thInner; context: { $implicit: header }"></ng-container>
-                  </th>
+              @if (colWin && !hasHeaderGroups) {
+                @for (header of colWinHeadersLeft; track header.key) {
+                  <ng-container *ngTemplateOutlet="thCell; context: { $implicit: header }"></ng-container>
+                }
+                @if (colWin.leftSpacerWidth > 0) {
+                  <th class="tbx-th tbx-th--col-spacer" [style.width.px]="colWin.leftSpacerWidth"></th>
+                }
+                @for (header of colWinHeadersVirtual; track header.key) {
+                  <ng-container *ngTemplateOutlet="thCell; context: { $implicit: header }"></ng-container>
+                }
+                @if (colWin.rightSpacerWidth > 0) {
+                  <th class="tbx-th tbx-th--col-spacer" [style.width.px]="colWin.rightSpacerWidth"></th>
+                }
+                @for (header of colWinHeadersRight; track header.key) {
+                  <ng-container *ngTemplateOutlet="thCell; context: { $implicit: header }"></ng-container>
+                }
+              } @else {
+                @for (header of topHeaderCells; track header.key) {
+                  @if (header.isGroup) {
+                    <th
+                      class="tbx-th tbx-th--group"
+                      scope="colgroup"
+                      [attr.colspan]="header.colSpan"
+                    >
+                      <span class="tbx-th-group-title">{{ header.title }}</span>
+                    </th>
+                  } @else {
+                    <ng-container *ngTemplateOutlet="thCell; context: { $implicit: header }"></ng-container>
+                  }
                 }
               }
             </tr>
@@ -1283,7 +1315,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                       {{ row.pinnedVariant ? '★' : row.serial }}
                     </td>
                   }
-                  @for (cell of row.cells; track cell.key) {
+                  <ng-template #tdCell let-cell>
                     <td
                       class="tbx-td"
                       [attr.tabindex]="!row.pinnedVariant && enableKeyboardNavigation ? (cell.focused ? 0 : -1) : null"
@@ -1482,22 +1514,27 @@ const SEARCH_DEBOUNCE_MS = 350;
                               type="button"
                               class="tbx-tree-toggle"
                               [class.tbx-tree-toggle--open]="cell.treeExpanded"
+                              [class.tbx-tree-toggle--loading]="cell.treeLoading"
                               [attr.aria-expanded]="cell.treeExpanded"
                               [attr.aria-label]="cell.treeExpanded ? 'Collapse children' : 'Expand children'"
-                              (click)="toggleTreeNode(row.id, $event)"
+                              (click)="toggleTreeNode(row.id, $event, row.data)"
                             >
-                              <svg
-                                class="tbx-icon"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="m9 18 6-6-6-6" />
-                              </svg>
+                              @if (cell.treeLoading) {
+                                <span class="tbx-tree-spinner"></span>
+                              } @else {
+                                <svg
+                                  class="tbx-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="m9 18 6-6-6-6" />
+                                </svg>
+                              }
                             </button>
                           } @else {
                             <span class="tbx-tree-spacer" aria-hidden="true"></span>
@@ -1529,6 +1566,28 @@ const SEARCH_DEBOUNCE_MS = 350;
                         ></span>
                       }
                     </td>
+                  </ng-template>
+
+                  @if (colWin && !hasHeaderGroups) {
+                    @for (cell of row.leftCells; track cell.key) {
+                      <ng-container *ngTemplateOutlet="tdCell; context: { $implicit: cell }"></ng-container>
+                    }
+                    @if (colWin.leftSpacerWidth > 0) {
+                      <td class="tbx-td tbx-td--col-spacer" [style.width.px]="colWin.leftSpacerWidth"></td>
+                    }
+                    @for (cell of row.virtualCells; track cell.key) {
+                      <ng-container *ngTemplateOutlet="tdCell; context: { $implicit: cell }"></ng-container>
+                    }
+                    @if (colWin.rightSpacerWidth > 0) {
+                      <td class="tbx-td tbx-td--col-spacer" [style.width.px]="colWin.rightSpacerWidth"></td>
+                    }
+                    @for (cell of row.rightCells; track cell.key) {
+                      <ng-container *ngTemplateOutlet="tdCell; context: { $implicit: cell }"></ng-container>
+                    }
+                  } @else {
+                    @for (cell of row.cells; track cell.key) {
+                      <ng-container *ngTemplateOutlet="tdCell; context: { $implicit: cell }"></ng-container>
+                    }
                   }
                 </tr>
                 @if (row.expanded && hasExpandColumn) {
@@ -1666,7 +1725,7 @@ const SEARCH_DEBOUNCE_MS = 350;
                     [style.left.px]="serialPinnedLeft"
                   ></td>
                 }
-                @for (sumCell of summaryCells; track sumCell.key) {
+                <ng-template #tdSummary let-sumCell>
                   <td
                     class="tbx-summary-cell"
                     [class.tbx-td--pinned-left]="sumCell.pinnedLeft !== null && sumCell.pinnedLeft !== undefined"
@@ -1686,6 +1745,28 @@ const SEARCH_DEBOUNCE_MS = 350;
                       <strong>Total</strong>
                     }
                   </td>
+                </ng-template>
+
+                @if (colWin && !hasHeaderGroups) {
+                  @for (sumCell of colWinSummaryLeft; track sumCell.key) {
+                    <ng-container *ngTemplateOutlet="tdSummary; context: { $implicit: sumCell }"></ng-container>
+                  }
+                  @if (colWin.leftSpacerWidth > 0) {
+                    <td class="tbx-td tbx-td--col-spacer" [style.width.px]="colWin.leftSpacerWidth"></td>
+                  }
+                  @for (sumCell of colWinSummaryVirtual; track sumCell.key) {
+                    <ng-container *ngTemplateOutlet="tdSummary; context: { $implicit: sumCell }"></ng-container>
+                  }
+                  @if (colWin.rightSpacerWidth > 0) {
+                    <td class="tbx-td tbx-td--col-spacer" [style.width.px]="colWin.rightSpacerWidth"></td>
+                  }
+                  @for (sumCell of colWinSummaryRight; track sumCell.key) {
+                    <ng-container *ngTemplateOutlet="tdSummary; context: { $implicit: sumCell }"></ng-container>
+                  }
+                } @else {
+                  @for (sumCell of summaryCells; track sumCell.key) {
+                    <ng-container *ngTemplateOutlet="tdSummary; context: { $implicit: sumCell }"></ng-container>
+                  }
                 }
               </tr>
             </tfoot>
@@ -1891,6 +1972,9 @@ const SEARCH_DEBOUNCE_MS = 350;
                       aria-hidden="true"
                     />
                     <span>{{ opt }}</span>
+                    @if (filterOptionCounts[opt] !== undefined) {
+                      <span class="tbx-filter-option-count"> ({{ filterOptionCounts[opt] }})</span>
+                    }
                   </div>
                 }
               </div>
@@ -1923,7 +2007,10 @@ const SEARCH_DEBOUNCE_MS = 350;
                       [class.tbx-filter-option--selected]="filterInputText === opt"
                       (click)="applyColumnFilter(activeFilterHeader.id, opt)"
                     >
-                      {{ opt }}
+                      <span>{{ opt }}</span>
+                      @if (filterOptionCounts[opt] !== undefined) {
+                        <span class="tbx-filter-option-count"> ({{ filterOptionCounts[opt] }})</span>
+                      }
                     </div>
                   }
                 </div>
@@ -2308,7 +2395,7 @@ const SEARCH_DEBOUNCE_MS = 350;
   `,
 })
 export class TableXComponent<TData>
-  implements OnInit, OnChanges, AfterContentInit, OnDestroy
+  implements OnInit, OnChanges, AfterContentInit, AfterViewInit, OnDestroy
 {
   // ---------------------------------------------------------------------
   // Inputs
@@ -2540,6 +2627,24 @@ export class TableXComponent<TData>
   /** `dark` / `auto` add the matching class to the root element. */
   @Input() theme: TableXTheme = "light";
 
+  /** Enable horizontal column virtualization for grids with dozens or hundreds of columns. */
+  @Input({ transform: booleanAttribute }) enableColumnVirtualization = false;
+
+  /** Number of unpinned columns rendered beyond the left and right edges of the horizontal scroll viewport. */
+  @Input() virtualColumnOverscan = DEFAULT_COLUMN_OVERSCAN;
+
+  /** Distribute excess container width across unpinned columns to eliminate whitespace gaps on wide viewports. */
+  @Input({ transform: booleanAttribute }) fitContainer = false;
+
+  /** Enable undo / redo history stack for cell edits, row edits, fill handle, and TSV paste mutations (Ctrl+Z / Ctrl+Y). */
+  @Input({ transform: booleanAttribute }) enableHistory = true;
+
+  /** Asynchronously fetch child rows for a tree node on demand. */
+  @Input() loadChildren?: (row: TData) => Promise<TData[]>;
+
+  /** Custom predicate determining whether a row displays an expandable tree toggle icon. */
+  @Input() hasChildren?: (row: TData) => boolean;
+
   /**
    * Force the row-click affordance on. It is already on whenever something is
    * listening to `rowClick`, so this is only needed when a host binds the
@@ -2688,6 +2793,20 @@ export class TableXComponent<TData>
   protected virtualTopSpacer = 0;
   protected virtualBottomSpacer = 0;
   private virtualScrollTop = 0;
+  private virtualScrollLeft = 0;
+  private fitObserver: ResizeObserver | null = null;
+  private readonly historyManager = new GridHistoryManager();
+  private readonly lazyTreeChildren = new Map<string, readonly TData[]>();
+  private readonly loadingTreeNodes = new Set<string>();
+
+  protected colWin: VirtualColumnsWindow<TableXAngularColumn<TData>> | null = null;
+  protected colWinHeadersLeft: NexGridHeaderView[] = [];
+  protected colWinHeadersVirtual: NexGridHeaderView[] = [];
+  protected colWinHeadersRight: NexGridHeaderView[] = [];
+  protected colWinSummaryLeft: TableXSummaryCellView[] = [];
+  protected colWinSummaryVirtual: TableXSummaryCellView[] = [];
+  protected colWinSummaryRight: TableXSummaryCellView[] = [];
+  protected filterOptionCounts: Record<string, number> = {};
   protected bulkActionsContext: TableXBulkActionsTemplateContext = {
     $implicit: [],
     selectedIds: [],
@@ -2938,9 +3057,40 @@ export class TableXComponent<TData>
     );
   }
 
+  ngAfterViewInit(): void {
+    if (this.fitContainer && typeof ResizeObserver !== "undefined") {
+      const wrap = this.hostRef.nativeElement?.querySelector?.(".tbx-table-wrap") as HTMLElement | null;
+      if (wrap) {
+        this.fitObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const w = entry.contentRect.width;
+            if (w > 0) {
+              const rawColumns =
+                this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+              const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+              const distributed = distributeContainerWidth(visible, w, this.columnWidths, {
+                getColumnId,
+                isPinned: (c) => isPinned(c, this.pinnedColumns) !== false,
+                defaultWidth: DEFAULT_COLUMN_WIDTH,
+              });
+              this.columnWidths = distributed;
+              this.zone.run(() => {
+                this.recompute();
+                this.cdr.markForCheck();
+              });
+            }
+          }
+        });
+        this.fitObserver.observe(wrap);
+      }
+    }
+  }
+
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
     this.searchInput$.complete();
+    this.fitObserver?.disconnect();
+    this.fitObserver = null;
     this.detachMenuListeners?.();
     this.detachMenuListeners = null;
     this.detachFilterListeners?.();
@@ -2951,6 +3101,102 @@ export class TableXComponent<TData>
     this.detachContextListeners = null;
     this.detachPointerUpListener?.();
     this.detachPointerUpListener = null;
+  }
+
+  // ---------------------------------------------------------------------
+  // Public Imperative API
+  // ---------------------------------------------------------------------
+
+  /** Undo the most recent cell mutation in history. */
+  undo(): boolean {
+    if (!this.enableHistory) return false;
+    const action = this.historyManager.undo();
+    if (action && action.mutations.length > 0) {
+      this.applyHistoryMutations(action.mutations, "oldValue");
+      return true;
+    }
+    return false;
+  }
+
+  /** Redo the most recently undone cell mutation in history. */
+  redo(): boolean {
+    if (!this.enableHistory) return false;
+    const action = this.historyManager.redo();
+    if (action && action.mutations.length > 0) {
+      this.applyHistoryMutations(action.mutations, "newValue");
+      return true;
+    }
+    return false;
+  }
+
+  /** Check if there is an action to undo. */
+  canUndo(): boolean {
+    return this.enableHistory && this.historyManager.canUndo();
+  }
+
+  /** Check if there is an action to redo. */
+  canRedo(): boolean {
+    return this.enableHistory && this.historyManager.canRedo();
+  }
+
+  /** Automatically resize all visible columns based on cell content. */
+  autoFitAllColumns(sampleRows = 50): void {
+    const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
+    const sample = this.currentDisplayData.slice(0, sampleRows);
+    const widths = computeAutosizeWidths(visible, sample, {
+      getColumnId,
+      getColumnTitle,
+      getCellValue,
+      getCellText: (val) =>
+        getCellText(val, { yes: this.strings.booleanYes, no: this.strings.booleanNo }),
+    });
+    this.columnWidths = { ...this.columnWidths, ...widths };
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  /** Automatically resize a single column based on cell content. */
+  autoFitColumn(id: string): void {
+    const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const col = flattenColumns(rawColumns).find((c) => getColumnId(c) === id);
+    if (!col) return;
+    const sample = this.currentDisplayData.slice(0, 50);
+    const widths = computeAutosizeWidths([col], sample, {
+      getColumnId,
+      getColumnTitle,
+      getCellValue,
+      getCellText: (val) =>
+        getCellText(val, { yes: this.strings.booleanYes, no: this.strings.booleanNo }),
+    });
+    this.columnWidths = { ...this.columnWidths, ...widths };
+    this.recompute();
+    this.cdr.markForCheck();
+  }
+
+  private applyHistoryMutations(
+    mutations: readonly CellMutation[],
+    targetField: "oldValue" | "newValue",
+  ): void {
+    const rawColumns = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const cols = flattenColumns(rawColumns);
+    for (const mut of mutations) {
+      const val = mut[targetField];
+      const targetRow = this.currentDisplayData.find((r) => this.getRowId(r) === mut.rowId);
+      if (targetRow) {
+        const col = cols.find((c) => getColumnId(c) === mut.columnId);
+        this.writeMutatedRowProperty(targetRow, col, mut.columnId, val);
+        this.dirtyCells.add(`${mut.rowId}::${mut.columnId}`);
+        this.cellEdit.emit({
+          row: targetRow,
+          columnId: mut.columnId,
+          oldValue: targetField === "oldValue" ? mut.newValue : mut.oldValue,
+          newValue: val,
+        });
+      }
+    }
+    this.recompute();
+    this.cdr.markForCheck();
   }
 
   // ---------------------------------------------------------------------
@@ -3160,6 +3406,9 @@ export class TableXComponent<TData>
     this.closeMenus();
     this.openFilterColumn = id;
     this.filterHasTyped = false;
+    const rawCols = this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
+    const col = flattenColumns(rawCols).find((c) => getColumnId(c) === id);
+    this.filterOptionCounts = col ? computeFilterOptionCounts(col, this.data) : {};
     const activeVal = header.activeFilter ?? "";
     if (header.filterType === "date-range" || header.filterType === "number-range") {
       const parts = activeVal.split("..");
@@ -3202,6 +3451,7 @@ export class TableXComponent<TData>
     this.openFilterColumn = null;
     this.activeFilterHeader = null;
     this.filterPopoverStyles = null;
+    this.filterOptionCounts = {};
     this.detachFilterListeners?.();
     this.detachFilterListeners = null;
     this.cdr.markForCheck();
@@ -3843,6 +4093,19 @@ export class TableXComponent<TData>
     this.writeMutatedRowProperty(targetRow, col, cell.columnId, nextVal);
     if (cell.rawValue !== nextVal) {
       this.dirtyCells.add(`${row.id}::${cell.columnId}`);
+      if (this.enableHistory) {
+        this.historyManager.push({
+          description: "cell",
+          mutations: [
+            {
+              rowId: row.id,
+              columnId: cell.columnId,
+              oldValue: cell.rawValue,
+              newValue: nextVal,
+            },
+          ],
+        });
+      }
     }
     this.editingCell = null;
     this.recompute();
@@ -3926,6 +4189,7 @@ export class TableXComponent<TData>
         ? ({ ...(targetRow as Record<string, unknown>) } as TData)
         : targetRow;
 
+    const rowMutations: CellMutation[] = [];
     for (const cell of row.cells) {
       if (!cell.editable) continue;
       const change = changes[cell.columnId];
@@ -3935,6 +4199,12 @@ export class TableXComponent<TData>
       this.writeMutatedRowProperty(updatedRow, col, cell.columnId, change.newValue);
       if (change.oldValue !== change.newValue) {
         this.dirtyCells.add(`${row.id}::${cell.columnId}`);
+        rowMutations.push({
+          rowId: row.id,
+          columnId: cell.columnId,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+        });
         this.cellEdit.emit({
           row: targetRow,
           columnId: cell.columnId,
@@ -3942,6 +4212,9 @@ export class TableXComponent<TData>
           newValue: change.newValue,
         });
       }
+    }
+    if (this.enableHistory && rowMutations.length > 0) {
+      this.historyManager.push({ description: "row", mutations: rowMutations });
     }
 
     this.editingRowId = null;
@@ -3999,13 +4272,32 @@ export class TableXComponent<TData>
     this.cdr.markForCheck();
   }
 
-  protected toggleTreeNode(nodeId: string, event: Event): void {
+  protected async toggleTreeNode(nodeId: string, event: Event, rowData?: TData): Promise<void> {
     event.stopPropagation();
     if (this.treeExpandedIds.has(nodeId)) {
       this.treeExpandedIds.delete(nodeId);
-    } else {
-      this.treeExpandedIds.add(nodeId);
+      this.recompute();
+      this.cdr.markForCheck();
+      return;
     }
+
+    if (this.loadChildren && rowData && !this.lazyTreeChildren.has(nodeId)) {
+      this.loadingTreeNodes.add(nodeId);
+      this.treeExpandedIds.add(nodeId);
+      this.recompute();
+      this.cdr.markForCheck();
+      try {
+        const children = await this.loadChildren(rowData);
+        this.lazyTreeChildren.set(nodeId, children ?? []);
+      } finally {
+        this.loadingTreeNodes.delete(nodeId);
+        this.recompute();
+        this.cdr.markForCheck();
+      }
+      return;
+    }
+
+    this.treeExpandedIds.add(nodeId);
     this.recompute();
     this.cdr.markForCheck();
   }
@@ -4100,6 +4392,7 @@ export class TableXComponent<TData>
     const sourceRow = rowsData[startRow];
     if (!sourceRow) return;
 
+    const fillMutations: CellMutation[] = [];
     for (let c = this.cellRange.minCol; c <= this.cellRange.maxCol; c++) {
       const col = visible[c];
       if (!col || !isEditable(col)) continue;
@@ -4113,7 +4406,14 @@ export class TableXComponent<TData>
         if (validateEditedCell(col, coerced, targetRow) !== null) continue;
         this.writeMutatedRowProperty(targetRow, col, cid, coerced);
         if (oldVal !== coerced) {
-          this.dirtyCells.add(`${this.getRowId(targetRow)}::${cid}`);
+          const rowId = this.getRowId(targetRow);
+          this.dirtyCells.add(`${rowId}::${cid}`);
+          fillMutations.push({
+            rowId,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           this.cellEdit.emit({
             row: targetRow,
             columnId: cid,
@@ -4122,6 +4422,9 @@ export class TableXComponent<TData>
           });
         }
       }
+    }
+    if (this.enableHistory && fillMutations.length > 0) {
+      this.historyManager.push({ description: "fill", mutations: fillMutations });
     }
     this.cellRange = { ...this.cellRange, maxRow: endRow };
     this.recompute();
@@ -4273,6 +4576,21 @@ export class TableXComponent<TData>
       this.orderedColumns.length === this.columns.length ? this.orderedColumns : this.columns;
     const visible = visibleColumns(flattenColumns(rawColumns), this.hiddenColumns);
 
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && this.enableHistory) {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y" && this.enableHistory) {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+
     if (
       (event.ctrlKey || event.metaKey) &&
       event.key.toLowerCase() === "c" &&
@@ -4373,6 +4691,7 @@ export class TableXComponent<TData>
     let maxR = startR;
     let maxC = startC;
 
+    const pasteMutations: CellMutation[] = [];
     for (let rOff = 0; rOff < matrix.length; rOff++) {
       const targetRow = this.currentDisplayData[startR + rOff];
       if (!targetRow) break;
@@ -4389,7 +4708,14 @@ export class TableXComponent<TData>
         if (validateEditedCell(col, coerced, targetRow) !== null) continue;
         this.writeMutatedRowProperty(targetRow, col, cid, coerced);
         if (oldVal !== coerced) {
-          this.dirtyCells.add(`${this.getRowId(targetRow)}::${cid}`);
+          const rowId = this.getRowId(targetRow);
+          this.dirtyCells.add(`${rowId}::${cid}`);
+          pasteMutations.push({
+            rowId,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           this.cellEdit.emit({
             row: targetRow,
             columnId: cid,
@@ -4398,6 +4724,9 @@ export class TableXComponent<TData>
           });
         }
       }
+    }
+    if (this.enableHistory && pasteMutations.length > 0) {
+      this.historyManager.push({ description: "paste", mutations: pasteMutations });
     }
 
     this.cellRange = normalizeCellRange(
@@ -4784,6 +5113,13 @@ export class TableXComponent<TData>
         this.recompute();
       }
     }
+    if (this.enableColumnVirtualization && target) {
+      const nextLeft = target.scrollLeft ?? 0;
+      if (Math.abs(nextLeft - this.virtualScrollLeft) >= 1) {
+        this.virtualScrollLeft = nextLeft;
+        this.recompute();
+      }
+    }
     if (target && this.isInfiniteMode && this.hasMore && !this.isLoading && !this.isLoadingMore) {
       const remaining = target.scrollHeight - target.scrollTop - target.clientHeight;
       if (remaining <= 120) {
@@ -4934,6 +5270,35 @@ export class TableXComponent<TData>
       this.syncFilteredPopoverOptions();
     }
 
+    const wrapEl = this.hostRef.nativeElement?.querySelector?.(".tbx-table-wrap") as HTMLElement | null;
+    const tableWrapWidth = wrapEl ? wrapEl.clientWidth : 800;
+
+    const colWin =
+      this.enableColumnVirtualization && !this.hasHeaderGroups
+        ? computeVirtualColumnsWindow({
+            columns: visible,
+            scrollLeft: this.virtualScrollLeft,
+            viewportWidth: tableWrapWidth,
+            columnWidths: this.columnWidths,
+            defaultWidth: DEFAULT_COLUMN_WIDTH,
+            overscan: this.virtualColumnOverscan,
+            isPinned: (col) => isPinned(col, this.pinnedColumns),
+            getColumnId,
+          })
+        : null;
+    this.colWin = colWin;
+
+    if (colWin) {
+      const idSet = new Set(colWin.virtualColumns.map(getColumnId));
+      this.colWinHeadersLeft = this.headers.filter((h) => h.pinnedLeft !== null);
+      this.colWinHeadersVirtual = this.headers.filter((h) => idSet.has(h.id));
+      this.colWinHeadersRight = this.headers.filter((h) => h.pinnedRight !== null);
+    } else {
+      this.colWinHeadersLeft = [];
+      this.colWinHeadersVirtual = [];
+      this.colWinHeadersRight = [];
+    }
+
     const isClient = this.isClientMode;
     const unpaginatedVirtual = this.enableVirtualization && !this.isPaginationVisible;
     const searchFields =
@@ -4954,6 +5319,9 @@ export class TableXComponent<TData>
           getSubRows: this.getSubRows,
           getRowId: this.getRowId,
           expandedIds: this.treeExpandedIds,
+          hasChildren: this.hasChildren,
+          lazyChildren: this.lazyTreeChildren,
+          loadingNodeIds: this.loadingTreeNodes,
         })
       : null;
     const displayData = treeNodes ? treeNodes.map((n) => n.row) : baseData;
@@ -5047,12 +5415,24 @@ export class TableXComponent<TData>
           treeDepth: tNode && columnIndex === 0 ? tNode.depth : 0,
           treeHasChildren: Boolean(tNode && columnIndex === 0 && tNode.hasChildren),
           treeExpanded: Boolean(tNode && columnIndex === 0 && tNode.isExpanded),
+          treeLoading: Boolean(tNode && columnIndex === 0 && tNode.isLoading),
           pinnedLeft: leftOffsets.get(colId) ?? null,
           pinnedRight: rightOffsets.get(colId) ?? null,
           isLastLeftPinned: lastLeftPinnedId === colId,
           isFirstRightPinned: firstRightPinnedId === colId,
         };
       });
+      let leftCells: NexGridCellView<TData>[] | undefined;
+      let virtualCells: NexGridCellView<TData>[] | undefined;
+      let rightCells: NexGridCellView<TData>[] | undefined;
+
+      if (colWin) {
+        const idSet = new Set(colWin.virtualColumns.map(getColumnId));
+        leftCells = cells.filter((c) => c.pinnedLeft !== null);
+        virtualCells = cells.filter((c) => idSet.has(c.columnId));
+        rightCells = cells.filter((c) => c.pinnedRight !== null);
+      }
+
       const candidateKey = pinnedVariant
         ? `${pinnedVariant}-${id || rowIndex}`
         : (id === "" ? String(rowIndex) : id);
@@ -5070,6 +5450,9 @@ export class TableXComponent<TData>
         pinnedVariant,
         isRowEditing,
         cells,
+        leftCells,
+        virtualCells,
+        rightCells,
       };
     };
 
@@ -5178,8 +5561,21 @@ export class TableXComponent<TData>
           isFirstRightPinned: firstRightPinnedId === colId,
         };
       });
+      if (colWin) {
+        const idSet = new Set(colWin.virtualColumns.map(getColumnId));
+        this.colWinSummaryLeft = this.summaryCells.filter((c) => c.pinnedLeft !== null);
+        this.colWinSummaryVirtual = this.summaryCells.filter((c, idx) => idSet.has(getColumnId(visible[idx]!)));
+        this.colWinSummaryRight = this.summaryCells.filter((c) => c.pinnedRight !== null);
+      } else {
+        this.colWinSummaryLeft = [];
+        this.colWinSummaryVirtual = [];
+        this.colWinSummaryRight = [];
+      }
     } else {
       this.summaryCells = [];
+      this.colWinSummaryLeft = [];
+      this.colWinSummaryVirtual = [];
+      this.colWinSummaryRight = [];
     }
 
     const toggleKeys = new Set<string>();

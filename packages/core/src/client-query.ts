@@ -554,3 +554,35 @@ export function queryClientData<TData>(
     totalPages,
   };
 }
+
+/**
+ * Compute the count of matching rows for each discrete filter option in `col.meta.filterOptions`.
+ */
+export function computeFilterOptionCounts<TData>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  col: TableXColumn<TData, any>,
+  rows: readonly TData[],
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const options = col.meta?.filterOptions;
+  if (!options || options.length === 0) return counts;
+
+  for (const opt of options) {
+    counts[opt] = 0;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    const val = getCellValue(col, row);
+    if (val === null || val === undefined) continue;
+    const str = String(val).trim().toLowerCase();
+
+    for (const opt of options) {
+      if (opt.trim().toLowerCase() === str) {
+        counts[opt] = (counts[opt] ?? 0) + 1;
+      }
+    }
+  }
+
+  return counts;
+}

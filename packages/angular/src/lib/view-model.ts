@@ -127,6 +127,8 @@ export interface TableXCellView<TData> {
   treeHasChildren?: boolean;
   /** Whether this tree node's child rows are currently expanded. */
   treeExpanded?: boolean;
+  /** Whether this tree node's child rows are currently loading asynchronously. */
+  treeLoading?: boolean;
   /** True on column 0 when `enableTreeData` is active. */
   isTreeColumn?: boolean;
   /** Left sticky pixel offset when pinned left, else `null`. */
@@ -165,6 +167,9 @@ export interface TableXRowView<TData> {
   /** True when `editMode === 'row'` and this row is currently being edited. */
   isRowEditing?: boolean;
   cells: TableXCellView<TData>[];
+  leftCells?: TableXCellView<TData>[];
+  virtualCells?: TableXCellView<TData>[];
+  rightCells?: TableXCellView<TData>[];
 }
 
 /** One rendered cell in the `<tfoot>` summary row. */

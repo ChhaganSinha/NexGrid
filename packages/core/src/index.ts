@@ -82,20 +82,37 @@ export {
   withFilter,
   totalPagesFor,
 } from "./query.js";
-export { queryClientData, matchesFilterValue, compareValues } from "./client-query.js";
+export {
+  queryClientData,
+  matchesFilterValue,
+  compareValues,
+  computeFilterOptionCounts,
+} from "./client-query.js";
 export type { ClientQueryOptions, FilterMatchOptions } from "./client-query.js";
 
 // Pagination presentation
 export { getPageNumbers, getRecordRange, serialNumber } from "./pagination.js";
 export type { PageItem, RecordRange } from "./pagination.js";
 
-// Row virtualization
+// Row & Column virtualization
 export {
   computeVirtualWindow,
   DEFAULT_VIRTUAL_HEIGHT,
   DEFAULT_VIRTUAL_OVERSCAN,
 } from "./virtual.js";
 export type { VirtualWindow, VirtualWindowInput } from "./virtual.js";
+export {
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
+} from "./virtual-columns.js";
+export type { VirtualColumnsInput, VirtualColumnsWindow } from "./virtual-columns.js";
+
+// Mutation History (Undo / Redo)
+export { GridHistoryManager } from "./history.js";
+export type { CellMutation, GridHistoryAction, GridHistoryState } from "./history.js";
 
 // Client-side row grouping
 export {

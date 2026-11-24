@@ -177,6 +177,10 @@ export interface TableXOptions<TData> {
   enableColumnReorder?: boolean;
   /** Enable DOM row virtualization for smooth 60fps scrolling over 10,000+ rows. Default `false`. */
   enableVirtualization?: boolean;
+  /** Enable horizontal column virtualization for tables with many columns. Default `false`. */
+  enableColumnVirtualization?: boolean;
+  /** Automatically distribute surplus container width across unpinned columns so the table fills 100% of the viewport. Default `false`. */
+  fitContainer?: boolean;
   /** Scroll viewport max-height in pixels when `enableVirtualization` is `true`. Default `520`. */
   virtualHeight?: number;
   /** Extra buffer rows rendered above and below the virtual viewport. Default `6`. */
@@ -187,6 +191,8 @@ export interface TableXOptions<TData> {
   onGroupByChange?: (columnId: string | undefined, allGroupBy: string[]) => void;
   /** Enable spreadsheet arrow-key cell focus & Enter/F2/Space shortcuts. Default `true`. */
   enableKeyboardNavigation?: boolean;
+  /** Enable Undo / Redo history tracking (`Ctrl+Z` / `Ctrl+Y`). Defaults to `true` when editing or range selection is enabled. */
+  enableHistory?: boolean;
   /** Enable right-click cell/row context menu. Default `true`. */
   enableContextMenu?: boolean;
   /** Custom context menu items appended when right-clicking a cell. */
@@ -197,6 +203,10 @@ export interface TableXOptions<TData> {
   childrenKey?: string;
   /** Custom child-row extractor enabling hierarchical tree rows. */
   getSubRows?: (row: TData) => readonly TData[] | undefined;
+  /** Async function to fetch child rows on-demand when a tree node is expanded. */
+  loadChildren?: (row: TData) => Promise<TData[]>;
+  /** Custom predicate to determine whether a tree row node has children (e.g. for lazy-loaded nodes). */
+  hasChildren?: (row: TData) => boolean;
   /** Initial expanded tree depth (`0` = collapsed, `1` = root expanded, `-1` = expand all). Default `0`. */
   defaultExpandedDepth?: number;
   /** Rows frozen at the top of `<tbody>`. */
@@ -326,6 +336,16 @@ export interface TableXHandle<TData> {
   isAllAcrossSelected(): boolean;
   /** Set the dataset (updates in-memory data in client mode, or current page in server mode). */
   setData(data: TData[]): void;
+  /** Undo the latest cell mutation or batch edit. */
+  undo(): void;
+  /** Redo the latest reverted cell mutation or batch edit. */
+  redo(): void;
+  /** True when mutations exist in the undo stack. */
+  canUndo(): boolean;
+  /** True when mutations exist in the redo stack. */
+  canRedo(): boolean;
+  /** Automatically resize all visible columns to fit their longest text content. */
+  autoFitAllColumns(): void;
   /** Tear down: detach the grid and remove every listener it registered. */
   destroy(): void;
 }

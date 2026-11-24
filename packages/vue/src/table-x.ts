@@ -83,7 +83,15 @@ import {
   withSort,
   withToggledMultiSort,
   withToggledSort,
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
   type CellCoord,
+  type CellMutation,
   type ContextMenuItem,
   type Density,
   type EditMode,
@@ -208,6 +216,10 @@ export const TableX = defineComponent({
     enableVirtualization: { type: Boolean, default: false },
     virtualHeight: { type: Number, default: DEFAULT_VIRTUAL_HEIGHT },
     virtualOverscan: { type: Number, default: undefined },
+    enableColumnVirtualization: { type: Boolean, default: false },
+    virtualColumnOverscan: { type: Number, default: 2 },
+    fitContainer: { type: Boolean, default: false },
+    enableHistory: { type: Boolean, default: true },
     groupBy: {
       type: [String, Array] as PropType<string | readonly string[]>,
       default: undefined,
@@ -231,6 +243,14 @@ export const TableX = defineComponent({
       default: undefined,
     },
     defaultExpandedDepth: { type: Number, default: 0 },
+    loadChildren: {
+      type: Function as PropType<(row: unknown) => Promise<readonly unknown[] | unknown[]>>,
+      default: undefined,
+    },
+    hasChildren: {
+      type: Function as PropType<(row: unknown) => boolean>,
+      default: undefined,
+    },
     pinnedTopRows: { type: Array as PropType<readonly unknown[]>, default: undefined },
     pinnedBottomRows: { type: Array as PropType<readonly unknown[]>, default: undefined },
     editMode: { type: String as PropType<EditMode>, default: "cell" },
@@ -330,10 +350,14 @@ export const TableX = defineComponent({
     "rowOrderChange",
     "loadMore",
   ],
-  setup(props, { slots, emit }) {
+  setup(props, { slots, emit, expose }) {
     const uid = `tbx-vue-${++vueUidCounter}`;
     const rootRef = ref<HTMLElement | null>(null);
     const tableWrapRef = ref<HTMLElement | null>(null);
+    const historyManager = ref<GridHistoryManager>(new GridHistoryManager());
+    const lazyTreeChildren = ref<Map<string, readonly unknown[]>>(new Map());
+    const loadingTreeNodes = ref<Set<string>>(new Set());
+    const virtualScrollLeft = ref(0);
 
     const locale = computed(() => resolveLocale(props.locale));
     const boolLabels = computed(() => ({
@@ -582,6 +606,8 @@ export const TableX = defineComponent({
       }
     };
 
+    let fitObserver: ResizeObserver | null = null;
+
     onMounted(() => {
       if (props.storageKey) {
         const persisted = loadGridState(props.storageKey);
@@ -608,11 +634,36 @@ export const TableX = defineComponent({
       if (typeof window !== "undefined") {
         window.addEventListener("resize", onWindowResize);
       }
+      if (props.fitContainer && tableWrapRef.value && typeof ResizeObserver !== "undefined") {
+        fitObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const width = entry.contentRect.width;
+            if (width > 0) {
+              const distributed = distributeContainerWidth(
+                visible.value,
+                width,
+                colWidths.value,
+                {
+                  getColumnId,
+                  isPinned: (c) => isPinned(c, pinnedCols.value) !== false,
+                  defaultWidth: DEFAULT_COLUMN_WIDTH,
+                },
+              );
+              colWidths.value = distributed;
+            }
+          }
+        });
+        fitObserver.observe(tableWrapRef.value);
+      }
     });
 
     onBeforeUnmount(() => {
       if (searchTimer) clearTimeout(searchTimer);
       resizeCleanup?.();
+      if (fitObserver) {
+        fitObserver.disconnect();
+        fitObserver = null;
+      }
       if (typeof document !== "undefined") {
         document.removeEventListener("pointerdown", onGlobalPointerDown, true);
         document.removeEventListener("pointerup", onGlobalPointerUp);
@@ -652,9 +703,25 @@ export const TableX = defineComponent({
             getSubRows: props.getSubRows,
             getRowId: rowIdFn.value,
             expandedIds: treeExpandedIds.value,
+            hasChildren: props.hasChildren,
+            lazyChildren: lazyTreeChildren.value,
+            loadingNodeIds: loadingTreeNodes.value,
           })
         : null,
     );
+
+    const colWin = computed(() => {
+      if (!props.enableColumnVirtualization || headerRows.value.hasGroups) return null;
+      return computeVirtualColumnsWindow({
+        columns: visible.value,
+        scrollLeft: virtualScrollLeft.value,
+        viewportWidth: tableWrapRef.value?.clientWidth ?? 1024,
+        columnWidths: colWidths.value,
+        getColumnId,
+        isPinned: (c) => isPinned(c, pinnedCols.value) || "none",
+        overscan: props.virtualColumnOverscan ?? 2,
+      });
+    });
     const rows = computed(() =>
       treeNodes.value ? treeNodes.value.map((n) => n.row) : baseRows.value,
     );
@@ -847,6 +914,7 @@ export const TableX = defineComponent({
       const updatedRow =
         row !== null && typeof row === "object" ? { ...(row as Record<string, unknown>) } : row;
       const nextDirty = new Set(dirtyCells.value);
+      const rowMutations: CellMutation[] = [];
       for (const col of visible.value) {
         if (!isEditable(col)) continue;
         const cid = getColumnId(col);
@@ -856,9 +924,22 @@ export const TableX = defineComponent({
         writeMutatedRow(updatedRow, col, cid, ch.newValue);
         if (ch.oldValue !== ch.newValue) {
           nextDirty.add(`${rid}::${cid}`);
+          rowMutations.push({
+            rowId: rid,
+            columnId: cid,
+            oldValue: ch.oldValue,
+            newValue: ch.newValue,
+          });
           const payload = { row, columnId: cid, oldValue: ch.oldValue, newValue: ch.newValue };
           emit("cellEdit", payload);
+          props.onCellEdit?.(payload);
         }
+      }
+      if (props.enableHistory !== false && rowMutations.length > 0) {
+        historyManager.value.push({
+          description: `Edit row ${rid}`,
+          mutations: rowMutations,
+        });
       }
       dirtyCells.value = nextDirty;
       editingRowId.value = null;
@@ -866,6 +947,7 @@ export const TableX = defineComponent({
       cellValidationError.value = null;
       const rowPayload: RowEditEvent<unknown> = { row, updatedRow, changes };
       emit("rowEdit", rowPayload);
+      props.onRowEdit?.(rowPayload);
     };
 
     const applyFillHandleToRow = (targetRowIdx: number): void => {
@@ -876,6 +958,7 @@ export const TableX = defineComponent({
       if (!sourceRow) return;
 
       const nextDirty = new Set(dirtyCells.value);
+      const fillMutations: CellMutation[] = [];
       for (let c = cellRange.value.minCol; c <= cellRange.value.maxCol; c++) {
         const col = visible.value[c];
         if (!col || !isEditable(col)) continue;
@@ -890,15 +973,30 @@ export const TableX = defineComponent({
           if (validateEditedCell(col, coerced, targetRow) !== null) continue;
           writeMutatedRow(targetRow, col, cid, coerced);
           if (oldVal !== coerced) {
-            nextDirty.add(`${rowIdFn.value(targetRow)}::${cid}`);
-            emit("cellEdit", {
-              row: targetRow,
+            const trId = rowIdFn.value(targetRow);
+            nextDirty.add(`${trId}::${cid}`);
+            fillMutations.push({
+              rowId: trId,
               columnId: cid,
               oldValue: oldVal,
               newValue: coerced,
             });
+            const payload = {
+              row: targetRow,
+              columnId: cid,
+              oldValue: oldVal,
+              newValue: coerced,
+            };
+            emit("cellEdit", payload);
+            props.onCellEdit?.(payload);
           }
         }
+      }
+      if (props.enableHistory !== false && fillMutations.length > 0) {
+        historyManager.value.push({
+          description: "Fill range",
+          mutations: fillMutations,
+        });
       }
       dirtyCells.value = nextDirty;
       cellRange.value = { ...cellRange.value, maxRow: endRow };
@@ -937,6 +1035,110 @@ export const TableX = defineComponent({
       colWidths.value = { ...colWidths.value, [colId]: Math.min(520, Math.round(best)) };
       savePersisted();
     };
+
+    const autoFitAllColumns = (sampleRows?: number): void => {
+      const computed = computeAutosizeWidths(
+        visible.value,
+        rows.value.slice(0, sampleRows ?? 50),
+        {
+          getColumnId,
+          getColumnTitle,
+          getCellValue: (col, r) => getCellValue(col, r),
+          getCellText: (val) => getCellText(val, boolLabels.value),
+        },
+      );
+      colWidths.value = { ...colWidths.value, ...computed };
+      savePersisted();
+    };
+
+    const undo = (): boolean => {
+      if (!historyManager.value.canUndo()) return false;
+      const action = historyManager.value.undo();
+      if (action && action.mutations.length > 0) {
+        const nextDirty = new Set(dirtyCells.value);
+        for (const mut of action.mutations) {
+          const targetRow = rows.value.find((r) => rowIdFn.value(r) === mut.rowId);
+          const col = visible.value.find((c) => getColumnId(c) === mut.columnId);
+          if (targetRow && col) {
+            writeMutatedRow(targetRow, col, mut.columnId, mut.oldValue);
+            nextDirty.add(`${mut.rowId}::${mut.columnId}`);
+            const payload = {
+              row: targetRow,
+              columnId: mut.columnId,
+              oldValue: mut.newValue,
+              newValue: mut.oldValue,
+            };
+            emit("cellEdit", payload);
+            props.onCellEdit?.(payload);
+          }
+        }
+        dirtyCells.value = nextDirty;
+        return true;
+      }
+      return false;
+    };
+
+    const redo = (): boolean => {
+      if (!historyManager.value.canRedo()) return false;
+      const action = historyManager.value.redo();
+      if (action && action.mutations.length > 0) {
+        const nextDirty = new Set(dirtyCells.value);
+        for (const mut of action.mutations) {
+          const targetRow = rows.value.find((r) => rowIdFn.value(r) === mut.rowId);
+          const col = visible.value.find((c) => getColumnId(c) === mut.columnId);
+          if (targetRow && col) {
+            writeMutatedRow(targetRow, col, mut.columnId, mut.newValue);
+            nextDirty.add(`${mut.rowId}::${mut.columnId}`);
+            const payload = {
+              row: targetRow,
+              columnId: mut.columnId,
+              oldValue: mut.oldValue,
+              newValue: mut.newValue,
+            };
+            emit("cellEdit", payload);
+            props.onCellEdit?.(payload);
+          }
+        }
+        dirtyCells.value = nextDirty;
+        return true;
+      }
+      return false;
+    };
+
+    const canUndo = (): boolean => historyManager.value.canUndo();
+    const canRedo = (): boolean => historyManager.value.canRedo();
+
+    const toggleTreeExpand = async (tNode: TreeRowNode<unknown>): Promise<void> => {
+      const willExpand = !treeExpandedIds.value.has(tNode.id);
+      if (willExpand && props.loadChildren && !lazyTreeChildren.value.has(tNode.id)) {
+        const nextLoading = new Set(loadingTreeNodes.value);
+        nextLoading.add(tNode.id);
+        loadingTreeNodes.value = nextLoading;
+        try {
+          const children = await props.loadChildren(tNode.row);
+          const nextLazy = new Map(lazyTreeChildren.value);
+          nextLazy.set(tNode.id, children ?? []);
+          lazyTreeChildren.value = nextLazy;
+        } finally {
+          const nextL = new Set(loadingTreeNodes.value);
+          nextL.delete(tNode.id);
+          loadingTreeNodes.value = nextL;
+        }
+      }
+      const nextExp = new Set(treeExpandedIds.value);
+      if (willExpand) nextExp.add(tNode.id);
+      else nextExp.delete(tNode.id);
+      treeExpandedIds.value = nextExp;
+    };
+
+    expose({
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      autoFitAllColumns,
+      autoFitColumn,
+    });
 
     const collectExportRows = async (): Promise<readonly unknown[]> => {
       if (props.fetchAllData) {
@@ -1066,6 +1268,23 @@ export const TableX = defineComponent({
       }
       if (rows.value.length === 0 || visible.value.length === 0) return;
 
+      if ((ev.ctrlKey || ev.metaKey) && !ev.altKey) {
+        const key = ev.key.toLowerCase();
+        if (key === "z" && !ev.shiftKey) {
+          if (props.enableHistory !== false && canUndo()) {
+            ev.preventDefault();
+            undo();
+            return;
+          }
+        } else if ((key === "z" && ev.shiftKey) || key === "y") {
+          if (props.enableHistory !== false && canRedo()) {
+            ev.preventDefault();
+            redo();
+            return;
+          }
+        }
+      }
+
       if (
         (ev.ctrlKey || ev.metaKey) &&
         ev.key.toLowerCase() === "c" &&
@@ -1144,6 +1363,7 @@ export const TableX = defineComponent({
       let maxR = startR;
       let maxC = startC;
       const nextDirty = new Set(dirtyCells.value);
+      const pasteMutations: CellMutation[] = [];
 
       for (let rOff = 0; rOff < matrix.length; rOff++) {
         const targetRow = rows.value[startR + rOff];
@@ -1161,11 +1381,25 @@ export const TableX = defineComponent({
           if (validateEditedCell(col, coerced, targetRow) !== null) continue;
           writeMutatedRow(targetRow, col, cid, coerced);
           if (oldVal !== coerced) {
-            nextDirty.add(`${rowIdFn.value(targetRow)}::${cid}`);
+            const trId = rowIdFn.value(targetRow);
+            nextDirty.add(`${trId}::${cid}`);
+            pasteMutations.push({
+              rowId: trId,
+              columnId: cid,
+              oldValue: oldVal,
+              newValue: coerced,
+            });
             const payload = { row: targetRow, columnId: cid, oldValue: oldVal, newValue: coerced };
             emit("cellEdit", payload);
+            props.onCellEdit?.(payload);
           }
         }
+      }
+      if (props.enableHistory !== false && pasteMutations.length > 0) {
+        historyManager.value.push({
+          description: "Paste TSV",
+          mutations: pasteMutations,
+        });
       }
       dirtyCells.value = nextDirty;
       cellRange.value = normalizeCellRange(
@@ -1612,7 +1846,7 @@ export const TableX = defineComponent({
           );
         }
 
-        visible.value.forEach((col, colIdx) => {
+        const renderBodyCell = (col: TableXVueColumn<unknown>, colIdx: number): VNode => {
           const cid = getColumnId(col);
           const editable = !pinnedVariant && isEditable(col);
           const isRowEditCell = isRowEditing && editable;
@@ -1728,10 +1962,24 @@ export const TableX = defineComponent({
                 const nextD = new Set(dirtyCells.value);
                 nextD.add(`${rawId}::${cid}`);
                 dirtyCells.value = nextD;
+                if (props.enableHistory !== false) {
+                  historyManager.value.push({
+                    description: `Edit cell ${rawId}::${cid}`,
+                    mutations: [
+                      {
+                        rowId: rawId,
+                        columnId: cid,
+                        oldValue: oldVal,
+                        newValue: nextVal,
+                      },
+                    ],
+                  });
+                }
               }
               editingCell.value = null;
               const payload = { row, columnId: cid, oldValue: oldVal, newValue: nextVal };
               emit("cellEdit", payload);
+              props.onCellEdit?.(payload);
             };
             const editor =
               editType === "select" && col.meta?.editOptions
@@ -1814,19 +2062,24 @@ export const TableX = defineComponent({
                             "button",
                             {
                               type: "button",
-                              class: tNode.isExpanded
-                                ? "tbx-tree-toggle tbx-tree-toggle--open"
-                                : "tbx-tree-toggle",
+                              class: [
+                                "tbx-tree-toggle",
+                                tNode.isExpanded ? "tbx-tree-toggle--open" : undefined,
+                                tNode.isLoading ? "tbx-tree-toggle--loading" : undefined,
+                              ]
+                                .filter(Boolean)
+                                .join(" "),
                               "aria-expanded": String(tNode.isExpanded),
                               onClick: (ev: MouseEvent) => {
                                 ev.stopPropagation();
-                                const next = new Set(treeExpandedIds.value);
-                                if (next.has(tNode.id)) next.delete(tNode.id);
-                                else next.add(tNode.id);
-                                treeExpandedIds.value = next;
+                                void toggleTreeExpand(tNode);
                               },
                             },
-                            [chevronRightIcon()],
+                            [
+                              tNode.isLoading
+                                ? h("span", { class: "tbx-tree-spinner" })
+                                : chevronRightIcon(),
+                            ],
                           )
                         : h("span", { class: "tbx-tree-spacer", "aria-hidden": "true" }),
                       h("span", { class: "tbx-tree-label" }, [inner]),
@@ -1841,101 +2094,141 @@ export const TableX = defineComponent({
             index === cellRange.value.maxRow &&
             colIdx === cellRange.value.maxCol;
 
-          cells.push(
-            h(
-              "td",
-              {
-                key: cid || `col-${colIdx}`,
-                "data-col-id": cid,
-                tabindex: !pinnedVariant && props.enableKeyboardNavigation ? (isFocused ? 0 : -1) : undefined,
-                class: [
-                  "tbx-td",
-                  editable ? "tbx-cell--editable" : undefined,
-                  isDirty ? "tbx-td--dirty" : undefined,
-                  isFocused ? "tbx-td--focused" : undefined,
-                  inRange ? "tbx-td--in-range" : undefined,
-                  leftOffsets.has(cid) ? "tbx-td--pinned-left" : undefined,
-                  rightOffsets.has(cid) ? "tbx-td--pinned-right" : undefined,
-                  lastLeftPinnedId === cid ? "tbx-pinned-border-left" : undefined,
-                  firstRightPinnedId === cid ? "tbx-pinned-border-right" : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" "),
-                style: {
-                  textAlign: col.meta?.align ?? "left",
-                  ...(leftOffsets.has(cid) ? { left: `${leftOffsets.get(cid)}px` } : {}),
-                  ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
-                },
-                onPointerdown: !pinnedVariant
-                  ? (ev: PointerEvent) => {
-                      if (ev.button !== 0) return;
-                      const t = ev.target as HTMLElement | null;
-                      if (t?.closest?.("input, select, button, .tbx-fill-handle")) return;
-                      const coord: CellCoord = { rowIndex: index, colIndex: colIdx };
-                      focusedCell.value = coord;
-                      if (props.enableRangeSelection) {
-                        if (ev.shiftKey && rangeAnchor.value) {
-                          cellRange.value = normalizeCellRange(rangeAnchor.value, coord);
-                        } else {
-                          rangeAnchor.value = coord;
-                          cellRange.value = normalizeCellRange(coord, coord);
-                          isDraggingRange = true;
-                        }
-                      }
-                    }
-                  : undefined,
-                onPointerenter:
-                  !pinnedVariant && props.enableRangeSelection
-                    ? () => {
-                        if (isDraggingRange && rangeAnchor.value) {
-                          cellRange.value = normalizeCellRange(rangeAnchor.value, {
-                            rowIndex: index,
-                            colIndex: colIdx,
-                          });
-                        } else if (isFillingRange) {
-                          applyFillHandleToRow(index);
-                        }
-                      }
-                    : undefined,
-                onContextmenu:
-                  !pinnedVariant && props.enableContextMenu
-                    ? (ev: MouseEvent) => {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        contextMenu.value = { x: ev.clientX, y: ev.clientY, row, col, colId: cid };
-                      }
-                    : undefined,
-                onDblclick: editable
-                  ? (ev: MouseEvent) => {
-                      ev.stopPropagation();
-                      cellValidationError.value = null;
-                      if (props.editMode === "row") startRowEdit(row, rawId);
-                      else {
-                        const val = getCellValue(col, row);
-                        editingCell.value = { rowId: rawId, columnId: cid };
-                        editingBool.value = Boolean(val);
-                        editingVal.value = val !== null && val !== undefined ? String(val) : "";
-                      }
-                    }
-                  : undefined,
+          return h(
+            "td",
+            {
+              key: cid || `col-${colIdx}`,
+              "data-col-id": cid,
+              tabindex: !pinnedVariant && props.enableKeyboardNavigation ? (isFocused ? 0 : -1) : undefined,
+              class: [
+                "tbx-td",
+                editable ? "tbx-cell--editable" : undefined,
+                isDirty ? "tbx-td--dirty" : undefined,
+                isFocused ? "tbx-td--focused" : undefined,
+                inRange ? "tbx-td--in-range" : undefined,
+                leftOffsets.has(cid) ? "tbx-td--pinned-left" : undefined,
+                rightOffsets.has(cid) ? "tbx-td--pinned-right" : undefined,
+                lastLeftPinnedId === cid ? "tbx-pinned-border-left" : undefined,
+                firstRightPinnedId === cid ? "tbx-pinned-border-right" : undefined,
+              ]
+                .filter(Boolean)
+                .join(" "),
+              style: {
+                textAlign: col.meta?.align ?? "left",
+                ...(leftOffsets.has(cid) ? { left: `${leftOffsets.get(cid)}px` } : {}),
+                ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
               },
-              [
-                cellBody,
-                showFillCorner
-                  ? h("span", {
-                      class: "tbx-fill-handle",
-                      "aria-hidden": "true",
-                      onPointerdown: (ev: PointerEvent) => {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        isFillingRange = true;
-                      },
-                    })
-                  : null,
-              ],
+              onPointerdown: !pinnedVariant
+                ? (ev: PointerEvent) => {
+                    if (ev.button !== 0) return;
+                    const t = ev.target as HTMLElement | null;
+                    if (t?.closest?.("input, select, button, .tbx-fill-handle")) return;
+                    const coord: CellCoord = { rowIndex: index, colIndex: colIdx };
+                    focusedCell.value = coord;
+                    if (props.enableRangeSelection) {
+                      if (ev.shiftKey && rangeAnchor.value) {
+                        cellRange.value = normalizeCellRange(rangeAnchor.value, coord);
+                      } else {
+                        rangeAnchor.value = coord;
+                        cellRange.value = normalizeCellRange(coord, coord);
+                        isDraggingRange = true;
+                      }
+                    }
+                  }
+                : undefined,
+              onPointerenter:
+                !pinnedVariant && props.enableRangeSelection
+                  ? () => {
+                      if (isDraggingRange && rangeAnchor.value) {
+                        cellRange.value = normalizeCellRange(rangeAnchor.value, {
+                          rowIndex: index,
+                          colIndex: colIdx,
+                        });
+                      } else if (isFillingRange) {
+                        applyFillHandleToRow(index);
+                      }
+                    }
+                  : undefined,
+              onContextmenu:
+                !pinnedVariant && props.enableContextMenu
+                  ? (ev: MouseEvent) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      contextMenu.value = { x: ev.clientX, y: ev.clientY, row, col, colId: cid };
+                    }
+                  : undefined,
+              onDblclick: editable
+                ? (ev: MouseEvent) => {
+                    ev.stopPropagation();
+                    cellValidationError.value = null;
+                    if (props.editMode === "row") startRowEdit(row, rawId);
+                    else {
+                      const val = getCellValue(col, row);
+                      editingCell.value = { rowId: rawId, columnId: cid };
+                      editingBool.value = Boolean(val);
+                      editingVal.value = val !== null && val !== undefined ? String(val) : "";
+                    }
+                  }
+                : undefined,
+            },
+            [
+              cellBody,
+              showFillCorner
+                ? h("span", {
+                    class: "tbx-fill-handle",
+                    "aria-hidden": "true",
+                    onPointerdown: (ev: PointerEvent) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      isFillingRange = true;
+                    },
+                  })
+                : null,
+            ],
+          );
+        };
+
+        if (colWin.value) {
+          colWin.value.leftPinned.forEach((col, idx) => cells.push(renderBodyCell(col, idx)));
+          if (colWin.value.leftSpacerWidth > 0) {
+            cells.push(
+              h("td", {
+                class: "tbx-td--col-spacer",
+                style: {
+                  width: `${colWin.value.leftSpacerWidth}px`,
+                  minWidth: `${colWin.value.leftSpacerWidth}px`,
+                  padding: "0",
+                },
+                "aria-hidden": "true",
+              }),
+            );
+          }
+          colWin.value.virtualColumns.forEach((col, idx) =>
+            cells.push(renderBodyCell(col, colWin.value!.startIndex + idx)),
+          );
+          if (colWin.value.rightSpacerWidth > 0) {
+            cells.push(
+              h("td", {
+                class: "tbx-td--col-spacer",
+                style: {
+                  width: `${colWin.value.rightSpacerWidth}px`,
+                  minWidth: `${colWin.value.rightSpacerWidth}px`,
+                  padding: "0",
+                },
+                "aria-hidden": "true",
+              }),
+            );
+          }
+          colWin.value.rightPinned.forEach((col, idx) =>
+            cells.push(
+              renderBodyCell(col, visible.value.length - colWin.value!.rightPinned.length + idx),
             ),
           );
-        });
+        } else {
+          visible.value.forEach((col, colIdx) => {
+            cells.push(renderBodyCell(col, colIdx));
+          });
+        }
 
         const trNode = h(
           "tr",
@@ -2695,6 +2988,9 @@ export const TableX = defineComponent({
                 if (props.enableVirtualization) {
                   virtualScrollTop.value = el.scrollTop;
                 }
+                if (props.enableColumnVirtualization) {
+                  virtualScrollLeft.value = el.scrollLeft;
+                }
                 if (isInfiniteMode.value && props.hasMore && !props.isLoading && !props.isLoadingMore) {
                   if (el.scrollHeight - el.scrollTop - el.clientHeight <= 120) {
                     emit("loadMore", props.nextCursor);
@@ -2806,7 +3102,39 @@ export const TableX = defineComponent({
                         )
                       : null,
                     ...(!headerRows.value.hasGroups
-                      ? visible.value.map((col) => renderLeafTh(col, 1, false))
+                      ? colWin.value
+                        ? [
+                            ...colWin.value.leftPinned.map((col) => renderLeafTh(col, 1, false)),
+                            ...(colWin.value.leftSpacerWidth > 0
+                              ? [
+                                  h("th", {
+                                    class: "tbx-th--col-spacer",
+                                    style: {
+                                      width: `${colWin.value.leftSpacerWidth}px`,
+                                      minWidth: `${colWin.value.leftSpacerWidth}px`,
+                                      padding: "0",
+                                    },
+                                    "aria-hidden": "true",
+                                  }),
+                                ]
+                              : []),
+                            ...colWin.value.virtualColumns.map((col) => renderLeafTh(col, 1, false)),
+                            ...(colWin.value.rightSpacerWidth > 0
+                              ? [
+                                  h("th", {
+                                    class: "tbx-th--col-spacer",
+                                    style: {
+                                      width: `${colWin.value.rightSpacerWidth}px`,
+                                      minWidth: `${colWin.value.rightSpacerWidth}px`,
+                                      padding: "0",
+                                    },
+                                    "aria-hidden": "true",
+                                  }),
+                                ]
+                              : []),
+                            ...colWin.value.rightPinned.map((col) => renderLeafTh(col, 1, false)),
+                          ]
+                        : visible.value.map((col) => renderLeafTh(col, 1, false))
                       : headerRows.value.topRow.map((cell, idx) =>
                           cell.isGroup
                             ? h(
@@ -2893,43 +3221,86 @@ export const TableX = defineComponent({
                                 : undefined,
                             })
                           : null,
-                        ...visible.value.map((col, idx) => {
-                          const cid = getColumnId(col);
-                          const aggVal = computeAggregation(col, rows.value);
-                          const lbl =
-                            col.meta?.aggregationLabel ||
-                            (typeof col.meta?.aggregation === "string"
-                              ? `${col.meta.aggregation}:`
-                              : "");
-                          return h(
-                            "td",
-                            {
-                              key: `sum-${cid || idx}`,
-                              class: [
-                                "tbx-summary-cell",
-                                leftOffsets.has(cid) ? "tbx-td--pinned-left" : undefined,
-                                rightOffsets.has(cid) ? "tbx-td--pinned-right" : undefined,
-                                lastLeftPinnedId === cid ? "tbx-pinned-border-left" : undefined,
-                                firstRightPinnedId === cid ? "tbx-pinned-border-right" : undefined,
-                              ]
-                                .filter(Boolean)
-                                .join(" "),
-                              style: {
-                                textAlign: col.meta?.align ?? "left",
-                                ...(leftOffsets.has(cid) ? { left: `${leftOffsets.get(cid)}px` } : {}),
-                                ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
-                              },
-                            },
-                            aggVal !== null && aggVal !== undefined
-                              ? [
-                                  lbl ? h("span", { class: "tbx-summary-label" }, `${lbl} `) : null,
-                                  h("strong", String(aggVal)),
+                        ...(() => {
+                          const renderSummaryCell = (col: TableXVueColumn<unknown>, idx: number) => {
+                            const cid = getColumnId(col);
+                            const aggVal = computeAggregation(col, rows.value);
+                            const lbl =
+                              col.meta?.aggregationLabel ||
+                              (typeof col.meta?.aggregation === "string"
+                                ? `${col.meta.aggregation}:`
+                                : "");
+                            return h(
+                              "td",
+                              {
+                                key: `sum-${cid || idx}`,
+                                class: [
+                                  "tbx-summary-cell",
+                                  leftOffsets.has(cid) ? "tbx-td--pinned-left" : undefined,
+                                  rightOffsets.has(cid) ? "tbx-td--pinned-right" : undefined,
+                                  lastLeftPinnedId === cid ? "tbx-pinned-border-left" : undefined,
+                                  firstRightPinnedId === cid ? "tbx-pinned-border-right" : undefined,
                                 ]
-                              : idx === 0 && !lbl
-                                ? [h("strong", "Total")]
-                                : [],
-                          );
-                        }),
+                                  .filter(Boolean)
+                                  .join(" "),
+                                style: {
+                                  textAlign: col.meta?.align ?? "left",
+                                  ...(leftOffsets.has(cid) ? { left: `${leftOffsets.get(cid)}px` } : {}),
+                                  ...(rightOffsets.has(cid) ? { right: `${rightOffsets.get(cid)}px` } : {}),
+                                },
+                              },
+                              aggVal !== null && aggVal !== undefined
+                                ? [
+                                    lbl ? h("span", { class: "tbx-summary-label" }, `${lbl} `) : null,
+                                    h("strong", String(aggVal)),
+                                  ]
+                                : idx === 0 && !lbl
+                                  ? [h("strong", "Total")]
+                                  : [],
+                            );
+                          };
+
+                          return colWin.value
+                            ? [
+                                ...colWin.value.leftPinned.map((col, idx) => renderSummaryCell(col, idx)),
+                                ...(colWin.value.leftSpacerWidth > 0
+                                  ? [
+                                      h("td", {
+                                        class: "tbx-td--col-spacer",
+                                        style: {
+                                          width: `${colWin.value.leftSpacerWidth}px`,
+                                          minWidth: `${colWin.value.leftSpacerWidth}px`,
+                                          padding: "0",
+                                        },
+                                        "aria-hidden": "true",
+                                      }),
+                                    ]
+                                  : []),
+                                ...colWin.value.virtualColumns.map((col, idx) =>
+                                  renderSummaryCell(col, colWin.value!.startIndex + idx),
+                                ),
+                                ...(colWin.value.rightSpacerWidth > 0
+                                  ? [
+                                      h("td", {
+                                        class: "tbx-td--col-spacer",
+                                        style: {
+                                          width: `${colWin.value.rightSpacerWidth}px`,
+                                          minWidth: `${colWin.value.rightSpacerWidth}px`,
+                                          padding: "0",
+                                        },
+                                        "aria-hidden": "true",
+                                      }),
+                                    ]
+                                  : []),
+                                ...colWin.value.rightPinned.map((col, idx) =>
+                                  renderSummaryCell(
+                                    col,
+                                    visible.value.length - colWin.value!.rightPinned.length + idx,
+                                  ),
+                                ),
+                              ]
+                            : visible.value.map((col, idx) => renderSummaryCell(col, idx));
+                        })(),
                       ]),
                     ])
                   : null,
@@ -2942,6 +3313,7 @@ export const TableX = defineComponent({
             ? (() => {
                 const col = leafCols.value.find((c) => getColumnId(c) === openFilterCol.value);
                 if (!col) return null;
+                const optionCounts = computeFilterOptionCounts(col, rows.value);
                 const cid = getColumnId(col);
                 const fField = getFilterField(col);
                 const sField = getSortField(col);
@@ -3282,6 +3654,9 @@ export const TableX = defineComponent({
                                       onChange: () => toggleMulti(opt),
                                     }),
                                     h("span", opt),
+                                    optionCounts[opt] !== undefined
+                                      ? h("span", { class: "tbx-filter-option-count" }, ` (${optionCounts[opt]})`)
+                                      : null,
                                   ],
                                 );
                               })),
@@ -3376,7 +3751,12 @@ export const TableX = defineComponent({
                                         applyVal(opt);
                                       },
                                     },
-                                    opt,
+                                    [
+                                      h("span", opt),
+                                      optionCounts[opt] !== undefined
+                                        ? h("span", { class: "tbx-filter-option-count" }, ` (${optionCounts[opt]})`)
+                                        : null,
+                                    ],
                                   );
                                 })),
                           ])

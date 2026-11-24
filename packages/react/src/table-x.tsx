@@ -93,7 +93,15 @@ import {
   flattenColumns,
   hasHeaderGroups,
   buildHeaderRows,
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
   type CellCoord,
+  type CellMutation,
   type ContextMenuItem,
   type Density,
   type ExportFormat,
@@ -143,7 +151,7 @@ import {
 } from "./render.js";
 import { useDebouncedSearch } from "./use-debounced-search.js";
 import { useDropdown } from "./use-dropdown.js";
-import type { TableXNoticeType, TableXProps, TableXReactColumn } from "./types.js";
+import type { TableXHandle, TableXNoticeType, TableXProps, TableXReactColumn } from "./types.js";
 
 /** Fallback row identity: the `id` property, else the row's own string form. */
 function defaultRowId<TData>(row: TData): string {
@@ -187,6 +195,7 @@ interface ReactColumnFilterPopoverProps<TData, TRender> {
   meta: NonNullable<TableXColumn<TData, TRender>["meta"]>;
   title: string;
   activeFilter?: string;
+  optionCounts?: Record<string, number>;
   filterable: boolean;
   enableColumnMenu: boolean;
   sortable: boolean;
@@ -213,6 +222,7 @@ function ReactColumnFilterPopover<TData, TRender>({
   meta,
   title,
   activeFilter,
+  optionCounts,
   filterable,
   enableColumnMenu,
   sortable,
@@ -734,6 +744,9 @@ function ReactColumnFilterPopover<TData, TRender>({
                     aria-hidden="true"
                   />
                   <span>{opt}</span>
+                  {optionCounts?.[opt] !== undefined && (
+                    <span className="tbx-filter-option-count">({optionCounts[opt]})</span>
+                  )}
                 </div>
               );
             })
@@ -844,7 +857,10 @@ function ReactColumnFilterPopover<TData, TRender>({
                     onClose();
                   }}
                 >
-                  {opt}
+                  <span>{opt}</span>
+                  {optionCounts?.[opt] !== undefined && (
+                    <span className="tbx-filter-option-count">({optionCounts[opt]})</span>
+                  )}
                 </div>
               );
             })
@@ -929,6 +945,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     enableVirtualization = false,
     virtualHeight = DEFAULT_VIRTUAL_HEIGHT,
     virtualOverscan,
+    enableColumnVirtualization = false,
+    virtualColumnOverscan = 2,
+    fitContainer = false,
+    enableHistory = true,
+    loadChildren,
+    hasChildren,
+    tableRef,
     groupBy: groupByProp,
     onGroupByChange,
     enableKeyboardNavigation = true,
@@ -1050,6 +1073,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         })
       : new Set<string>(),
   );
+  const [lazyTreeChildren, setLazyTreeChildren] = React.useState<Map<string, readonly TData[]>>(() => new Map());
+  const [loadingTreeNodes, setLoadingTreeNodes] = React.useState<Set<string>>(() => new Set());
+  const [virtualScrollLeft, setVirtualScrollLeft] = React.useState(0);
+  const historyManagerRef = React.useRef<GridHistoryManager | null>(null);
+  if (!historyManagerRef.current && enableHistory !== false) {
+    historyManagerRef.current = new GridHistoryManager();
+  }
+  const [, setHistoryTick] = React.useState(0);
 
   const [savedViewsList, setSavedViewsList] = React.useState<SavedGridView[]>(() =>
     savedViewsProp ? [...savedViewsProp] : loadSavedViews(storageKey),
@@ -1194,9 +1225,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             getSubRows,
             getRowId,
             expandedIds: treeExpandedIds,
+            hasChildren,
+            lazyChildren: lazyTreeChildren,
+            loadingNodeIds: loadingTreeNodes,
           })
         : null,
-    [isTreeEnabled, baseRows, childrenKey, getSubRows, getRowId, treeExpandedIds],
+    [isTreeEnabled, baseRows, childrenKey, getSubRows, getRowId, treeExpandedIds, hasChildren, lazyTreeChildren, loadingTreeNodes],
   );
   const rows = React.useMemo(
     () => (treeNodes ? treeNodes.map((n) => n.row) : baseRows),
@@ -1422,6 +1456,34 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     });
   };
   const toggleTreeExpand = (nodeId: string): void => {
+    const isExpanded = treeExpandedIds.has(nodeId);
+    if (!isExpanded && loadChildren) {
+      const node = treeNodes?.find((n) => n.id === nodeId);
+      if (node && !lazyTreeChildren.has(nodeId)) {
+        const canLoad = hasChildren ? hasChildren(node.row) : true;
+        if (canLoad) {
+          setLoadingTreeNodes((prev) => new Set(prev).add(nodeId));
+          loadChildren(node.row)
+            .then((children) => {
+              setLazyTreeChildren((prev) => new Map(prev).set(nodeId, children));
+              setLoadingTreeNodes((prev) => {
+                const next = new Set(prev);
+                next.delete(nodeId);
+                return next;
+              });
+              setTreeExpandedIds((prev) => new Set(prev).add(nodeId));
+            })
+            .catch(() => {
+              setLoadingTreeNodes((prev) => {
+                const next = new Set(prev);
+                next.delete(nodeId);
+                return next;
+              });
+            });
+          return;
+        }
+      }
+    }
     setTreeExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) next.delete(nodeId);
@@ -1443,6 +1505,19 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         : null,
     [enableVirtualization, isTreeEnabled, activeGroupBy.length, rows.length, virtualScrollTop, virtualHeight, density, virtualOverscan],
   );
+
+  const colWin = React.useMemo(() => {
+    if (!enableColumnVirtualization || headerRows.hasGroups) return null;
+    return computeVirtualColumnsWindow({
+      columns: visible,
+      scrollLeft: virtualScrollLeft,
+      viewportWidth: tableWrapRef.current?.clientWidth ?? 1024,
+      columnWidths: colWidths,
+      getColumnId,
+      isPinned: (c) => isPinned(c, pinnedCols) || "none",
+      overscan: virtualColumnOverscan,
+    });
+  }, [enableColumnVirtualization, headerRows.hasGroups, visible, virtualScrollLeft, colWidths, pinnedCols, virtualColumnOverscan]);
   const renderedRows = React.useMemo(
     () => (virtualWin ? rows.slice(virtualWin.startIndex, virtualWin.endIndex) : rows),
     [rows, virtualWin],
@@ -2232,6 +2307,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         : row;
 
     const nextDirty = new Set(dirtyCells);
+    const rowMutations: CellMutation[] = [];
     for (const col of visible) {
       if (!isEditable(col)) continue;
       const cid = getColumnId(col);
@@ -2241,6 +2317,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       writeMutatedRowValue(updatedRow, col, cid, change.newValue);
       if (change.oldValue !== change.newValue) {
         nextDirty.add(`${rowId}::${cid}`);
+        rowMutations.push({
+          rowId,
+          columnId: cid,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+        });
         onCellEdit?.({
           row,
           columnId: cid,
@@ -2248,6 +2330,13 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           newValue: change.newValue,
         });
       }
+    }
+
+    if (enableHistory !== false && rowMutations.length > 0) {
+      historyManagerRef.current?.push({
+        description: `Edit row ${rowId}`,
+        mutations: rowMutations,
+      });
     }
 
     setDirtyCells(nextDirty);
@@ -2265,6 +2354,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     if (!sourceRow) return;
 
     const nextDirty = new Set(dirtyCells);
+    const fillMutations: CellMutation[] = [];
     for (let c = cellRange.minCol; c <= cellRange.maxCol; c++) {
       const col = visible[c];
       if (!col || !isEditable(col)) continue;
@@ -2279,7 +2369,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         if (validateEditedCell(col, coerced, targetRow) !== null) continue;
         writeMutatedRowValue(targetRow, col, cid, coerced);
         if (oldVal !== coerced) {
-          nextDirty.add(`${getRowId(targetRow)}::${cid}`);
+          const rid = getRowId(targetRow);
+          nextDirty.add(`${rid}::${cid}`);
+          fillMutations.push({
+            rowId: rid,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           onCellEdit?.({
             row: targetRow,
             columnId: cid,
@@ -2289,9 +2386,106 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         }
       }
     }
+    if (enableHistory !== false && fillMutations.length > 0) {
+      historyManagerRef.current?.push({
+        description: "Fill range",
+        mutations: fillMutations,
+      });
+    }
     setDirtyCells(nextDirty);
     setCellRange({ ...cellRange, maxRow: endRow });
   };
+
+  const undo = React.useCallback((): boolean => {
+    if (enableHistory === false) return false;
+    const action = historyManagerRef.current?.undo();
+    if (!action) return false;
+    const pool = isClientSide ? data : rows;
+    for (const m of action.mutations) {
+      const col = visible.find((c) => getColumnId(c) === m.columnId);
+      const targetRow = pool.find((r) => getRowId(r) === m.rowId);
+      if (col && targetRow) {
+        writeMutatedRowValue(targetRow, col, m.columnId, m.oldValue);
+        onCellEdit?.({
+          row: targetRow,
+          columnId: m.columnId,
+          oldValue: m.newValue,
+          newValue: m.oldValue,
+        });
+      }
+    }
+    setHistoryTick((t) => t + 1);
+    return true;
+  }, [enableHistory, isClientSide, data, rows, visible, getRowId, onCellEdit]);
+
+  const redo = React.useCallback((): boolean => {
+    if (enableHistory === false) return false;
+    const action = historyManagerRef.current?.redo();
+    if (!action) return false;
+    const pool = isClientSide ? data : rows;
+    for (const m of action.mutations) {
+      const col = visible.find((c) => getColumnId(c) === m.columnId);
+      const targetRow = pool.find((r) => getRowId(r) === m.rowId);
+      if (col && targetRow) {
+        writeMutatedRowValue(targetRow, col, m.columnId, m.newValue);
+        onCellEdit?.({
+          row: targetRow,
+          columnId: m.columnId,
+          oldValue: m.oldValue,
+          newValue: m.newValue,
+        });
+      }
+    }
+    setHistoryTick((t) => t + 1);
+    return true;
+  }, [enableHistory, isClientSide, data, rows, visible, getRowId, onCellEdit]);
+
+  const autoFitAllColumns = React.useCallback(
+    (sampleRows = 50) => {
+      const widths = computeAutosizeWidths(visible, rows.slice(0, sampleRows), {
+        getColumnId,
+        getColumnTitle,
+        getCellValue: (col, r) => getCellValue(col, r),
+        getCellText: (val) => getCellText(val, boolLabels),
+      });
+      setColWidths((prev) => ({ ...prev, ...widths }));
+    },
+    [visible, rows, boolLabels],
+  );
+
+  React.useEffect(() => {
+    if (!fitContainer || typeof window === "undefined") return;
+    const wrap = tableWrapRef.current;
+    if (!wrap) return;
+    const handleResize = () => {
+      const w = wrap.clientWidth;
+      if (w > 0) {
+        setColWidths((prev) =>
+          distributeContainerWidth(visible, w, prev, {
+            getColumnId,
+            isPinned: (c) => isPinned(c, pinnedCols) !== false,
+            defaultWidth: DEFAULT_COLUMN_WIDTH,
+          }),
+        );
+      }
+    };
+    handleResize();
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [fitContainer, visible, pinnedCols]);
+
+  React.useImperativeHandle(
+    tableRef as React.Ref<TableXHandle<TData>>,
+    () => ({
+      undo,
+      redo,
+      canUndo: () => Boolean(enableHistory !== false && historyManagerRef.current?.canUndo()),
+      canRedo: () => Boolean(enableHistory !== false && historyManagerRef.current?.canRedo()),
+      autoFitAllColumns,
+    }),
+    [undo, redo, autoFitAllColumns, enableHistory],
+  );
 
   const handleRootKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (enableKeyboardNavigation === false) return;
@@ -2307,6 +2501,21 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     }
     if (editingCell || editingRowId) return;
     if (rows.length === 0 || visible.length === 0) return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      redo();
+      return;
+    }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && enableRangeSelection && cellRange) {
       const tsv = formatRangeTsv(rows, visible, cellRange, boolLabels);
@@ -2390,6 +2599,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     let maxR = startR;
     let maxC = startC;
     const nextDirty = new Set(dirtyCells);
+    const pasteMutations: CellMutation[] = [];
 
     for (let rOff = 0; rOff < matrix.length; rOff++) {
       const targetRow = rows[startR + rOff];
@@ -2407,7 +2617,14 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         if (validateEditedCell(col, coerced, targetRow) !== null) continue;
         writeMutatedRowValue(targetRow, col, cid, coerced);
         if (oldVal !== coerced) {
-          nextDirty.add(`${getRowId(targetRow)}::${cid}`);
+          const rid = getRowId(targetRow);
+          nextDirty.add(`${rid}::${cid}`);
+          pasteMutations.push({
+            rowId: rid,
+            columnId: cid,
+            oldValue: oldVal,
+            newValue: coerced,
+          });
           onCellEdit?.({
             row: targetRow,
             columnId: cid,
@@ -2416,6 +2633,12 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           });
         }
       }
+    }
+    if (enableHistory !== false && pasteMutations.length > 0) {
+      historyManagerRef.current?.push({
+        description: "Paste clipboard",
+        mutations: pasteMutations,
+      });
     }
     setDirtyCells(nextDirty);
     setCellRange(
@@ -2631,7 +2854,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             </td>
           ) : null}
 
-          {visible.map((col, colIndex) => {
+          {(() => {
+            const renderBodyCell = (col: TableXColumn<TData, React.ReactNode>, colIndex: number) => {
             const colId = getColumnId(col);
             const isPinnedLeft = leftOffsets.has(colId);
             const isPinnedRight = rightOffsets.has(colId);
@@ -2676,19 +2900,31 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   {treeNode.hasChildren ? (
                     <button
                       type="button"
-                      className={
-                        treeNode.isExpanded
-                          ? "tbx-tree-toggle tbx-tree-toggle--open"
-                          : "tbx-tree-toggle"
-                      }
+                      className={[
+                        "tbx-tree-toggle",
+                        treeNode.isExpanded ? "tbx-tree-toggle--open tbx-tree-toggle--expanded" : undefined,
+                        treeNode.isLoading ? "tbx-tree-toggle--loading" : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       aria-expanded={treeNode.isExpanded}
-                      aria-label={treeNode.isExpanded ? "Collapse children" : "Expand children"}
+                      aria-label={
+                        treeNode.isLoading
+                          ? (locale.loadingNodeText || "Loading...")
+                          : treeNode.isExpanded
+                            ? "Collapse children"
+                            : "Expand children"
+                      }
                       onClick={(ev) => {
                         ev.stopPropagation();
                         toggleTreeExpand(treeNode.id);
                       }}
                     >
-                      <ChevronRightIcon className="tbx-icon" />
+                      {treeNode.isLoading ? (
+                        <span className="tbx-tree-spinner" aria-hidden="true" />
+                      ) : (
+                        <ChevronRightIcon className="tbx-icon" />
+                      )}
                     </button>
                   ) : (
                     <span className="tbx-tree-spacer" aria-hidden="true" />
@@ -2894,6 +3130,19 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                       writeMutatedRowValue(row, col, colId, nextVal);
                       if (currentCellVal !== nextVal) {
                         markDirtyCell(rawId, colId);
+                        if (enableHistory !== false) {
+                          historyManagerRef.current?.push({
+                            description: `Edit cell ${colId}`,
+                            mutations: [
+                              {
+                                rowId: rawId,
+                                columnId: colId,
+                                oldValue: currentCellVal,
+                                newValue: nextVal,
+                              },
+                            ],
+                          });
+                        }
                       }
                       onCellEdit?.({
                         row,
@@ -3024,7 +3273,32 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                 ) : null}
               </td>
             );
-          })}
+          };
+
+          return colWin ? (
+            <>
+              {colWin.leftPinned.map((col, idx) => renderBodyCell(col, idx))}
+              {colWin.leftSpacerWidth > 0 ? (
+                <td
+                  className="tbx-td--col-spacer"
+                  style={{ width: `${colWin.leftSpacerWidth}px`, minWidth: `${colWin.leftSpacerWidth}px`, padding: 0 }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {colWin.virtualColumns.map((col, idx) => renderBodyCell(col, colWin.startIndex + idx))}
+              {colWin.rightSpacerWidth > 0 ? (
+                <td
+                  className="tbx-td--col-spacer"
+                  style={{ width: `${colWin.rightSpacerWidth}px`, minWidth: `${colWin.rightSpacerWidth}px`, padding: 0 }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {colWin.rightPinned.map((col, idx) => renderBodyCell(col, visible.length - colWin.rightPinned.length + idx))}
+            </>
+          ) : (
+            visible.map((col, colIndex) => renderBodyCell(col, colIndex))
+          );
+        })()}
         </tr>
         {isExpanded && renderExpandedRow ? (
           <tr className="tbx-expanded-row">
@@ -3550,6 +3824,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             meta={activeFilterPopoverCol.meta ?? {}}
             title={getColumnTitle(activeFilterPopoverCol) || popId}
             activeFilter={activeFilterPopoverVal}
+            optionCounts={computeFilterOptionCounts(activeFilterPopoverCol, rows)}
             filterable={popFilterable}
             enableColumnMenu={enableColumnMenu !== false}
             sortable={popSortable}
@@ -3652,6 +3927,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
           if (enableVirtualization) {
             setVirtualScrollTop(e.currentTarget.scrollTop);
           }
+          if (enableColumnVirtualization) {
+            setVirtualScrollLeft(e.currentTarget.scrollLeft);
+          }
           if (isInfiniteMode && hasMore && !isLoading && !isLoadingMore) {
             const el = e.currentTarget;
             const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -3751,7 +4029,29 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
               ) : null}
 
               {!headerRows.hasGroups
-                ? visible.map((col) => renderLeafTh(col, 1, false))
+                ? colWin ? (
+                    <>
+                      {colWin.leftPinned.map((col) => renderLeafTh(col, 1, false))}
+                      {colWin.leftSpacerWidth > 0 ? (
+                        <th
+                          className="tbx-th--col-spacer"
+                          style={{ width: `${colWin.leftSpacerWidth}px`, minWidth: `${colWin.leftSpacerWidth}px`, padding: 0 }}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      {colWin.virtualColumns.map((col) => renderLeafTh(col, 1, false))}
+                      {colWin.rightSpacerWidth > 0 ? (
+                        <th
+                          className="tbx-th--col-spacer"
+                          style={{ width: `${colWin.rightSpacerWidth}px`, minWidth: `${colWin.rightSpacerWidth}px`, padding: 0 }}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      {colWin.rightPinned.map((col) => renderLeafTh(col, 1, false))}
+                    </>
+                  ) : (
+                    visible.map((col) => renderLeafTh(col, 1, false))
+                  )
                 : headerRows.topRow.map((cell, idx) => {
                   if (cell.isGroup) {
                     return (
@@ -3954,41 +4254,67 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   />
                 ) : null}
 
-                {visible.map((col, colIndex) => {
-                  const colId = getColumnId(col);
-                  const aggVal = computeAggregation(col, rows);
-                  const aggLabel =
-                    col.meta?.aggregationLabel ||
-                    (typeof col.meta?.aggregation === "string" ? `${col.meta.aggregation}:` : "");
-                  return (
-                    <td
-                      key={`sum-${colId || colIndex}`}
-                      className={[
-                        "tbx-summary-cell",
-                        leftOffsets.has(colId) ? "tbx-td--pinned-left" : undefined,
-                        rightOffsets.has(colId) ? "tbx-td--pinned-right" : undefined,
-                        lastLeftPinnedId === colId ? "tbx-pinned-border-left" : undefined,
-                        firstRightPinnedId === colId ? "tbx-pinned-border-right" : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      style={{
-                        textAlign: col.meta?.align ?? "left",
-                        ...(leftOffsets.has(colId) ? { left: leftOffsets.get(colId) } : {}),
-                        ...(rightOffsets.has(colId) ? { right: rightOffsets.get(colId) } : {}),
-                      }}
-                    >
-                      {aggVal !== null && aggVal !== undefined ? (
-                        <>
-                          {aggLabel ? <span className="tbx-summary-label">{aggLabel} </span> : null}
-                          <strong>{String(aggVal)}</strong>
-                        </>
-                      ) : colIndex === 0 && !aggLabel ? (
-                        <strong>Total</strong>
+                {(() => {
+                  const renderSummaryCell = (col: TableXColumn<TData, React.ReactNode>, colIndex: number) => {
+                    const colId = getColumnId(col);
+                    const aggVal = computeAggregation(col, rows);
+                    const aggLabel =
+                      col.meta?.aggregationLabel ||
+                      (typeof col.meta?.aggregation === "string" ? `${col.meta.aggregation}:` : "");
+                    return (
+                      <td
+                        key={`sum-${colId || colIndex}`}
+                        className={[
+                          "tbx-summary-cell",
+                          leftOffsets.has(colId) ? "tbx-td--pinned-left" : undefined,
+                          rightOffsets.has(colId) ? "tbx-td--pinned-right" : undefined,
+                          lastLeftPinnedId === colId ? "tbx-pinned-border-left" : undefined,
+                          firstRightPinnedId === colId ? "tbx-pinned-border-right" : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={{
+                          textAlign: col.meta?.align ?? "left",
+                          ...(leftOffsets.has(colId) ? { left: leftOffsets.get(colId) } : {}),
+                          ...(rightOffsets.has(colId) ? { right: rightOffsets.get(colId) } : {}),
+                        }}
+                      >
+                        {aggVal !== null && aggVal !== undefined ? (
+                          <>
+                            {aggLabel ? <span className="tbx-summary-label">{aggLabel} </span> : null}
+                            <strong>{String(aggVal)}</strong>
+                          </>
+                        ) : colIndex === 0 && !aggLabel ? (
+                          <strong>Total</strong>
+                        ) : null}
+                      </td>
+                    );
+                  };
+
+                  return colWin ? (
+                    <>
+                      {colWin.leftPinned.map((col, idx) => renderSummaryCell(col, idx))}
+                      {colWin.leftSpacerWidth > 0 ? (
+                        <td
+                          className="tbx-td--col-spacer"
+                          style={{ width: `${colWin.leftSpacerWidth}px`, minWidth: `${colWin.leftSpacerWidth}px`, padding: 0 }}
+                          aria-hidden="true"
+                        />
                       ) : null}
-                    </td>
+                      {colWin.virtualColumns.map((col, idx) => renderSummaryCell(col, colWin.startIndex + idx))}
+                      {colWin.rightSpacerWidth > 0 ? (
+                        <td
+                          className="tbx-td--col-spacer"
+                          style={{ width: `${colWin.rightSpacerWidth}px`, minWidth: `${colWin.rightSpacerWidth}px`, padding: 0 }}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      {colWin.rightPinned.map((col, idx) => renderSummaryCell(col, visible.length - colWin.rightPinned.length + idx))}
+                    </>
+                  ) : (
+                    visible.map((col, colIndex) => renderSummaryCell(col, colIndex))
                   );
-                })}
+                })()}
               </tr>
             </tfoot>
           ) : null}

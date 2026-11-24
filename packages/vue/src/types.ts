@@ -79,6 +79,10 @@ export interface TableXProps<TData> {
   enableVirtualization?: boolean;
   virtualHeight?: number;
   virtualOverscan?: number;
+  enableColumnVirtualization?: boolean;
+  virtualColumnOverscan?: number;
+  fitContainer?: boolean;
+  enableHistory?: boolean;
   groupBy?: string | readonly string[];
   onGroupByChange?: (columnId: string | undefined, allGroupBy: string[]) => void;
   enableKeyboardNavigation?: boolean;
@@ -88,6 +92,8 @@ export interface TableXProps<TData> {
   childrenKey?: string;
   getSubRows?: (row: TData) => readonly TData[] | undefined;
   defaultExpandedDepth?: number;
+  loadChildren?: (row: TData) => Promise<readonly TData[] | TData[]>;
+  hasChildren?: (row: TData) => boolean;
   pinnedTopRows?: readonly TData[];
   pinnedBottomRows?: readonly TData[];
   editMode?: EditMode;
@@ -128,3 +134,18 @@ export interface TableXProps<TData> {
   onNotify?: (notice: TableXNotice) => void;
 }
 export type NexGridProps<TData> = TableXProps<TData>;
+
+/** Imperative handle exposed via template ref on Vue `<TableX />` and `<NexGrid />`. */
+export interface TableXHandle<TData = unknown> {
+  /** Undo the latest cell mutation or batch edit. Returns true if an action was undone. */
+  undo(): boolean;
+  /** Redo the latest reverted cell mutation or batch edit. Returns true if an action was redone. */
+  redo(): boolean;
+  /** True when mutations exist in the undo stack. */
+  canUndo(): boolean;
+  /** True when mutations exist in the redo stack. */
+  canRedo(): boolean;
+  /** Automatically resize all visible columns to fit their longest text content. */
+  autoFitAllColumns(sampleRows?: number): void;
+}
+export type NexGridHandle<TData = unknown> = TableXHandle<TData>;

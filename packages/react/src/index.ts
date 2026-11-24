@@ -15,11 +15,13 @@ export type {
   TableXNotice,
   TableXNoticeType,
   TableXTheme,
+  TableXHandle,
   NexGridProps,
   NexGridReactColumn,
   NexGridNotice,
   NexGridNoticeType,
   NexGridTheme,
+  NexGridHandle,
 } from "./types.js";
 
 /** Column definitions render `React.ReactNode`; see {@link TableXReactColumn}. */
@@ -112,6 +114,14 @@ export {
   reorderArrayItem,
   coerceEditedValue,
   validateEditedCell,
+  // Enterprise Extensions: History, Column Virtualization, Autosize, and Filter Option Counts
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
 } from "@nexgrid/core";
 export type {
   ClientQueryOptions,
@@ -132,4 +142,9 @@ export type {
   RowOrderChangeEvent,
   VirtualWindow,
   VirtualWindowInput,
+  CellMutation,
+  GridHistoryAction,
+  GridHistoryState,
+  VirtualColumnsInput,
+  VirtualColumnsWindow,
 } from "@nexgrid/core";

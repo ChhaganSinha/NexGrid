@@ -9,11 +9,13 @@ export type {
   TableXNotice,
   TableXNoticeType,
   TableXTheme,
+  TableXHandle,
   NexGridProps,
   NexGridVueColumn,
   NexGridNotice,
   NexGridNoticeType,
   NexGridTheme,
+  NexGridHandle,
 } from "./types.js";
 
 export type {
@@ -78,6 +80,14 @@ export {
   reorderArrayItem,
   coerceEditedValue,
   validateEditedCell,
+  // Enterprise Extensions
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  computeFilterOptionCounts,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
 } from "@nexgrid/core";
 
 export type {
@@ -116,4 +126,9 @@ export type {
   RowOrderChangeEvent,
   VirtualWindow,
   VirtualWindowInput,
+  CellMutation,
+  GridHistoryAction,
+  GridHistoryState,
+  VirtualColumnsInput,
+  VirtualColumnsWindow,
 } from "@nexgrid/core";

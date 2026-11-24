@@ -228,6 +228,14 @@ internal sealed class TableXConfig
 
     public bool? EnableRangeSelection { get; set; }
 
+    public bool? EnableColumnVirtualization { get; set; }
+
+    public int? VirtualColumnOverscan { get; set; }
+
+    public bool? FitContainer { get; set; }
+
+    public bool? EnableHistory { get; set; }
+
     public TableXQueryConfig? Query { get; set; }
 }
 

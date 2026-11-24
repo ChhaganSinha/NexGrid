@@ -193,3 +193,57 @@ test("React TableX SSR renders tree data, pinned top/bottom rows, nested groupBy
   assert.ok(groupedMarkup.includes('data-group-depth="1"'), "Inner nested group depth 1 renders");
 });
 
+test("React package re-exports enterprise extensions (history, virtualization, filter counts, autosize)", async () => {
+  const {
+    GridHistoryManager,
+    computeVirtualColumnsWindow,
+    computeAutosizeWidths,
+    distributeContainerWidth,
+    computeFilterOptionCounts,
+  } = await import("../dist/index.js");
+
+  assert.equal(typeof GridHistoryManager, "function");
+  assert.equal(typeof computeVirtualColumnsWindow, "function");
+  assert.equal(typeof computeAutosizeWidths, "function");
+  assert.equal(typeof distributeContainerWidth, "function");
+  assert.equal(typeof computeFilterOptionCounts, "function");
+
+  const history = new GridHistoryManager(10);
+  history.push({
+    description: "Edit row 1",
+    mutations: [{ rowId: "1", columnId: "name", oldValue: "Alice", newValue: "Alicia" }],
+  });
+  assert.equal(history.canUndo(), true);
+  const undone = history.undo();
+  assert.equal(undone?.mutations[0].oldValue, "Alice");
+});
+
+test("React TableX SSR renders column virtualization and tree hasChildren predicates", async () => {
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const cols = Array.from({ length: 20 }, (_, i) => ({
+    id: `col_${i}`,
+    accessorKey: `field_${i}`,
+    header: `Col ${i}`,
+  }));
+  const rows = [
+    { id: "r1", field_0: "Node 1", hasSub: true },
+    { id: "r2", field_0: "Node 2", hasSub: false },
+  ];
+
+  const html = renderToStaticMarkup(
+    React.createElement(TableX, {
+      caption: "Virtual Cols Grid",
+      columns: cols,
+      data: rows,
+      enableColumnVirtualization: true,
+      virtualColumnOverscan: 1,
+      enableTreeData: true,
+      hasChildren: (r) => Boolean(r.hasSub),
+      loadChildren: async () => [],
+    }),
+  );
+
+  assert.ok(html.includes("tbx-table"), "Grid table renders");
+  assert.ok(html.includes("tbx-tree-toggle"), "Tree toggle button renders when hasChildren returns true");
+});
+

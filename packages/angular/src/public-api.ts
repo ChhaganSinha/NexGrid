@@ -22,6 +22,7 @@ export type {
   TableXRowOrderChangeEvent,
   TableXSelectionChange,
   TableXTheme,
+  TableXHandle,
   NexGridAngularColumn,
   NexGridBulkActionsTemplateContext,
   NexGridCellEditEvent,
@@ -32,6 +33,7 @@ export type {
   NexGridRowOrderChangeEvent,
   NexGridSelectionChange,
   NexGridTheme,
+  NexGridHandle,
 } from "./lib/types";
 
 export type {
@@ -106,9 +108,17 @@ export {
   withToggledSort,
   withToggledMultiSort,
   writeSavedViews,
+  GridHistoryManager,
+  computeVirtualColumnsWindow,
+  computeAutosizeWidths,
+  distributeContainerWidth,
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_COLUMN_OVERSCAN,
+  computeFilterOptionCounts,
 } from "@nexgrid/core";
 export type {
   CellCoord,
+  CellMutation,
   ClientQueryOptions,
   ContextMenuItem,
   EditMode,
@@ -117,6 +127,8 @@ export type {
   Density,
   ExcelBadgeRule,
   ExportFormat,
+  GridHistoryAction,
+  GridHistoryState,
   NestedGroupRenderItem,
   NormalizedCellRange,
   RangeAggregationStats,
@@ -140,4 +152,6 @@ export type {
   SortSpec,
   VirtualWindow,
   VirtualWindowInput,
+  VirtualColumnsInput,
+  VirtualColumnsWindow,
 } from "@nexgrid/core";
