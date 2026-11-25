@@ -218,3 +218,32 @@ test("Vue TableX avoids colIndex collision under column virtualization and auto-
   const totalMatches = html.match(/<strong>Total<\/strong>/g) ?? [];
   assert.equal(totalMatches.length, 1, "Summary Total renders once at colIndex 0");
 });
+
+test("Vue TableX searches nested tree children across all pages in client mode", async () => {
+  const treeRoots = Array.from({ length: 12 }, (_, idx) => ({
+    id: `dept_${idx}`,
+    name: `Department ${idx}`,
+    children:
+      idx === 11
+        ? [{ id: "emp_target", name: "NeedleChildVue" }]
+        : [{ id: `emp_${idx}`, name: `Worker ${idx}` }],
+  }));
+
+  const app = createSSRApp({
+    setup() {
+      return () =>
+        h(TableX, {
+          caption: "Multi-Page Tree Search Vue",
+          columns: [{ accessorKey: "name", header: "Name" }],
+          data: treeRoots,
+          enableTreeData: true,
+          clientSidePagination: true,
+          query: { page: 1, pageSize: 10, sort: [], q: "NeedleChildVue" },
+        });
+    },
+  });
+
+  const html = await renderToString(app);
+  assert.ok(html.includes("Department 11"), "Matches parent branch whose child is on page 2");
+  assert.ok(!html.includes("Department 0"), "Excludes non-matching branches");
+});

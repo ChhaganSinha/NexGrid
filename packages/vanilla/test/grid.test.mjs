@@ -1907,6 +1907,95 @@ test("Enterprise features: Async tree loading with loadChildren", async () => {
   handle.destroy();
 });
 
+test("Search, filter optionCounts, and export cover all pages (allData, fetchEndpoint, and tree data)", async () => {
+  // 1. allData with single-page data uses full dataset for filter popover optionCounts
+  const c1 = document.createElement("div");
+  document.body.appendChild(c1);
+  const allStudents = Array.from({ length: 25 }, (_, i) => ({
+    id: `s${i + 1}`,
+    name: `Student ${i + 1}`,
+    status: i % 5 === 0 ? "Pending" : "Active",
+  }));
+  const h1 = createTableX(c1, {
+    caption: "Paged AllData",
+    columns: [
+      { accessorKey: "name", header: "Name" },
+      { accessorKey: "status", header: "Status", meta: { filterOptions: ["Active", "Pending"] } },
+    ],
+    data: allStudents.slice(0, 5),
+    allData: allStudents,
+    total: allStudents.length,
+    onQueryChange: () => {},
+  });
+  const statusFilterBtn = c1.querySelectorAll(".tbx-col-filter-btn").find((b) => b.getAttribute("data-filter-col") === "status");
+  statusFilterBtn.dispatchEvent(new MockMouseEvent("click"));
+  const pop = c1.querySelector(".tbx-filter-popover");
+  const activeOpt = Array.from(pop.querySelectorAll(".tbx-filter-option")).find((el) => el.textContent.includes("Active"));
+  assert.ok(activeOpt.textContent.includes("20"), `Expected Active count 20 across allData, got ${activeOpt.textContent}`);
+  h1.destroy();
+
+  // 2. fetchEndpoint with omitted total still walks all pages (even with server capping pageSize < 100) for clipboard export
+  const c2 = document.createElement("div");
+  document.body.appendChild(c2);
+  const fullServerRows = Array.from({ length: 6 }, (_, i) => ({ id: `srv_${i + 1}`, name: `Row ${i + 1}` }));
+  const origFetch = globalThis.fetch;
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  let copiedTsv = "";
+  globalThis.fetch = async (url) => {
+    const u = new URL(url, "http://localhost");
+    const page = Number(u.searchParams.get("page") || "1");
+    const size = 2;
+    const start = (page - 1) * size;
+    return {
+      ok: true,
+      json: async () => ({ items: fullServerRows.slice(start, start + size), page, pageSize: size, total: 6 }),
+    };
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    value: { clipboard: { writeText: async (text) => { copiedTsv = text; } } },
+    configurable: true,
+  });
+  try {
+    const h2 = createTableX(c2, {
+      caption: "Endpoint Export",
+      columns: [{ accessorKey: "name", header: "Name" }],
+      data: fullServerRows.slice(0, 2),
+      fetchEndpoint: "/api/rows",
+      onQueryChange: () => {},
+    });
+    const exportBtn = c2.querySelector(".tbx-btn--export");
+    exportBtn.dispatchEvent(new MockMouseEvent("click"));
+    const clipItem = c2.querySelectorAll(".tbx-menu-item").find((b) => b.textContent.includes("Clipboard") || b.textContent.includes("Copy"));
+    clipItem.dispatchEvent(new MockMouseEvent("click"));
+    await new Promise((r) => setTimeout(r, 30));
+    assert.ok(copiedTsv.includes("Row 1") && copiedTsv.includes("Row 6"), `Exported all 6 rows across 3 pages, got: ${copiedTsv}`);
+    h2.destroy();
+  } finally {
+    globalThis.fetch = origFetch;
+    if (navDesc) Object.defineProperty(globalThis, "navigator", navDesc);
+  }
+
+  // 3. Multi-page tree search finds nested child on page 2
+  const c3 = document.createElement("div");
+  document.body.appendChild(c3);
+  const treeRows = Array.from({ length: 12 }, (_, i) => ({
+    id: `root_${i}`,
+    name: `Branch ${i}`,
+    children: i === 11 ? [{ id: "needle", name: "NeedleTarget" }] : [{ id: `child_${i}`, name: `Leaf ${i}` }],
+  }));
+  const h3 = createTableX(c3, {
+    caption: "Tree Search All Pages",
+    columns: [{ accessorKey: "name", header: "Name" }],
+    data: treeRows,
+    enableTreeData: true,
+    clientSidePagination: true,
+    query: { page: 1, pageSize: 10, sort: [], q: "NeedleTarget" },
+  });
+  assert.ok(c3.textContent.includes("Branch 11"), "Multi-page client tree search finds parent branch of matching child");
+  assert.ok(!c3.textContent.includes("Branch 0"));
+  h3.destroy();
+});
+
 
 
 

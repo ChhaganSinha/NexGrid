@@ -161,3 +161,89 @@ export function flattenTreeRows<TData>(
   walk(rows, 0, null, "");
   return out;
 }
+
+/**
+ * Flatten all nodes and descendants across the tree regardless of expansion state.
+ */
+export function flattenAllTreeData<TData>(
+  rows: readonly TData[],
+  options?: Omit<FlattenTreeOptions<TData>, "expandedIds">,
+): TData[] {
+  const out: TData[] = [];
+  if (rows.length === 0) return out;
+
+  const childrenKey = options?.childrenKey || "children";
+  const visited = new Set<string>();
+  const activeObjects = new Set<TData>();
+
+  const walk = (items: readonly TData[], prefix: string): void => {
+    for (let i = 0; i < items.length; i++) {
+      const row = items[i];
+      if (row === undefined || activeObjects.has(row)) continue;
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      const rawId = options?.getRowId ? options.getRowId(row) : defaultTreeRowId(row, path);
+      const id = visited.has(rawId) ? `${rawId}__${path}` : rawId;
+      visited.add(id);
+
+      out.push(row);
+      const children = extractChildren(row, childrenKey, options?.getSubRows, options?.lazyChildren, id);
+      if (children.length > 0) {
+        activeObjects.add(row);
+        walk(children, path);
+        activeObjects.delete(row);
+      }
+    }
+  };
+
+  walk(rows, "");
+  return out;
+}
+
+/**
+ * Filter root tree rows keeping any branch whose own row or any descendant
+ * satisfies `predicate` (so multi-page tree search & filters match child nodes).
+ */
+export function filterTreeHierarchy<TData>(
+  rows: readonly TData[],
+  predicate: (row: TData) => boolean,
+  options?: Omit<FlattenTreeOptions<TData>, "expandedIds">,
+): TData[] {
+  if (rows.length === 0) return [];
+
+  const childrenKey = options?.childrenKey || "children";
+  const visited = new Set<string>();
+  const activeObjects = new Set<TData>();
+
+  const hasMatch = (items: readonly TData[], prefix: string): boolean => {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item === undefined || activeObjects.has(item)) continue;
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      const rawId = options?.getRowId ? options.getRowId(item) : defaultTreeRowId(item, path);
+      const id = visited.has(rawId) ? `${rawId}__${path}` : rawId;
+      visited.add(id);
+
+      if (predicate(item)) return true;
+      const children = extractChildren(item, childrenKey, options?.getSubRows, options?.lazyChildren, id);
+      if (children.length > 0) {
+        activeObjects.add(item);
+        const childMatched = hasMatch(children, path);
+        activeObjects.delete(item);
+        if (childMatched) return true;
+      }
+    }
+    return false;
+  };
+
+  return rows.filter((row, idx) => {
+    if (predicate(row)) return true;
+    const rawId = options?.getRowId ? options.getRowId(row) : defaultTreeRowId(row, String(idx));
+    visited.add(rawId);
+    const children = extractChildren(row, childrenKey, options?.getSubRows, options?.lazyChildren, rawId);
+    if (children.length === 0) return false;
+    activeObjects.add(row);
+    const matched = hasMatch(children, String(idx));
+    activeObjects.delete(row);
+    return matched;
+  });
+}

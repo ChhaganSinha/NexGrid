@@ -7,7 +7,9 @@ import {
   computeAutosizeWidths,
   distributeContainerWidth,
   flattenTreeRows,
+  flattenAllTreeData,
   computeFilterOptionCounts,
+  queryClientData,
 } from "../dist/index.js";
 
 test("GridHistoryManager manages undo/redo stack, respects limits, and ignores zero-effect edits", () => {
@@ -256,4 +258,31 @@ test("distributeContainerWidth preserves column meta.width and subtracts reserve
   );
   assert.equal(boolCounts.Yes, 2);
   assert.equal(boolCounts.No, 1);
+
+  // Tree-aware queryClientData search/filter across multiple pages and tree filter option counts
+  const treeRoots = Array.from({ length: 12 }, (_, idx) => ({
+    id: `root-${idx}`,
+    name: `Dept ${idx}`,
+    role: "Dept",
+    children:
+      idx === 11
+        ? [{ id: "leaf-target", name: "NeedlePerson", role: "Lead" }]
+        : [{ id: `leaf-${idx}`, name: `Member ${idx}`, role: "Staff" }],
+  }));
+  const treeSearch = queryClientData(
+    treeRoots,
+    { page: 1, pageSize: 10, sort: [], q: "NeedlePerson" },
+    { tree: { childrenKey: "children" } },
+  );
+  assert.equal(treeSearch.total, 1, "Finds nested child on page 2");
+  assert.equal(treeSearch.items[0].id, "root-11");
+
+  const treeRoleCounts = computeFilterOptionCounts(
+    { id: "role", meta: { filterOptions: ["Dept", "Lead", "Staff"] } },
+    treeRoots,
+    { childrenKey: "children" },
+  );
+  assert.equal(treeRoleCounts.Dept, 12);
+  assert.equal(treeRoleCounts.Lead, 1);
+  assert.equal(treeRoleCounts.Staff, 11);
 });

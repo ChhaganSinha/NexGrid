@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-25
+
 ### Added
+
+- **Undo / Redo Edit History (`enableHistory`, `GridHistoryManager`)**:
+  - `Ctrl+Z` / `Ctrl+Shift+Z` / `Ctrl+Y` (guarded against international Windows `AltGr` chords) and imperative `undo()`, `redo()`, `canUndo()`, `canRedo()` APIs across `@nexgrid/core`, `@nexgrid/vanilla`, `@nexgrid/react`, `@nexgrid/vue`, and `@nexgrid/angular`.
+- **Horizontal Column Virtualization (`enableColumnVirtualization`, `virtualColumnOverscan`)**:
+  - Windows wide unpinned column sets horizontally while keeping sticky left/right pinned columns anchored and preserving accurate body/summary column indices.
+- **Async / Lazy-Loading Tree Data (`loadChildren`, `hasChildren`)**:
+  - Dynamic async child fetching with `.tbx-tree-spinner` loading states across all adapters, plus automatic tree enablement and `flattenAllTreeData` / `filterTreeHierarchy` helpers.
+- **Autosize Columns & Fit Container (`autoFitColumn`, `autoFitAllColumns`, `fitContainer`)**:
+  - Content-based column width sizing honoring `meta.minWidth` and reactive `ResizeObserver` viewport width distribution (`distributeContainerWidth` with `reservedWidth`).
+- **Filter Option Counts & Full Cross-Page Search / Filter / Export (`computeFilterOptionCounts`)**:
+  - Live per-option counts inside column filter popovers across all pages (`allData` / client dataset / tree nodes).
+  - Cross-page tree search & filtering (`queryClientData(..., { tree })`), multi-page server endpoint pagination in `fetchAllPages` even when endpoints cap `pageSize < MAX_PAGE_SIZE`, cross-page bulk export for selected rows, and `all-data` support in `TableX.AspNetCore`.
 
 - **100% Cross-Framework Feature Parity (`@nexgrid/angular` & `TableX.AspNetCore`)**:
   - `@nexgrid/angular`: Added sticky left/right pinned columns, master-detail accordion row expansion (`*nexGridExpandedRow` / `renderExpandedRow`), `<tfoot>` summary/aggregation rows, double-click inline cell editing (`(cellEdit)`), drag-and-drop column reordering (`(columnOrderChange)`), floating bulk actions bar (`*nexGridBulkActions`), indeterminate Select-All checkbox, and zero-boilerplate client mode.

@@ -85,10 +85,10 @@ export function withSort(query: QueryState, field: string, dir: SortDir): QueryS
   return { ...query, sort: [{ field, dir }], page: 1 };
 }
 
-/** Replace the global search string (empty -> removed). Resets to page 1. */
+/** Replace the global search string (empty or whitespace -> removed). Resets to page 1. */
 export function withSearch(query: QueryState, q: string): QueryState {
-  const trimmed = q;
-  return { ...query, q: trimmed ? trimmed : undefined, page: 1 };
+  const hasContent = q.trim().length > 0;
+  return { ...query, q: hasContent ? q : undefined, page: 1 };
 }
 
 /** Navigate to a 1-based page, clamped to `[1, totalPages]`. */

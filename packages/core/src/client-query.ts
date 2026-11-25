@@ -23,6 +23,11 @@ import {
   type TableXColumn,
   type TableXColumnMeta,
 } from "./column.js";
+import {
+  filterTreeHierarchy,
+  flattenAllTreeData,
+  type FlattenTreeOptions,
+} from "./tree.js";
 import { totalPagesFor } from "./query.js";
 
 /** Hints guiding how {@link matchesFilterValue} evaluates a filter value. */
@@ -60,6 +65,8 @@ export interface ClientQueryOptions<TData> {
   columns?: readonly TableXColumn<TData, any>[];
   /** Whether to slice items into the requested page window. Defaults to `true`. If `false`, returns all matching rows (useful for export). */
   paginate?: boolean;
+  /** When supplied, search & column filter predicates also match nested child rows. */
+  tree?: Omit<FlattenTreeOptions<TData>, "expandedIds">;
 }
 
 const NUMERIC_LIKE_PATTERN = /^[+-]?[$€£₹]?\s*(?:0|[1-9]\d*(?:,\d{3})*)(?:\.\d+)?\s*%?$/;
@@ -423,32 +430,31 @@ export function queryClientData<TData>(
     });
   };
 
-  // 1. Global search
+  // 1. Global search & 2. Column filters (evaluates descendants too when `options.tree` is provided)
   const term = (query.q || "").trim().toLowerCase();
-  if (term) {
-    const fields = options?.searchableFields;
-    matching = matching.filter((row) => {
-      if (fields && fields.length > 0) {
-        return fields.some((field) => {
-          const col = findColumn(field);
-          const val = col ? getCellValue(col, row) : readPropertyByPath(row, field);
-          if (val === null || val === undefined) return false;
-          if (val instanceof Date) {
-            return matchesFilterValue(val, term);
-          }
-          return String(val).toLowerCase().includes(term);
-        });
-      }
-      if (row !== null && typeof row === "object") {
-        return Object.values(row as Record<string, unknown>).some(
-          (val) => val !== null && val !== undefined && String(val).toLowerCase().includes(term),
-        );
-      }
-      return String(row).toLowerCase().includes(term);
-    });
-  }
+  const fields = options?.searchableFields;
+  const matchesGlobalSearch = (row: TData): boolean => {
+    if (!term) return true;
+    if (fields && fields.length > 0) {
+      return fields.some((field) => {
+        const col = findColumn(field);
+        const val = col ? getCellValue(col, row) : readPropertyByPath(row, field);
+        if (val === null || val === undefined) return false;
+        if (val instanceof Date) {
+          return matchesFilterValue(val, term);
+        }
+        return String(val).toLowerCase().includes(term);
+      });
+    }
+    if (row !== null && typeof row === "object") {
+      return Object.values(row as Record<string, unknown>).some(
+        (val) => val !== null && val !== undefined && String(val).toLowerCase().includes(term),
+      );
+    }
+    return String(row).toLowerCase().includes(term);
+  };
 
-  // 2. Column filters
+  const activeFilters: { key: string; filterVal: string; col: TableXColumn<TData, any> | undefined }[] = [];
   const filter = query.filter;
   if (filter && Object.keys(filter).length > 0) {
     const allowedFields = options?.filterableFields;
@@ -461,25 +467,45 @@ export function queryClientData<TData>(
 
       const col = findColumn(key);
       if (!allowedLower && col && !isFilterable(col, true)) continue;
-
-      matching = matching.filter((row) => {
-        if (col && typeof col.filterFn === "function") {
-          return col.filterFn(row, getColumnId(col), filterVal);
-        }
-        const val = col ? getCellValue(col, row) : readPropertyByPath(row, key);
-        return matchesFilterValue(
-          val,
-          filterVal,
-          col?.meta
-            ? {
-                filterType: col.meta.filterType,
-                multiSelect: col.meta.multiSelectFilter,
-                filterOptions: col.meta.filterOptions,
-              }
-            : undefined,
-        );
-      });
+      activeFilters.push({ key, filterVal, col });
     }
+  }
+
+  const matchesColumnFilters = (row: TData): boolean => {
+    for (let i = 0; i < activeFilters.length; i++) {
+      const { key, filterVal, col } = activeFilters[i]!;
+      if (col && typeof col.filterFn === "function") {
+        if (!col.filterFn(row, getColumnId(col), filterVal)) return false;
+        continue;
+      }
+      const val = col ? getCellValue(col, row) : readPropertyByPath(row, key);
+      const matched = matchesFilterValue(
+        val,
+        filterVal,
+        col?.meta
+          ? {
+              filterType: col.meta.filterType,
+              multiSelect: col.meta.multiSelectFilter,
+              filterOptions: col.meta.filterOptions,
+            }
+          : undefined,
+      );
+      if (!matched) return false;
+    }
+    return true;
+  };
+
+  if (options?.tree) {
+    if (term || activeFilters.length > 0) {
+      matching = filterTreeHierarchy(
+        matching,
+        (row) => matchesGlobalSearch(row) && matchesColumnFilters(row),
+        options.tree,
+      );
+    }
+  } else {
+    if (term) matching = matching.filter(matchesGlobalSearch);
+    if (activeFilters.length > 0) matching = matching.filter(matchesColumnFilters);
   }
 
   // 3. Multi-column sorting
@@ -557,22 +583,26 @@ export function queryClientData<TData>(
 
 /**
  * Compute the count of matching rows for each discrete filter option in `col.meta.filterOptions`.
+ * When `treeOptions` is provided, traverses nested children as well as root rows.
  */
 export function computeFilterOptionCounts<TData>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   col: TableXColumn<TData, any>,
   rows: readonly TData[],
+  treeOptions?: Omit<FlattenTreeOptions<TData>, "expandedIds">,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
   const options = col.meta?.filterOptions;
   if (!options || options.length === 0) return counts;
 
+  const sourceRows = treeOptions ? flattenAllTreeData(rows, treeOptions) : rows;
+
   for (const opt of options) {
     counts[opt] = 0;
   }
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
+  for (let i = 0; i < sourceRows.length; i++) {
+    const row = sourceRows[i]!;
     const val = getCellValue(col, row);
     if (val === null || val === undefined) continue;
     const str = (

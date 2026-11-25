@@ -47,13 +47,19 @@ export async function fetchAllPages<T>(
     const batch = response.items ?? [];
     items.push(...batch);
 
+    const serverPageSize =
+      typeof response.pageSize === "number" && response.pageSize > 0
+        ? Math.min(response.pageSize, MAX_PAGE_SIZE)
+        : MAX_PAGE_SIZE;
+
     // Stop on: reached the total, an empty/short page (server said that's all),
     // or the safety cap. The short-page check also protects against a server
-    // whose `total` disagrees with what it actually returns.
+    // whose `total` disagrees with what it actually returns while still allowing
+    // endpoints whose maximum pageSize is smaller than MAX_PAGE_SIZE (e.g. 25).
     if (
       items.length >= total ||
       batch.length === 0 ||
-      batch.length < MAX_PAGE_SIZE ||
+      batch.length < serverPageSize ||
       (cap > 0 && Number.isFinite(cap) && items.length >= cap)
     ) {
       break;

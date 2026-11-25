@@ -371,6 +371,12 @@
     public IEnumerable<TItem>? Data { get; set; }
 
     /// <summary>
+    /// Optional full in-memory dataset used for cross-page export, selection, and filter counts when <see cref="Data"/> holds a single page.
+    /// </summary>
+    [Parameter]
+    public IEnumerable<TItem>? AllData { get; set; }
+
+    /// <summary>
     /// Total row count when supplying a single server page via <see cref="Data"/>.
     /// </summary>
     [Parameter]
@@ -427,6 +433,7 @@
         Caption = Caption,
         Columns = _columns,
         Data = Data,
+        AllData = AllData,
         Total = Total,
         ClientSidePagination = ClientSidePagination,
         Endpoint = Endpoint,

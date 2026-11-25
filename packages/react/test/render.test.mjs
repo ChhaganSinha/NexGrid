@@ -277,3 +277,29 @@ test("React TableX avoids colIndex collision with pinned columns under column vi
   assert.equal(totalMatches.length, 1, "Summary Total renders once at colIndex 0");
 });
 
+test("React TableX searches nested tree children across all pages in client mode", async () => {
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const treeRoots = Array.from({ length: 12 }, (_, idx) => ({
+    id: `dept_${idx}`,
+    name: `Department ${idx}`,
+    children:
+      idx === 11
+        ? [{ id: "emp_target", name: "NeedleChild" }]
+        : [{ id: `emp_${idx}`, name: `Worker ${idx}` }],
+  }));
+
+  const html = renderToStaticMarkup(
+    React.createElement(TableX, {
+      caption: "Multi-Page Tree Search",
+      columns: [{ accessorKey: "name", header: "Name" }],
+      data: treeRoots,
+      enableTreeData: true,
+      clientSidePagination: true,
+      query: { page: 1, pageSize: 10, sort: [], q: "NeedleChild" },
+    }),
+  );
+
+  assert.ok(html.includes("Department 11"), "Matches parent branch whose child is on page 2");
+  assert.ok(!html.includes("Department 0"), "Excludes non-matching branches");
+});
+

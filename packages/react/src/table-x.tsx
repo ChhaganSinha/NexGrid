@@ -33,6 +33,7 @@ import {
   downloadPdf,
   fetchAllPages,
   filePrefixFromCaption,
+  flattenAllTreeData,
   flattenTreeRows,
   formatFilterPillValue,
   formatMessage,
@@ -1204,6 +1205,16 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
 
   const unpaginatedVirtual = enableVirtualization && !isPaginationVisible;
 
+  const treeQueryOptions = React.useMemo(
+    () => ({
+      childrenKey,
+      getSubRows,
+      lazyChildren: lazyTreeChildren,
+      getRowId,
+    }),
+    [childrenKey, getSubRows, lazyTreeChildren, getRowId],
+  );
+
   const clientQueryOptions = React.useMemo(
     // An empty list means "search everything" to the engine, so only pass one
     // when it has entries — with no visible column there is nothing to narrow
@@ -1212,8 +1223,9 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       columns: colList,
       ...(clientSearchFields.length > 0 ? { searchableFields: clientSearchFields } : {}),
       ...(unpaginatedVirtual ? { paginate: false } : {}),
+      ...(isTreeEnabled ? { tree: treeQueryOptions } : {}),
     }),
-    [colList, clientSearchFields, unpaginatedVirtual],
+    [colList, clientSearchFields, unpaginatedVirtual, isTreeEnabled, treeQueryOptions],
   );
 
   const clientPaged = React.useMemo(() => {
@@ -1695,7 +1707,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         ...clientQueryOptions,
         paginate: false,
       });
-      for (const row of full.items) {
+      const items = flattenExportTreeIfNeeded(full.items);
+      for (const row of items) {
         next.add(getRowId(row));
       }
     } else {
@@ -1843,14 +1856,29 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
     }
   };
 
+  const flattenExportTreeIfNeeded = (list: readonly TData[]): readonly TData[] =>
+    isTreeEnabled ? flattenAllTreeData(list, treeQueryOptions) : list;
+
+  const hasActiveSearchOrFilter =
+    Boolean(query.q?.trim()) ||
+    Object.values(query.filter ?? {}).some((v) => Boolean(v?.trim()));
+
   const collectExportRows = async (): Promise<readonly TData[]> => {
     if (fetchAllData) {
       const result = await fetchAllData(query);
-      return Array.isArray(result) ? result : rows;
+      return Array.isArray(result) ? flattenExportTreeIfNeeded(result) : rows;
     }
 
     const clientFullData = allData ?? (isClientSide ? data : undefined);
     if (clientFullData && clientFullData.length > 0) {
+      if (isTreeEnabled) {
+        if (hasActiveSearchOrFilter) {
+          const flat = flattenAllTreeData(clientFullData, treeQueryOptions);
+          return queryClientData(flat, query, { ...clientQueryOptions, tree: undefined, paginate: false }).items;
+        }
+        const ordered = queryClientData(clientFullData, query, { ...clientQueryOptions, paginate: false });
+        return flattenAllTreeData(ordered.items, treeQueryOptions);
+      }
       const full = queryClientData(clientFullData, query, { ...clientQueryOptions, paginate: false });
       return full.items;
     }
@@ -1861,7 +1889,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         (page, size) => fetchPage(page, size, query),
         cap,
       );
-      return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+      const items = cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+      return flattenExportTreeIfNeeded(items);
     }
 
     if (fetchEndpoint) {
@@ -1876,7 +1905,8 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
       }, cap);
-      return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+      const items = cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+      return flattenExportTreeIfNeeded(items);
     }
 
     return rows;
@@ -1888,7 +1918,18 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
       return;
     }
     const pool = allData ?? (isClientSide ? data : rows);
-    const selectedRows = pool.filter((r) => selectedIds.has(getRowId(r)));
+    const flatPool = flattenExportTreeIfNeeded(pool);
+    let selectedRows = flatPool.filter((r) => selectedIds.has(getRowId(r)));
+    if (
+      selectedRows.length < selectedIds.size &&
+      !allData &&
+      !isClientSide &&
+      (fetchAllData || fetchPage || fetchEndpoint)
+    ) {
+      const allMatching = await collectExportRows();
+      const picked = allMatching.filter((r) => selectedIds.has(getRowId(r)));
+      if (picked.length > 0) selectedRows = picked;
+    }
     if (selectedRows.length > 0) {
       await executeExportWithRows(format, selectedRows);
       return;
@@ -3372,6 +3413,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                     if (event.key === "Escape" && searchText) {
                       event.preventDefault();
                       setSearchText("");
+                      if (query.q) onQueryChange(withSearch(query, ""));
                     }
                   }}
                   placeholder={searchPlaceholder ?? locale.searchPlaceholder}
@@ -3381,7 +3423,10 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
                   <button
                     type="button"
                     className="tbx-search-clear"
-                    onClick={() => setSearchText("")}
+                    onClick={() => {
+                      setSearchText("");
+                      if (query.q) onQueryChange(withSearch(query, ""));
+                    }}
                     aria-label={locale.clearSearch}
                   >
                     <XIcon className="tbx-icon" />
@@ -3862,6 +3907,7 @@ export function TableX<TData>(props: TableXProps<TData>): React.JSX.Element {
             optionCounts={computeFilterOptionCounts(
               activeFilterPopoverCol,
               isClientSide ? (allData ?? data) : (allData ?? rows),
+              isTreeEnabled ? treeQueryOptions : undefined,
             )}
             filterable={popFilterable}
             enableColumnMenu={enableColumnMenu !== false}

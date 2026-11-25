@@ -210,6 +210,7 @@ public class TableXTagHelperTests
             Id = "client-grid",
             Caption = "Users",
             Data = rows,
+            AllData = rows,
             ClientSidePagination = true,
             AutoInit = false,
         };
@@ -221,6 +222,7 @@ public class TableXTagHelperTests
         using var doc = JsonDocument.Parse(json);
         Assert.True(doc.RootElement.GetProperty("clientSidePagination").GetBoolean());
         Assert.Equal("Alice </script> Johnson", doc.RootElement.GetProperty("data")[0].GetProperty("name").GetString());
+        Assert.Equal(1, doc.RootElement.GetProperty("allData").GetArrayLength());
     }
 
     [Fact]

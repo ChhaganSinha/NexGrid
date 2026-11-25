@@ -295,6 +295,10 @@ public class TableXTagHelper : TagHelper
     [HtmlAttributeName("data")]
     public object? Data { get; set; }
 
+    /// <summary>Optional full in-memory dataset used for cross-page export, selection, and filter counts when <see cref="Data"/> holds a single server page.</summary>
+    [HtmlAttributeName("all-data")]
+    public object? AllData { get; set; }
+
     /// <summary>Total row count when supplying a single server page via <see cref="Data"/>.</summary>
     [HtmlAttributeName("total")]
     public int? Total { get; set; }
@@ -409,6 +413,7 @@ public class TableXTagHelper : TagHelper
         Caption = Caption ?? string.Empty,
         Columns = columns,
         Data = Data,
+        AllData = AllData,
         Total = Total,
         ClientSidePagination = ClientSidePagination,
         Endpoint = NullIfBlank(Endpoint),

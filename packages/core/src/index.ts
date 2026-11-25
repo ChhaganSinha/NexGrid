@@ -130,6 +130,8 @@ export type {
 // Hierarchical tree data
 export {
   flattenTreeRows,
+  flattenAllTreeData,
+  filterTreeHierarchy,
   collectInitialExpandedTreeIds,
 } from "./tree.js";
 export type { TreeRowNode, FlattenTreeOptions } from "./tree.js";

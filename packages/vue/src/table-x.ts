@@ -32,6 +32,7 @@ import {
   fetchAllPages,
   filePrefixFromCaption,
   flattenColumns,
+  flattenAllTreeData,
   flattenTreeRows,
   formatFilterPillValue,
   formatMessage,
@@ -690,6 +691,12 @@ export const TableX = defineComponent({
     const isPaginationVisible = computed(
       () => props.enablePagination && props.showPagination !== false,
     );
+    const treeQueryOpts = computed(() => ({
+      childrenKey: props.childrenKey,
+      getSubRows: props.getSubRows,
+      lazyChildren: lazyTreeChildren.value,
+      getRowId: rowIdFn.value,
+    }));
     const clientQueryOpts = computed(() => {
       const fields =
         props.searchableFields ?? searchableColumnIds(colList.value, hiddenCols.value);
@@ -697,6 +704,7 @@ export const TableX = defineComponent({
         columns: colList.value,
         ...(fields.length > 0 ? { searchableFields: fields } : {}),
         ...(props.enableVirtualization && !isPaginationVisible.value ? { paginate: false } : {}),
+        ...(isTreeEnabled.value ? { tree: treeQueryOpts.value } : {}),
       };
     });
 
@@ -1193,13 +1201,34 @@ export const TableX = defineComponent({
       autoFitColumn,
     });
 
+    const flattenExportTreeIfNeeded = (list: readonly unknown[]): readonly unknown[] =>
+      isTreeEnabled.value ? flattenAllTreeData(list, treeQueryOpts.value) : list;
+
+    const hasActiveSearchOrFilter = (q: QueryState): boolean =>
+      Boolean(q.q?.trim()) || Object.values(q.filter ?? {}).some((v) => Boolean(v?.trim()));
+
     const collectExportRows = async (): Promise<readonly unknown[]> => {
       if (props.fetchAllData) {
         const res = await props.fetchAllData(activeQuery.value);
-        return Array.isArray(res) ? res : rows.value;
+        return Array.isArray(res) ? flattenExportTreeIfNeeded(res) : rows.value;
       }
       const pool = props.allData ?? (isClientSide.value ? props.data : undefined);
       if (pool && pool.length > 0) {
+        if (isTreeEnabled.value) {
+          if (hasActiveSearchOrFilter(activeQuery.value)) {
+            const flat = flattenAllTreeData(pool, treeQueryOpts.value);
+            return queryClientData(flat, activeQuery.value, {
+              ...clientQueryOpts.value,
+              tree: undefined,
+              paginate: false,
+            }).items;
+          }
+          const ordered = queryClientData(pool, activeQuery.value, {
+            ...clientQueryOpts.value,
+            paginate: false,
+          });
+          return flattenAllTreeData(ordered.items, treeQueryOpts.value);
+        }
         return queryClientData(pool, activeQuery.value, {
           ...clientQueryOpts.value,
           paginate: false,
@@ -1208,7 +1237,8 @@ export const TableX = defineComponent({
       if (props.fetchPage) {
         const cap = props.maxExportRows ?? DEFAULT_ROW_CAP;
         const full = await fetchAllPages((p, s) => props.fetchPage!(p, s, activeQuery.value), cap);
-        return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+        const items = cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+        return flattenExportTreeIfNeeded(items);
       }
       if (props.fetchEndpoint) {
         const cap = props.maxExportRows ?? DEFAULT_ROW_CAP;
@@ -1222,7 +1252,8 @@ export const TableX = defineComponent({
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           return (await resp.json()) as PagedResponse<unknown>;
         }, cap);
-        return cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+        const items = cap > 0 && full.items.length > cap ? full.items.slice(0, cap) : full.items;
+        return flattenExportTreeIfNeeded(items);
       }
       return rows.value;
     };
@@ -1301,7 +1332,18 @@ export const TableX = defineComponent({
         return;
       }
       const pool = props.allData ?? (isClientSide.value ? props.data : rows.value);
-      const picked = pool.filter((r) => selectedIds.value.has(rowIdFn.value(r)));
+      const flatPool = flattenExportTreeIfNeeded(pool);
+      let picked = flatPool.filter((r) => selectedIds.value.has(rowIdFn.value(r)));
+      if (
+        picked.length < selectedIds.value.size &&
+        !props.allData &&
+        !isClientSide.value &&
+        (props.fetchAllData || props.fetchPage || props.fetchEndpoint)
+      ) {
+        const allMatching = await collectExportRows();
+        const crossPicked = allMatching.filter((r) => selectedIds.value.has(rowIdFn.value(r)));
+        if (crossPicked.length > 0) picked = crossPicked;
+      }
       if (picked.length > 0) {
         await exportWithRows(fmt, picked);
         return;
@@ -2540,6 +2582,10 @@ export const TableX = defineComponent({
                           onKeydown: (ev: KeyboardEvent) => {
                             if (ev.key === "Escape" && searchText.value) {
                               searchText.value = "";
+                              if (searchTimer) {
+                                clearTimeout(searchTimer);
+                                searchTimer = null;
+                              }
                               pushQuery(withSearch(activeQuery.value, ""));
                             }
                           },
@@ -2553,6 +2599,10 @@ export const TableX = defineComponent({
                                 "aria-label": loc.clearSearch,
                                 onClick: () => {
                                   searchText.value = "";
+                                  if (searchTimer) {
+                                    clearTimeout(searchTimer);
+                                    searchTimer = null;
+                                  }
                                   pushQuery(withSearch(activeQuery.value, ""));
                                 },
                               },
@@ -3006,10 +3056,11 @@ export const TableX = defineComponent({
                         const next = new Set(selectedIds.value);
                         const pool = props.allData ?? (isClientSide.value ? props.data : undefined);
                         if (pool && pool.length > 0) {
-                          for (const r of queryClientData(pool, q, {
+                          const matchedRoots = queryClientData(pool, q, {
                             ...clientQueryOpts.value,
                             paginate: false,
-                          }).items) {
+                          }).items;
+                          for (const r of flattenExportTreeIfNeeded(matchedRoots)) {
                             next.add(rowIdFn.value(r));
                           }
                         } else {
@@ -3379,6 +3430,7 @@ export const TableX = defineComponent({
                 const optionCounts = computeFilterOptionCounts(
                   col,
                   isClientSide.value ? (props.allData ?? props.data) : (props.allData ?? rows.value),
+                  isTreeEnabled.value ? treeQueryOpts.value : undefined,
                 );
                 const cid = getColumnId(col);
                 const fField = getFilterField(col);

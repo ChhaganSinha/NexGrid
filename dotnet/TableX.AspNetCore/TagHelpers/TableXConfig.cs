@@ -136,6 +136,8 @@ internal sealed class TableXConfig
 
     public object? Data { get; set; }
 
+    public object? AllData { get; set; }
+
     public int? Total { get; set; }
 
     public bool? ClientSidePagination { get; set; }

@@ -45,7 +45,7 @@ import {
   booleanAttribute,
   inject,
 } from "@angular/core";
-import { Subject, Subscription, debounceTime, distinctUntilChanged } from "rxjs";
+import { Subject, Subscription, debounceTime } from "rxjs";
 
 import {
   DEFAULT_PAGE_SIZE,
@@ -72,6 +72,7 @@ import {
   downloadPdf,
   fetchAllPages,
   filePrefixFromCaption,
+  flattenAllTreeData,
   flattenTreeRows,
   formatFilterPillValue,
   formatMessage,
@@ -2977,7 +2978,7 @@ export class TableXComponent<TData>
   ngOnInit(): void {
     this.subscriptions.add(
       this.searchInput$
-        .pipe(debounceTime(SEARCH_DEBOUNCE_MS), distinctUntilChanged())
+        .pipe(debounceTime(SEARCH_DEBOUNCE_MS))
         .subscribe((text) => {
           if (text === (this.query.q ?? "")) return;
           this.pendingSearchEcho = text;
@@ -3275,7 +3276,10 @@ export class TableXComponent<TData>
 
   protected clearSearch(): void {
     this.searchText = "";
-    this.searchInput$.next("");
+    this.pendingSearchEcho = "";
+    if (this.query.q) {
+      this.emitQuery(withSearch(this.query, ""));
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -3477,6 +3481,7 @@ export class TableXComponent<TData>
       ? computeFilterOptionCounts(
           col,
           this.isClientMode ? (this.allData ?? this.data) : (this.allData ?? this.currentDisplayData),
+          this.isTreeEnabled ? this.treeQueryOptions() : undefined,
         )
       : {};
     const activeVal = header.activeFilter ?? "";
@@ -3971,8 +3976,12 @@ export class TableXComponent<TData>
         paginate: false,
         columns: rawColumns,
         ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+        ...(this.isTreeEnabled ? { tree: this.treeQueryOptions() } : {}),
       });
-      for (const item of full.items) {
+      const items = this.isTreeEnabled
+        ? flattenAllTreeData(full.items, this.treeQueryOptions())
+        : full.items;
+      for (const item of items) {
         next.add(this.getRowId(item));
       }
     } else {
@@ -4858,13 +4867,43 @@ export class TableXComponent<TData>
   // Export (spec section 5 — identical flow in every adapter)
   // ---------------------------------------------------------------------
 
+  private treeQueryOptions() {
+    return {
+      childrenKey: this.childrenKey,
+      getSubRows: this.getSubRows,
+      lazyChildren: this.lazyTreeChildren,
+      getRowId: this.getRowId,
+    };
+  }
+
+  private hasActiveSearchOrFilter(): boolean {
+    if (this.query.q && this.query.q.trim() !== "") return true;
+    const f = this.query.filter;
+    return f ? Object.values(f).some((v) => v !== undefined && v.trim() !== "") : false;
+  }
+
+  private flattenForExportIfTree(rows: readonly TData[]): TData[] {
+    return this.isTreeEnabled ? flattenAllTreeData(rows, this.treeQueryOptions()) : [...rows];
+  }
+
   protected async runBulkExport(format: "excel" | "csv" | "pdf"): Promise<void> {
     if (this.allAcrossSelected) {
       await this.runExport(format);
       return;
     }
     const pool = this.allData ?? (this.isClientMode ? this.data : this.rows.map((r) => r.data));
-    const selectedRows = pool.filter((r) => this.selectedIds.has(this.getRowId(r)));
+    const flatPool = this.flattenForExportIfTree(pool);
+    let selectedRows = flatPool.filter((r) => this.selectedIds.has(this.getRowId(r)));
+    if (
+      selectedRows.length < this.selectedIds.size &&
+      !this.allData &&
+      !this.isClientMode &&
+      (this.fetchAllData || this.fetchPage || this.fetchEndpoint)
+    ) {
+      const allMatching = await this.collectExportRows();
+      const picked = allMatching.filter((r) => this.selectedIds.has(this.getRowId(r)));
+      if (picked.length > 0) selectedRows = picked;
+    }
     if (selectedRows.length > 0) {
       await this.exportRowsWithFormat(format, selectedRows);
       return;
@@ -4990,10 +5029,10 @@ export class TableXComponent<TData>
       });
       try {
         const rows = await this.fetchAllData(this.query);
-        return Array.isArray(rows) ? (rows as TData[]) : this.data;
+        return Array.isArray(rows) ? this.flattenForExportIfTree(rows as TData[]) : this.flattenForExportIfTree(this.data);
       } catch {
         this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
-        return this.data;
+        return this.flattenForExportIfTree(this.data);
       }
     }
 
@@ -5004,7 +5043,25 @@ export class TableXComponent<TData>
       const searchFields =
         this.searchableFields && this.searchableFields.length > 0
           ? this.searchableFields
-          : (searchableColumnIds(leafCols) as (keyof TData & string)[]);
+          : (searchableColumnIds(leafCols, this.hiddenColumns as Record<string, boolean>) as (keyof TData & string)[]);
+      if (this.isTreeEnabled) {
+        const treeOpts = this.treeQueryOptions();
+        if (this.hasActiveSearchOrFilter()) {
+          const flat = flattenAllTreeData(all, treeOpts);
+          return queryClientData(flat, this.query, {
+            paginate: false,
+            columns: rawColumns,
+            ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+          }).items;
+        }
+        const ordered = queryClientData(all, this.query, {
+          paginate: false,
+          columns: rawColumns,
+          ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
+          tree: treeOpts,
+        });
+        return flattenAllTreeData(ordered.items, treeOpts);
+      }
       const full = queryClientData(all, this.query, {
         paginate: false,
         columns: rawColumns,
@@ -5026,15 +5083,18 @@ export class TableXComponent<TData>
           (page, pageSize) => this.fetchPage!(page, pageSize, this.query),
           cap,
         );
-        return cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
+        const items = cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
+        return this.flattenForExportIfTree(items);
       } catch {
         this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
-        return this.data;
+        return this.flattenForExportIfTree(this.data);
       }
     }
 
     const endpoint = this.fetchEndpoint;
-    if (!endpoint || this.data.length >= knownTotal) return this.data;
+    if (!endpoint || (this.total !== undefined && this.data.length >= this.total && this.data.length > 0)) {
+      return this.flattenForExportIfTree(this.data);
+    }
 
     this.notify.emit({
       type: "info",
@@ -5055,10 +5115,11 @@ export class TableXComponent<TData>
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
       }, cap);
-      return cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
+      const items = cap > 0 && result.items.length > cap ? result.items.slice(0, cap) : result.items;
+      return this.flattenForExportIfTree(items);
     } catch {
       this.notify.emit({ type: "error", message: this.strings.exportFetchFailed });
-      return this.data;
+      return this.flattenForExportIfTree(this.data);
     }
   }
 
@@ -5415,6 +5476,7 @@ export class TableXComponent<TData>
           columns: rawColumns,
           ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
           ...(unpaginatedVirtual ? { paginate: false } : {}),
+          ...(this.isTreeEnabled ? { tree: this.treeQueryOptions() } : {}),
         })
       : null;
     const baseData = this.reorderedData ?? (clientPaged ? clientPaged.items : this.data);

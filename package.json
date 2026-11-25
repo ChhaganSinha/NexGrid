@@ -1,6 +1,6 @@
 {
   "name": "nexgrid-monorepo",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "TableX \u2014 a professional, server-driven data grid for React, Vue, Angular, vanilla JS, and ASP.NET Core.",
   "license": "MIT",

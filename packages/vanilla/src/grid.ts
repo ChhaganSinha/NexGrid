@@ -101,6 +101,7 @@ import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_COLUMN_OVERSCAN,
   computeFilterOptionCounts,
+  flattenAllTreeData,
   type CellCoord,
   type CellMutation,
   type VirtualColumnsWindow,
@@ -206,6 +207,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
   private rawClientData: TData[] = [];
   private isClientSide: boolean;
   private total: number;
+  private hasKnownTotal: boolean;
   private query: QueryState;
   private density: Density;
   private hidden: Record<string, boolean>;
@@ -317,7 +319,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
       options.clientSidePagination === true ||
       options.paginationMode === "client" ||
       (options.endpoint === undefined && options.onQueryChange === undefined);
-    this.rawClientData = options.data ? [...options.data] : [];
+    this.hasKnownTotal = options.total !== undefined || this.isClientSide;
+    this.rawClientData = options.data
+      ? [...options.data]
+      : options.allData
+        ? [...options.allData]
+        : [];
 
     if (options.storageKey) {
       const persisted = loadGridState(options.storageKey);
@@ -419,7 +426,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (kEvent.key === "Escape" && input.value !== "") {
           input.value = "";
           this.syncSearchClear();
-          this.scheduleSearch("");
+          if (this.searchTimer !== null) {
+            clearTimeout(this.searchTimer);
+            this.searchTimer = null;
+          }
+          this.applyQuery(withSearch(this.query, ""));
         }
       });
       this.searchInput = input;
@@ -707,6 +718,21 @@ class NexGridController<TData> implements TableXHandle<TData> {
     if (options.endpoint !== undefined) void this.fetchFromEndpoint();
   }
 
+  private treeQueryOptions() {
+    return {
+      childrenKey: this.options.childrenKey,
+      getSubRows: this.options.getSubRows,
+      lazyChildren: this.lazyTreeChildren,
+      getRowId: this.rowId,
+    };
+  }
+
+  private hasActiveSearchOrFilter(): boolean {
+    if (this.query.q && this.query.q.trim() !== "") return true;
+    const f = this.query.filter;
+    return f ? Object.values(f).some((v) => v !== undefined && v.trim() !== "") : false;
+  }
+
   private clientQueryOptions(extra?: Partial<ClientQueryOptions<TData>>): ClientQueryOptions<TData> {
     const searchFields =
       this.options.searchableFields ??
@@ -718,6 +744,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
       columns: this.columns,
       ...(searchFields.length > 0 ? { searchableFields: searchFields } : {}),
       ...(unpaginatedVirtual ? { paginate: false } : {}),
+      ...(this.isTreeEnabled() ? { tree: this.treeQueryOptions() } : {}),
       ...extra,
     };
   }
@@ -744,7 +771,10 @@ class NexGridController<TData> implements TableXHandle<TData> {
         this.data = patch.data;
       }
     }
-    if (patch.total !== undefined && !this.isClientSide) this.total = patch.total;
+    if (patch.total !== undefined && !this.isClientSide) {
+      this.total = patch.total;
+      this.hasKnownTotal = true;
+    }
     if (patch.query !== undefined) {
       queryChanged = !queryEquals(patch.query, this.query);
       const filterChanged = this.filterFingerprint(patch.query) !== this.filterFingerprint(this.query);
@@ -1184,6 +1214,7 @@ class NexGridController<TData> implements TableXHandle<TData> {
 
       this.data = Array.isArray(body.items) ? body.items : [];
       this.total = typeof body.total === "number" ? body.total : this.data.length;
+      this.hasKnownTotal = typeof body.total === "number";
       this.isLoading = false;
     } catch {
       if (seq !== this.requestSeq || this.destroyed) return;
@@ -1200,6 +1231,12 @@ class NexGridController<TData> implements TableXHandle<TData> {
   // Export (adapter spec §5)
   // =========================================================================
 
+  private flattenForExportIfTree(rows: readonly TData[]): TData[] {
+    return this.isTreeEnabled()
+      ? flattenAllTreeData(rows, this.treeQueryOptions())
+      : [...rows];
+  }
+
   private async collectExportRows(): Promise<TData[]> {
     if (this.options.fetchAllData) {
       this.isExporting = true;
@@ -1210,10 +1247,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
       );
       try {
         const rows = await this.options.fetchAllData(this.query);
-        return Array.isArray(rows) ? (rows as TData[]) : this.data;
+        const list = Array.isArray(rows) ? (rows as TData[]) : this.data;
+        return this.flattenForExportIfTree(list);
       } catch {
         this.notify("error", this.locale.exportFetchFailed);
-        return this.data;
+        return this.flattenForExportIfTree(this.data);
       } finally {
         this.isExporting = false;
         this.render();
@@ -1223,6 +1261,23 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const allData =
       this.options.allData ?? (this.isClientSide ? this.rawClientData : undefined);
     if (allData && allData.length > 0) {
+      if (this.isTreeEnabled()) {
+        const treeOpts = this.treeQueryOptions();
+        if (this.hasActiveSearchOrFilter()) {
+          const flat = flattenAllTreeData(allData, treeOpts);
+          return queryClientData(
+            flat,
+            this.query,
+            this.clientQueryOptions({ paginate: false, tree: undefined }),
+          ).items;
+        }
+        const ordered = queryClientData(
+          allData,
+          this.query,
+          this.clientQueryOptions({ paginate: false }),
+        );
+        return flattenAllTreeData(ordered.items, treeOpts);
+      }
       const full = queryClientData(
         allData,
         this.query,
@@ -1244,10 +1299,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
           (page, pageSize) => this.options.fetchPage!(page, pageSize, this.query),
           cap,
         );
-        return cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
+        const items = cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
+        return this.flattenForExportIfTree(items);
       } catch {
         this.notify("error", this.locale.exportFetchFailed);
-        return this.data;
+        return this.flattenForExportIfTree(this.data);
       } finally {
         this.isExporting = false;
         this.render();
@@ -1255,7 +1311,14 @@ class NexGridController<TData> implements TableXHandle<TData> {
     }
 
     const endpoint = this.options.fetchEndpoint ?? this.options.endpoint;
-    if (this.data.length >= this.total || endpoint === undefined) return this.data;
+    if (
+      endpoint === undefined ||
+      (this.hasKnownTotal &&
+        this.data.length >= this.total &&
+        (this.total > 0 || !this.options.fetchEndpoint))
+    ) {
+      return this.flattenForExportIfTree(this.data);
+    }
 
     this.isExporting = true;
     this.render();
@@ -1279,10 +1342,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return (await response.json()) as PagedResponse<TData>;
       }, cap);
-      return cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
+      const items = cap > 0 && collected.items.length > cap ? collected.items.slice(0, cap) : collected.items;
+      return this.flattenForExportIfTree(items);
     } catch {
       this.notify("error", this.locale.exportFetchFailed);
-      return this.data;
+      return this.flattenForExportIfTree(this.data);
     } finally {
       this.isExporting = false;
       this.render();
@@ -1326,7 +1390,18 @@ class NexGridController<TData> implements TableXHandle<TData> {
       return;
     }
     const pool = this.options.allData ?? (this.isClientSide ? this.rawClientData : this.data);
-    const selectedRows = pool.filter((r) => this.selected.has(this.rowId(r)));
+    const flatPool = this.flattenForExportIfTree(pool);
+    let selectedRows = flatPool.filter((r) => this.selected.has(this.rowId(r)));
+    if (
+      selectedRows.length < this.selected.size &&
+      !this.options.allData &&
+      !this.isClientSide &&
+      (this.options.fetchAllData || this.options.fetchPage || this.options.fetchEndpoint || this.options.endpoint)
+    ) {
+      const allMatching = await this.collectExportRows();
+      const crossPagePicked = allMatching.filter((r) => this.selected.has(this.rowId(r)));
+      if (crossPagePicked.length > 0) selectedRows = crossPagePicked;
+    }
     if (selectedRows.length > 0) {
       await this.exportRowsWithFormat(format, selectedRows);
       return;
@@ -1480,7 +1555,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const pool = this.options.allData ?? (this.isClientSide ? this.rawClientData : undefined);
     if (pool && pool.length > 0) {
       const full = queryClientData(pool, this.query, this.clientQueryOptions({ paginate: false }));
-      for (const row of full.items) {
+      const items = this.flattenForExportIfTree(full.items);
+      for (const row of items) {
         this.selected.add(this.rowId(row));
       }
     } else {
@@ -1912,7 +1988,11 @@ class NexGridController<TData> implements TableXHandle<TData> {
       input.value = "";
       this.syncSearchClear();
       input.focus();
-      this.scheduleSearch("");
+      if (this.searchTimer !== null) {
+        clearTimeout(this.searchTimer);
+        this.searchTimer = null;
+      }
+      this.applyQuery(withSearch(this.query, ""));
     });
     wrap.appendChild(button);
   }
@@ -3745,7 +3825,8 @@ class NexGridController<TData> implements TableXHandle<TData> {
     const filterField = getFilterField(column);
     const optionCounts = computeFilterOptionCounts(
       column,
-      this.isClientSide ? this.rawClientData : this.data,
+      this.options.allData ?? (this.isClientSide ? this.rawClientData : this.data),
+      this.isTreeEnabled() ? this.treeQueryOptions() : undefined,
     );
     const apply = (valToApply?: string) => {
       const val = (valToApply !== undefined ? valToApply : "").trim();

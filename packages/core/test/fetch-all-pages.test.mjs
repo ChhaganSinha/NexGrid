@@ -93,3 +93,21 @@ test("errors propagate so callers can degrade honestly", async () => {
     /HTTP 500/,
   );
 });
+
+test("endpoints capping pageSize smaller than MAX_PAGE_SIZE still walk all pages", async () => {
+  const rows = Array.from({ length: 75 }, (_, i) => ({ id: i + 1 }));
+  const result = await fetchAllPages(async (page) => {
+    const serverSize = 25;
+    const start = (page - 1) * serverSize;
+    return {
+      items: rows.slice(start, start + serverSize),
+      page,
+      pageSize: serverSize,
+      total: rows.length,
+      totalPages: 3,
+    };
+  });
+
+  assert.equal(result.items.length, 75);
+  assert.equal(result.complete, true);
+});
