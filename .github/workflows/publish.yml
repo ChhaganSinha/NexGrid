@@ -32,30 +32,29 @@ jobs:
           npm run typecheck
           npm test
 
-      - name: Publish @nexgrid/core
-        run: npm publish --workspace=@nexgrid/core --access public || echo "@nexgrid/core already published or up-to-date"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nexgrid/vanilla
-        run: npm publish --workspace=@nexgrid/vanilla --access public || echo "@nexgrid/vanilla already published or up-to-date"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nexgrid/react
-        run: npm publish --workspace=@nexgrid/react --access public || echo "@nexgrid/react already published or up-to-date"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @nexgrid/angular
+      - name: Publish NPM packages
         run: |
-          cd packages/angular/dist
-          npm publish --access public || echo "@nexgrid/angular already published or up-to-date"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN secret is not set in GitHub Repository Secrets."
+            exit 1
+          fi
 
-      - name: Publish @nexgrid/vue
-        run: npm publish --workspace=@nexgrid/vue --access public || echo "@nexgrid/vue already published or up-to-date"
+          for pkg_dir in \
+            packages/core \
+            packages/vanilla \
+            packages/react \
+            packages/angular/dist \
+            packages/vue; do
+            pkg_name=$(node -p "require('./${pkg_dir}/package.json').name")
+            pkg_version=$(node -p "require('./${pkg_dir}/package.json').version")
+            if [ "$(npm view "${pkg_name}@${pkg_version}" version 2>/dev/null || true)" = "${pkg_version}" ]; then
+              echo "${pkg_name}@${pkg_version} is already published on npm — skipping."
+            else
+              echo "Publishing ${pkg_name}@${pkg_version}..."
+              npm publish "./${pkg_dir}" --access public
+            fi
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -89,11 +88,19 @@ jobs:
 
       - name: NuGet Login (Trusted Publishing / OIDC)
         id: login
+        continue-on-error: true
         uses: NuGet/login@v1
         with:
           user: ChhaganSinha
 
       - name: Push to NuGet.org
         run: |
-          dotnet nuget push ./nupkg/*.nupkg --api-key "${{ steps.login.outputs.NUGET_API_KEY || secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          set -euo pipefail
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "::error::NuGet authentication failed: neither NuGet OIDC login nor NUGET_API_KEY secret produced an API key."
+            exit 1
+          fi
+          dotnet nuget push ./nupkg/*.nupkg --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY || secrets.NUGET_API_KEY }}
 
